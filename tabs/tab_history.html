@@ -1,0 +1,18 @@
+<!-- HISTORY -->
+<div id="history-view">
+  <div class="hist-filters">
+    <button class="hist-filter-chip active" onclick="filterHist('all',this)">All time</button>
+    <button class="hist-filter-chip" onclick="filterHist('week',this)">This week</button>
+    <button class="hist-filter-chip" onclick="filterHist('month',this)">This month</button>
+    <button class="hist-filter-chip" onclick="filterHist('good',this)">🔥 Good days (≥75%)</button>
+    <button class="hist-filter-chip" onclick="filterHist('bad',this)">💪 Low days (&lt;40%)</button>
+    <button class="hist-filter-chip" onclick="filterHist('gym',this)">🏋️ Gym days</button>
+    <button class="hist-filter-chip" onclick="filterHist('social',this)">🎉 Social days</button>
+    <button class="hist-filter-chip" onclick="filterHist('spent',this)">💸 Spending days</button>
+    <button class="hist-filter-chip" onclick="filterHist('events',this)">📅 Has events</button>
+    <button class="hist-filter-chip" onclick="filterHist('sleep',this)">😴 Sleep logged</button>
+  </div>
+  <div class="hist-list" id="histList"></div>
+</div>
+
+</div><!-- /app -->

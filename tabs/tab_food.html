@@ -1,0 +1,278 @@
+<!-- FOOD -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--amberL)">🍽️</div>
+        <div><div class="card-title">Food & Nutrition</div><div class="card-sub">What fueled you?</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Food type</div>
+        <div class="chips" id="food-chips">
+          <button class="chip" data-v="homemade" onclick="pick('food','homemade',this,'sage')">🥗 Homemade</button>
+          <button class="chip" data-v="healthy_out" onclick="pick('food','healthy_out',this,'sky')">🥙 Healthy out</button>
+          <button class="chip" data-v="junk" onclick="pick('food','junk',this,'coral')">🍔 Junk food</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Soda today?</div>
+        <div class="chips" id="soda-chips">
+          <button class="chip" data-v="false" onclick="pick('soda',false,this,'sage')">💧 No soda</button>
+          <button class="chip" data-v="true" onclick="pick('soda',true,this,'coral')">🥤 Had soda</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Fruits/veggies today?</div>
+        <div class="chips" id="fruitveg-chips">
+          <button class="chip" data-v="false" onclick="pick('fruit_veg',false,this,'coral')">🚫 No</button>
+          <button class="chip" data-v="true" onclick="pick('fruit_veg',true,this,'sage')">🍎 Yes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALORIES -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--amberL)">🔥</div>
+        <div><div class="card-title">Calories</div><div class="card-sub">Target ~1500 kcal (deficit)</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets" id="cal-presets">
+          <button class="preset" onclick="setSmartVal('calories',1200,this)">1200</button>
+          <button class="preset" onclick="setSmartVal('calories',1500,this)">1500</button>
+          <button class="preset" onclick="setSmartVal('calories',1800,this)">1800</button>
+          <button class="preset" onclick="setSmartVal('calories',2000,this)">2000</button>
+          <button class="preset" onclick="setSmartVal('calories',2200,this)">2200</button>
+          <button class="preset" onclick="setSmartVal('calories',2400,this)">2400</button>
+          <button class="preset" onclick="setSmartVal('calories',2700,this)">2700</button>
+          <button class="preset" onclick="setSmartVal('calories',3000,this)">3000</button>
+          <button class="preset" onclick="setSmartVal('calories',3500,this)">3500</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="cal-slider" min="500" max="5000" step="50" value="1500" oninput="syncSlider('calories',this.value)"/>
+          <div><div class="smart-num" id="cal-display">1500</div><div class="smart-unit">kcal</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROTEIN -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--sageL)">💪</div>
+        <div><div class="card-title">Protein</div><div class="card-sub">Target 176g (2g/kg)</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('protein',60,this)">60g</button>
+          <button class="preset" onclick="setSmartVal('protein',80,this)">80g</button>
+          <button class="preset" onclick="setSmartVal('protein',100,this)">100g</button>
+          <button class="preset" onclick="setSmartVal('protein',130,this)">130g</button>
+          <button class="preset" onclick="setSmartVal('protein',150,this)">150g</button>
+          <button class="preset" onclick="setSmartVal('protein',176,this)">176g</button>
+          <button class="preset" onclick="setSmartVal('protein',200,this)">200g</button>
+          <button class="preset" onclick="setSmartVal('protein',220,this)">220g</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="prot-slider" min="0" max="300" step="5" value="100" oninput="syncSlider('protein',this.value)"/>
+          <div><div class="smart-num" id="prot-display">100</div><div class="smart-unit">g</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEIGHT -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--skyL)">⚖️</div>
+        <div><div class="card-title">Body Weight</div><div class="card-sub">Daily weigh-in</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('weight',80,this)">80</button>
+          <button class="preset" onclick="setSmartVal('weight',82,this)">82</button>
+          <button class="preset" onclick="setSmartVal('weight',84,this)">84</button>
+          <button class="preset" onclick="setSmartVal('weight',86,this)">86</button>
+          <button class="preset" onclick="setSmartVal('weight',87,this)">87</button>
+          <button class="preset" onclick="setSmartVal('weight',88,this)">88</button>
+          <button class="preset" onclick="setSmartVal('weight',89,this)">89</button>
+          <button class="preset" onclick="setSmartVal('weight',90,this)">90</button>
+          <button class="preset" onclick="setSmartVal('weight',92,this)">92</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="wt-slider" min="70" max="120" step="0.5" value="88" oninput="syncSlider('weight',this.value)"/>
+          <div><div class="smart-num" id="wt-display">88</div><div class="smart-unit">kg</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOOD & PAIN -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--roseL)">🧠</div>
+        <div><div class="card-title">Mind & Body</div><div class="card-sub">How are you feeling?</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Mood <span id="moodVal" style="color:var(--sage);font-size:16px">5</span>/10</div>
+        <div class="mood-row">
+          <span style="font-size:16px">😞</span>
+          <input type="range" class="mood-slider mood" id="mood" min="1" max="10" value="5" oninput="document.getElementById('moodVal').textContent=this.value;autoSave()"/>
+          <span style="font-size:16px">😄</span>
+        </div>
+        <div class="mood-emoji-row" style="font-size:11px;color:var(--text3)"><span>Low</span><span>Neutral</span><span>High</span></div>
+      </div>
+      <div class="fgroup" style="margin:0">
+        <div class="flabel">Pain level <span id="painVal" style="color:var(--rose);font-size:16px">3</span>/10</div>
+        <div class="mood-row">
+          <span style="font-size:16px">💚</span>
+          <input type="range" class="mood-slider pain" id="pain" min="1" max="10" value="3" oninput="document.getElementById('painVal').textContent=this.value;autoSave()"/>
+          <span style="font-size:16px">🔴</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STUDY -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--plumL)">📚</div>
+        <div><div class="card-title">University Study</div><div class="card-sub">Academic grind</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('uni_study_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',120,this)">2h</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',180,this)">3h</button>
+          <button class="preset" onclick="setSmartVal('uni_study_mins',240,this)">4h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="uni-slider" min="0" max="480" step="15" value="0" oninput="syncSlider('uni_study_mins',this.value)"/>
+          <div><div class="smart-num" id="uni-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAR COURSES -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--amberL)">🚗</div>
+        <div><div class="card-title">Car Courses</div><div class="card-sub">Automotive learning</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('car_courses_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('car_courses_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="car-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('car_courses_mins',this.value)"/>
+          <div><div class="smart-num" id="car-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELF DEV -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--skyL)">🌱</div>
+        <div><div class="card-title">Self Development</div><div class="card-sub">Invest in yourself</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('selfdev_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('selfdev_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="dev-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('selfdev_mins',this.value)"/>
+          <div><div class="smart-num" id="dev-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELLNESS -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--roseL)">✨</div>
+        <div><div class="card-title">Wellness Routine</div><div class="card-sub">Skin & health habits</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Skincare routine</div>
+        <div class="chips" id="skincare-chips">
+          <button class="chip" data-v="none" onclick="pick('skincare','none',this,'coral')">❌ Skipped</button>
+          <button class="chip" data-v="half" onclick="pick('skincare','half',this,'amber')">🫧 Half done</button>
+          <button class="chip" data-v="full" onclick="pick('skincare','full',this,'sage')">✨ Full routine</button>
+        </div>
+      </div>
+      <div class="toggle-row" style="border-top:1.5px solid var(--cream2);padding-top:12px;margin-top:4px;">
+        <div>
+          <div class="toggle-text">💊 Pills taken</div>
+          <div class="toggle-sub">Daily medication</div>
+        </div>
+        <label class="sw"><input type="checkbox" id="pills" onchange="autoSave()"><span class="sw-track"></span></label>
+      </div>
+    </div>
+
+    <!-- TEETH + MEDITATION -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--skyL)">🪥</div>
+        <div><div class="card-title">Habits</div><div class="card-sub">Teeth & meditation</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Teeth brushed today</div>
+        <div class="chips" id="teeth-chips">
+          <button class="chip" data-v="0" onclick="pick('teeth_brushed',0,this,'coral')">0× None</button>
+          <button class="chip" data-v="1" onclick="pick('teeth_brushed',1,this,'amber')">1× Once</button>
+          <button class="chip" data-v="2" onclick="pick('teeth_brushed',2,this,'sage')">2× Twice ✓</button>
+        </div>
+      </div>
+      <div class="toggle-row" style="border-top:1.5px solid var(--cream2);padding-top:12px;margin-top:4px;">
+        <div>
+          <div class="toggle-text">🧘 Meditated today</div>
+          <div class="toggle-sub">Any mindfulness practice</div>
+        </div>
+        <label class="sw"><input type="checkbox" id="meditated" onchange="autoSave()"><span class="sw-track"></span></label>
+      </div>
+    </div>
+
+    <!-- SOCIAL -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--amberL)">🤝</div>
+        <div><div class="card-title">Social Life</div><div class="card-sub">Don't ghost the world!</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Did you socialize?</div>
+        <div class="chips" id="social-chips">
+          <button class="chip" data-v="none" onclick="pick('socialized','none',this,'coral')">🏠 Solo day</button>
+          <button class="chip" data-v="chat" onclick="pick('socialized','chat',this,'amber')">💬 Chatted online</button>
+          <button class="chip" data-v="irl" onclick="pick('socialized','irl',this,'sage')">🎉 Met in person</button>
+        </div>
+      </div>
+      <div class="fgroup" style="margin:0">
+        <div class="flabel">30-day social streak</div>
+        <div class="streak-dots" id="streakDots"></div>
+      </div>
+    </div>
+
+    <!-- SAVE -->
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:var(--text2)">All set for today?</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px;">Auto-saves as you go</div>
+      </div>
+      <button class="save-btn" onclick="saveAll()">✓ Save Today's Log</button>
+    </div>
+
+  </div><!-- /sections -->
+</div><!-- /today -->
+

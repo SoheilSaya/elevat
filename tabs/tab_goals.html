@@ -1,0 +1,511 @@
+<!-- ══════════════════════════════════════════════════════
+     GOALS TAB  —  tab_goals.html
+     Inject into index.html where other tab views live.
+     Show/hide with: document.getElementById('goals-view')
+     Nav button: data-tab="goals"
+     ══════════════════════════════════════════════════════ -->
+
+<style>
+/* ── Goal tab specific styles ──────────────────────── */
+#goals-view { display:none; }
+
+.goals-hero {
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:16px;
+  margin-bottom:28px;
+  animation: fadeUp .4s ease .05s both;
+}
+.goal-stat-card {
+  background:#fff;
+  border:1.5px solid var(--warm);
+  border-radius:var(--r);
+  padding:20px 18px;
+  box-shadow:var(--shadow);
+  text-align:center;
+}
+.goal-stat-num {
+  font-family:'Fraunces',serif;
+  font-size:36px;
+  font-weight:700;
+  color:var(--ink);
+  line-height:1;
+}
+.goal-stat-label {
+  font-size:11px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-top:6px;
+  font-weight:600;
+}
+.goal-stat-sub {
+  font-size:12px;
+  color:var(--text2);
+  margin-top:4px;
+}
+
+.goals-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.goals-filters {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.gf-chip {
+  padding:7px 16px;
+  border-radius:50px;
+  border:1.5px solid var(--cream3);
+  background:#fff;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .15s;
+  color:var(--text2);
+}
+.gf-chip.active { background:var(--ink); border-color:var(--ink); color:#fff; }
+
+.goal-add-btn {
+  padding:10px 22px;
+  border-radius:50px;
+  border:none;
+  background:linear-gradient(135deg, var(--coral), var(--rose));
+  color:#fff;
+  font-family:'Bricolage Grotesque',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 3px 14px rgba(232,93,58,.3);
+  transition:all .2s;
+  white-space:nowrap;
+}
+.goal-add-btn:hover { transform:translateY(-2px); box-shadow:0 6px 22px rgba(232,93,58,.4); }
+
+/* Goal cards grid */
+.goals-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap:18px;
+}
+
+.goal-card {
+  background:#fff;
+  border:1.5px solid var(--warm);
+  border-radius:var(--r);
+  padding:22px;
+  box-shadow:var(--shadow);
+  transition:all .2s;
+  animation:fadeUp .35s ease both;
+  position:relative;
+  overflow:hidden;
+}
+.goal-card:hover { border-color:var(--warmD); transform:translateY(-2px); box-shadow:var(--shadow2); }
+
+.goal-card-accent {
+  position:absolute;
+  top:0; left:0; right:0;
+  height:3px;
+  border-radius:var(--r) var(--r) 0 0;
+}
+
+.goal-card-top {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:14px;
+}
+.goal-card-title {
+  font-family:'Fraunces',serif;
+  font-size:17px;
+  font-weight:700;
+  color:var(--ink);
+  line-height:1.3;
+  flex:1;
+  padding-right:10px;
+}
+.goal-card-actions {
+  display:flex;
+  gap:6px;
+  flex-shrink:0;
+}
+.goal-icon-btn {
+  width:30px; height:30px;
+  border-radius:8px;
+  border:1.5px solid var(--cream3);
+  background:transparent;
+  cursor:pointer;
+  font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+  color:var(--text3);
+}
+.goal-icon-btn:hover { background:var(--coralL); border-color:var(--coral); color:var(--coral); }
+.goal-icon-btn.done-btn:hover { background:var(--sageL); border-color:var(--sage); color:var(--sage); }
+
+.goal-tags {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.goal-tag {
+  padding:3px 10px;
+  border-radius:50px;
+  font-size:11px;
+  font-weight:600;
+}
+.goal-tag.importance-high { background:var(--coralL); color:var(--coral); }
+.goal-tag.importance-med  { background:var(--amberL); color:var(--amber); }
+.goal-tag.importance-low  { background:var(--sageL);  color:var(--sage); }
+.goal-tag.diff-hard   { background:var(--plumL); color:var(--plum); }
+.goal-tag.diff-medium { background:var(--skyL);  color:var(--sky); }
+.goal-tag.diff-easy   { background:var(--sageL); color:var(--sage); }
+.goal-tag.status-done { background:var(--sageL); color:var(--sage); }
+.goal-tag.status-active { background:var(--skyL); color:var(--sky); }
+.goal-tag.status-paused { background:var(--amberL); color:var(--amber); }
+.goal-tag.cat-financial   { background:var(--sageL);  color:var(--sage); }
+.goal-tag.cat-professional{ background:var(--skyL);   color:var(--sky); }
+.goal-tag.cat-looks       { background:var(--roseL);  color:var(--rose); }
+.goal-tag.cat-social      { background:var(--amberL); color:var(--amber); }
+
+.goal-meta-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:14px;
+}
+.goal-meta-item {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:10px 12px;
+}
+.goal-meta-label {
+  font-size:10px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  font-weight:600;
+  margin-bottom:3px;
+}
+.goal-meta-val {
+  font-family:'Fraunces',serif;
+  font-size:15px;
+  font-weight:600;
+  color:var(--ink);
+}
+
+/* Progress bar on card */
+.goal-progress-wrap { margin-bottom:10px; }
+.goal-progress-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:6px;
+}
+.goal-progress-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+.goal-progress-pct { font-family:'Fraunces',serif; font-size:15px; font-weight:700; color:var(--ink); }
+.goal-progress-bar {
+  height:6px;
+  background:var(--cream3);
+  border-radius:6px;
+  overflow:hidden;
+}
+.goal-progress-fill {
+  height:100%;
+  border-radius:6px;
+  transition:width .6s;
+}
+
+.goal-notes {
+  font-size:12px;
+  color:var(--text2);
+  line-height:1.6;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1.5px solid var(--cream2);
+  font-style:italic;
+}
+
+.goal-deadline-pill {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:11px;
+  font-weight:600;
+  padding:4px 10px;
+  border-radius:50px;
+  margin-top:8px;
+}
+.goal-deadline-pill.on-track { background:var(--sageL); color:var(--sage); }
+.goal-deadline-pill.at-risk  { background:var(--amberL); color:var(--amber); }
+.goal-deadline-pill.overdue  { background:var(--coralL); color:var(--coral); }
+.goal-deadline-pill.done     { background:var(--sageL); color:var(--sage); }
+
+.goals-empty {
+  grid-column:1/-1;
+  text-align:center;
+  padding:80px 20px;
+  color:var(--text3);
+}
+.goals-empty-icon { font-size:56px; margin-bottom:16px; display:block; }
+.goals-empty-title { font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--text2); margin-bottom:8px; }
+.goals-empty-sub { font-size:14px; }
+
+/* ── Goal Modal ─────────────────────────────────────── */
+#goalModalOverlay .modal {
+  max-width:560px;
+  max-height:88vh;
+  overflow-y:auto;
+  width:95%;
+}
+.goal-modal-section {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:14px 16px;
+  margin-bottom:14px;
+  border:1.5px solid var(--cream3);
+}
+.goal-modal-section-title {
+  font-size:11px;
+  font-weight:700;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-bottom:10px;
+}
+.goal-form-row {
+  display:grid;
+  gap:10px;
+  margin-bottom:10px;
+}
+.goal-form-row.cols2 { grid-template-columns:1fr 1fr; }
+.goal-form-row.cols3 { grid-template-columns:1fr 1fr 1fr; }
+.goal-chip-group { display:flex; gap:6px; flex-wrap:wrap; }
+.goal-chip-sel {
+  padding:7px 14px;
+  border-radius:50px;
+  border:1.5px solid var(--cream3);
+  background:#fff;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .15s;
+  color:var(--text2);
+}
+.goal-chip-sel.active { background:var(--coral); border-color:var(--coral); color:#fff; }
+.goal-chip-sel.sage.active { background:var(--sage); border-color:var(--sage); }
+.goal-chip-sel.amber.active { background:var(--amber); border-color:var(--amber); }
+.goal-chip-sel.plum.active { background:var(--plum); border-color:var(--plum); }
+.goal-chip-sel.sky.active { background:var(--sky); border-color:var(--sky); }
+</style>
+
+<div id="goals-view">
+  <!-- ── Stats hero ──────────────────────── -->
+  <div class="goals-hero" id="goalsHero">
+    <div class="goal-stat-card">
+      <div class="goal-stat-num" id="gStatTotal">0</div>
+      <div class="goal-stat-label">Total Goals</div>
+      <div class="goal-stat-sub">across all categories</div>
+    </div>
+    <div class="goal-stat-card">
+      <div class="goal-stat-num" style="color:var(--sage)" id="gStatDone">0</div>
+      <div class="goal-stat-label">Achieved ✅</div>
+      <div class="goal-stat-sub" id="gStatDonePct">— % completion</div>
+    </div>
+    <div class="goal-stat-card">
+      <div class="goal-stat-num" style="color:var(--coral)" id="gStatActive">0</div>
+      <div class="goal-stat-label">Active Now 🔥</div>
+      <div class="goal-stat-sub">in progress</div>
+    </div>
+    <div class="goal-stat-card">
+      <div class="goal-stat-num" style="color:var(--amber)" id="gStatBudget">0</div>
+      <div class="goal-stat-label">Total Budget</div>
+      <div class="goal-stat-sub" id="gStatBudgetUnit">Million T</div>
+    </div>
+  </div>
+
+  <!-- ── Toolbar ─────────────────────────── -->
+  <div class="goals-toolbar">
+    <div class="goals-filters" id="goalsFilters">
+      <button class="gf-chip active" onclick="setGoalFilter('all',this)">All</button>
+      <button class="gf-chip" onclick="setGoalFilter('active',this)">Active</button>
+      <button class="gf-chip" onclick="setGoalFilter('done',this)">Done</button>
+      <button class="gf-chip" onclick="setGoalFilter('paused',this)">Paused</button>
+      <button class="gf-chip" onclick="setGoalFilter('high',this)">🔴 High Priority</button>
+      <button class="gf-chip" onclick="setGoalFilter('financial',this)">💰 Financial</button>
+      <button class="gf-chip" onclick="setGoalFilter('professional',this)">💼 Professional</button>
+      <button class="gf-chip" onclick="setGoalFilter('looks',this)">✨ Looks</button>
+      <button class="gf-chip" onclick="setGoalFilter('social',this)">🤝 Social</button>
+    </div>
+    <button class="goal-add-btn" onclick="openGoalModal()">+ New Goal</button>
+  </div>
+
+  <!-- ── Cards grid ─────────────────────── -->
+  <div class="goals-grid" id="goalsGrid">
+    <div class="goals-empty">
+      <span class="goals-empty-icon">🎯</span>
+      <div class="goals-empty-title">No goals yet</div>
+      <div class="goals-empty-sub">Add your first goal to start tracking your journey.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GOAL MODAL
+══════════════════════════════════════════ -->
+<div class="overlay" id="goalModalOverlay">
+  <div class="modal">
+    <h3 id="goalModalTitle">🎯 New Goal</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:18px;">Define your goal, set its importance, difficulty and when you plan to reach it.</p>
+
+    <!-- Title & Category -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Goal Details</div>
+      <div class="goal-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Goal title *</div>
+          <input type="text" class="modal-input" id="gTitle" placeholder="e.g. Run a marathon, Learn Spanish..." style="margin:0;width:100%;"/>
+        </div>
+      </div>
+      <div class="goal-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Description / notes</div>
+          <textarea class="modal-input" id="gNotes" rows="2" placeholder="Why does this matter? What's your plan?" style="margin:0;width:100%;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Category</div>
+      <div class="goal-chip-group" id="gCategoryGroup">
+        <button class="goal-chip-sel sage active" data-val="financial" onclick="selectGoalChip('gCategoryGroup',this)">💰 Financial</button>
+        <button class="goal-chip-sel sky" data-val="professional" onclick="selectGoalChip('gCategoryGroup',this)">💼 Professional</button>
+        <button class="goal-chip-sel" data-val="looks" onclick="selectGoalChip('gCategoryGroup',this)">✨ Looks</button>
+        <button class="goal-chip-sel amber" data-val="social" onclick="selectGoalChip('gCategoryGroup',this)">🤝 Social</button>
+      </div>
+    </div>
+
+    <!-- Importance & Difficulty -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Importance &amp; Difficulty</div>
+      <div class="goal-form-row cols2">
+        <div>
+          <div class="builder-label" style="margin-bottom:8px;">Importance</div>
+          <div class="goal-chip-group" id="gImportanceGroup">
+            <button class="goal-chip-sel" data-val="low" onclick="selectGoalChip('gImportanceGroup',this)">🟢 Low</button>
+            <button class="goal-chip-sel amber active" data-val="medium" onclick="selectGoalChip('gImportanceGroup',this)">🟡 Medium</button>
+            <button class="goal-chip-sel" data-val="high" onclick="selectGoalChip('gImportanceGroup',this)">🔴 High</button>
+          </div>
+        </div>
+        <div>
+          <div class="builder-label" style="margin-bottom:8px;">Difficulty</div>
+          <div class="goal-chip-group" id="gDiffGroup">
+            <button class="goal-chip-sel sage" data-val="easy" onclick="selectGoalChip('gDiffGroup',this)">😌 Easy</button>
+            <button class="goal-chip-sel sky active" data-val="medium" onclick="selectGoalChip('gDiffGroup',this)">💪 Medium</button>
+            <button class="goal-chip-sel plum" data-val="hard" onclick="selectGoalChip('gDiffGroup',this)">🔥 Hard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Timeline (Jalali)</div>
+      <div class="goal-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Target date</div>
+          <div id="gTargetDatePicker"></div>
+          <input type="hidden" id="gTargetDateIso"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">When you think you'll reach this goal</div>
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- Status -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Resources</div>
+      <div class="goal-form-row cols2">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">💰 Money needed (total)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="modal-input" id="gMoney" placeholder="0" min="0" style="margin:0;flex:1;" oninput="goalsUpdateProgressMode()"/>
+            <select class="builder-select" id="gMoneyUnit" style="font-size:12px;padding:10px 8px;">
+              <option value="KT">K Tomans</option>
+              <option value="MT">M Tomans</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">💰 Money saved/spent so far</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="modal-input" id="gMoneySpent" placeholder="0" min="0" style="margin:0;flex:1;" oninput="goalsUpdateProgressMode()"/>
+            <span class="builder-label" id="gMoneySpentUnit" style="white-space:nowrap;min-width:60px;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="goal-form-row cols2">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">⏱️ Time needed (total hrs)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="modal-input" id="gTime" placeholder="0" min="0" style="margin:0;flex:1;" oninput="goalsUpdateProgressMode()"/>
+            <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs total</span>
+          </div>
+        </div>
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">⏱️ Hours logged so far</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="modal-input" id="gTimeSpent" placeholder="0" min="0" style="margin:0;flex:1;" oninput="goalsUpdateProgressMode()"/>
+            <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-derived progress indicator (shown when resource tracking active) -->
+      <div id="gAutoProgressWrap" style="display:none;margin-top:6px;padding:10px 12px;background:var(--cream2);border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Auto progress</span>
+          <span id="gAutoProgressPct" style="font-size:15px;font-weight:700;color:var(--ink);">0%</span>
+        </div>
+        <div style="height:6px;background:var(--cream3);border-radius:3px;overflow:hidden;">
+          <div id="gAutoProgressBar" style="height:100%;width:0%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
+        </div>
+        <div id="gAutoProgressNote" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
+      </div>
+
+      <!-- Manual progress (shown only when no trackable resource) -->
+      <div id="gManualProgressWrap" style="margin-top:10px;">
+        <div class="builder-label" style="margin-bottom:8px;">Progress (manual, 0 – 100%)</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="range" class="smart-slider" id="gProgress" min="0" max="100" value="0"
+            oninput="document.getElementById('gProgressVal').textContent=this.value+'%'" style="flex:1;"/>
+          <span class="smart-num" id="gProgressVal" style="min-width:44px;text-align:right;">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="goal-modal-section">
+      <div class="goal-modal-section-title">Status</div>
+      <div class="goal-chip-group" id="gStatusGroup">
+        <button class="goal-chip-sel sky active" data-val="active" onclick="selectGoalChip('gStatusGroup',this)">▶ Active</button>
+        <button class="goal-chip-sel amber" data-val="paused" onclick="selectGoalChip('gStatusGroup',this)">⏸ Paused</button>
+        <button class="goal-chip-sel sage" data-val="done" onclick="selectGoalChip('gStatusGroup',this)">✅ Done</button>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeGoalModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveGoal()">Save Goal</button>
+    </div>
+  </div>
+</div>

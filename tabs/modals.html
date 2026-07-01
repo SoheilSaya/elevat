@@ -1,0 +1,201 @@
+
+
+<!-- Score Breakdown Modal -->
+<div class="overlay" id="scoreBreakdownOverlay">
+  <div class="modal" style="max-width:520px;max-height:80vh;overflow-y:auto;">
+    <h3>📊 How Scoring Works</h3>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">Total 100 points across all categories. Here's what each thing is worth:</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="background:var(--sageL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🏋️ Gym Session — 20 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full session: <b>20 pts</b> · Half session: <b>10 pts</b> · Rest day: <b>0 pts</b> · Skipped (should've gone): <b>−5 pts penalty</b></div>
+      </div>
+      <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🏠 Home Exercise — 10 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full session: <b>10 pts</b> · Light / Short: <b>5 pts</b> · None: <b>0 pts</b> (no penalty)</div>
+      </div>
+      <div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🍽️ Food — 12 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Homemade: <b>12 pts</b> · Healthy out: <b>8 pts</b> · Junk food: <b>2 pts</b></div>
+      </div>
+      <div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🔥 Calories + 💪 Protein — 10 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Calories near 1500 target: up to <b>5 pts</b> · Protein near 176g target: up to <b>5 pts</b></div>
+      </div>
+      <div style="background:var(--plumL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">📚 Study — 28 pts total</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Uni study: up to <b>12 pts</b> (full at 2h) · Car courses: up to <b>8 pts</b> (full at 1h) · Self dev: up to <b>8 pts</b> (full at 1h)</div>
+      </div>
+      <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">💊 Pills + ⚖️ Weight — 10 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Pills taken: <b>8 pts</b> · Weight logged: <b>2 pts</b></div>
+      </div>
+      <div style="background:var(--roseL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--rose);margin-bottom:6px;">✨ Skincare — 6 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full routine: <b>6 pts</b> · Half done: <b>3 pts</b> · Skipped: <b>0 pts</b></div>
+      </div>
+      <div style="background:var(--sageL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🧠 Mood + Pain — 11 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Mood (1–10): up to <b>6 pts</b> · Low pain score: up to <b>5 pts</b></div>
+      </div>
+<div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
+  <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🤝 Social + 💧 No Soda + 🍎 Fruit/Veg — 16 pts</div>
+  <div style="font-size:12px;color:var(--text2);line-height:1.7;">Met IRL: <b>8 pts</b> · Chatted: <b>4 pts</b> · Solo: <b>0 pts</b> · No soda: <b>4 pts</b> · Fruit/veg: <b>4 pts</b></div>
+</div>
+      <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🪥 Teeth + 🧘 Meditation — 8 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Brushed twice: <b>4 pts</b> · Once: <b>2 pts</b> · Meditated: <b>4 pts</b></div>
+      </div>
+      <div style="background:var(--plumL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">😴 Sleep — 6 pts</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Sleeping before midnight + waking 7–9am = up to <b>6 pts</b></div>
+      </div>
+    </div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="btn-ok" onclick="document.getElementById('scoreBreakdownOverlay').classList.remove('open')">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="overlay" id="adalOverlay">
+  <div class="modal">
+    <h3>💉 Adalimumab Reminder</h3>
+    <p>Enter the date of your <strong>last injection</strong> and how many days until the next one (usually 14). The app will show a countdown and alert you when it's due.</p>
+    <div class="builder-label" style="margin-bottom:6px;">Date of last injection</div>
+    <input type="date" class="modal-input" id="adalDate"/>
+    <div class="builder-label" style="margin-bottom:6px;">Days between injections</div>
+    <input type="number" class="modal-input" id="adalInterval" value="14" min="7" max="30"/>
+    <div style="background:var(--amberL);border-radius:var(--r2);padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:4px;">
+      ⚠️ Always follow your doctor's prescribed schedule. This is just a reminder tool.
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeAdal()">Cancel</button>
+      <button class="btn-ok" onclick="saveAdal()">Save Reminder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day spending modal -->
+<div class="overlay" id="daySpendOverlay">
+  <div class="modal" style="max-width:520px;width:95%">
+    <h3 id="dayModalTitle">💸 Day Spending</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Log spending and income by tag. Each unit = 1,000 Tomans.</p>
+
+    <!-- Tag entries list -->
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">🧾 Expenses</div>
+    <div id="dayTagEntries" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+
+    <!-- Add tag row -->
+    <div id="dayAddTagRow" style="background:var(--cream2);border-radius:var(--r2);padding:12px;border:1.5px solid var(--cream3);margin-bottom:18px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Add spending by category</div>
+      <div style="display:grid;grid-template-columns:1fr 140px auto;gap:8px;align-items:center;">
+        <select class="builder-select" id="dayTagSelect" style="font-size:13px;"></select>
+        <input type="number" class="modal-input" id="dayTagAmount" placeholder="Amount (K T)" min="0" style="margin:0;"/>
+        <button class="m-btn" onclick="addDayTagEntry()" style="height:38px;white-space:nowrap;">+ Add</button>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;" id="dayAmtPresets">
+        <button class="preset" onclick="setTagPreset(50)">50</button>
+        <button class="preset" onclick="setTagPreset(100)">100</button>
+        <button class="preset" onclick="setTagPreset(150)">150</button>
+        <button class="preset" onclick="setTagPreset(200)">200</button>
+        <button class="preset" onclick="setTagPreset(300)">300</button>
+        <button class="preset" onclick="setTagPreset(500)">500</button>
+        <button class="preset" onclick="setTagPreset(750)">750</button>
+        <button class="preset" onclick="setTagPreset(1000)">1,000</button>
+        <button class="preset" onclick="setTagPreset(2000)">2,000</button>
+      </div>
+    </div>
+
+    <!-- Income entries list -->
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">💰 Income</div>
+    <div id="dayIncomeEntries" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+
+    <!-- Add income row -->
+    <div id="dayAddIncomeRow" style="background:var(--cream2);border-radius:var(--r2);padding:12px;border:1.5px solid var(--cream3);margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Add income by source</div>
+      <div style="display:grid;grid-template-columns:1fr 140px auto;gap:8px;align-items:center;">
+        <select class="builder-select" id="dayIncomeTagSelect" style="font-size:13px;"></select>
+        <input type="number" class="modal-input" id="dayIncomeAmount" placeholder="Amount (K T)" min="0" style="margin:0;"/>
+        <button class="m-btn sage" onclick="addDayIncomeEntry()" style="height:38px;white-space:nowrap;">+ Add</button>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;" id="dayIncomeAmtPresets">
+        <button class="preset" onclick="setIncomePreset(100)">100</button>
+        <button class="preset" onclick="setIncomePreset(300)">300</button>
+        <button class="preset" onclick="setIncomePreset(500)">500</button>
+        <button class="preset" onclick="setIncomePreset(1000)">1,000</button>
+        <button class="preset" onclick="setIncomePreset(2000)">2,000</button>
+        <button class="preset" onclick="setIncomePreset(5000)">5,000</button>
+        <button class="preset" onclick="setIncomePreset(10000)">10,000</button>
+      </div>
+    </div>
+
+    <!-- Total & limit -->
+    <div id="dayTotalRow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);margin-bottom:8px;">
+      <span style="font-size:13px;font-weight:600;color:var(--text2);">Total spent today</span>
+      <span style="font-family:Fraunces,serif;font-size:20px;font-weight:700;color:var(--ink)" id="dayRunningTotal">0 K T</span>
+    </div>
+    <div id="dayIncomeTotalRow" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--sageL);border-radius:var(--r2);border:1.5px solid var(--cream3);margin-bottom:14px;">
+      <span style="font-size:13px;font-weight:600;color:var(--sage);">Total earned today</span>
+      <span style="font-family:Fraunces,serif;font-size:20px;font-weight:700;color:var(--sage)" id="dayRunningIncomeTotal">0 K T</span>
+    </div>
+    <div id="dayVsLimit" style="font-size:12px;padding:8px 12px;border-radius:8px;display:none;margin-bottom:12px;"></div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeDayModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveDaySpend()">Save Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tag edit modal (for both expense and income tags) -->
+<div class="overlay" id="tagEditOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="tagEditTitle">Edit Tag</h3>
+    <div class="builder-label" style="margin-bottom:6px;">Name</div>
+    <input type="text" class="modal-input" id="tagEditName" placeholder="Tag name" style="width:100%;margin-bottom:12px;"/>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+      <div style="flex:1;">
+        <div class="builder-label" style="margin-bottom:6px;">Emoji</div>
+        <input type="text" class="modal-input" id="tagEditIcon" placeholder="🏷️" style="width:100%;text-align:center;font-size:18px;margin:0;"/>
+      </div>
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Color</div>
+        <input type="color" id="tagEditColor" style="width:48px;height:42px;border-radius:8px;border:1.5px solid var(--cream3);cursor:pointer;padding:2px;background:var(--cream2);"/>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeTagEdit()">Cancel</button>
+      <button class="btn-ok" onclick="saveTagEdit()">Save Tag</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Food add-item modal -->
+<div class="overlay" id="foodItemOverlay">
+  <div class="modal food-modal">
+    <h3 id="foodItemTitle">Add to Meal</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Select ingredient and enter quantity.</p>
+    <div class="builder-label" style="margin-bottom:6px;">Ingredient</div>
+    <select class="builder-select" id="foodIngredientSelect" style="width:100%;margin-bottom:12px;font-size:14px;"></select>
+    <div class="builder-label" style="margin-bottom:6px;">Quantity</div>
+    <div class="qty-presets" id="qtyPresets"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input type="number" class="modal-input" id="foodQtyInput" placeholder="Amount" min="0" style="flex:1;margin:0;"/>
+      <div style="padding:10px 14px;background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);font-size:13px;font-weight:600;color:var(--text3);white-space:nowrap;" id="foodQtyUnit">g</div>
+    </div>
+    <div id="foodCustomUnitRow" style="display:none;margin-bottom:10px;">
+      <div class="builder-label" style="margin-bottom:6px;">Describe it <span style="font-size:10px;color:var(--text3);font-weight:400">(e.g. "10 inch pizza", "یک پرس چلوکباب")</span></div>
+      <input type="text" class="modal-input" id="foodCustomUnitInput" placeholder='10 inch pizza / یک پرس چلوکباب' style="width:100%;margin:0;"/>
+    </div>
+    <div class="builder-label" style="margin-bottom:6px;">Note (optional)</div>
+    <input type="text" class="modal-input" id="foodItemNote" placeholder="e.g. from Hani restaurant, homemade..." style="margin-bottom:4px;"/>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="btn-cancel" onclick="closeFoodItemModal()">Cancel</button>
+      <button class="btn-ok" onclick="confirmFoodItem()">Add to Meal</button>
+    </div>
+  </div>
+</div>
+
+

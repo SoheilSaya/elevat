@@ -1,0 +1,133 @@
+<!-- TODAY -->
+<div id="today-view">
+  <div class="editing-banner" id="editingBanner">
+    ✏️ <span id="editingBannerText">Editing a past day</span> — changes save to that date only.
+  </div>
+
+  <!-- STICKY NOTES (compact, top of page) -->
+  <div id="stickyPanel" style="margin-bottom:20px;background:linear-gradient(135deg,#fef9c3,#fef3b0);border:1.5px solid #f0c040;border-radius:var(--r2);padding:12px 16px;box-shadow:var(--shadow);">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="font-size:12px;font-weight:700;color:#7a5c00;white-space:nowrap;flex-shrink:0;">📌 Sticky Notes</div>
+      <div id="stickyList" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;"></div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <input type="text" id="stickyInput" placeholder="Add note..." maxlength="40"
+          style="width:140px;padding:6px 10px;border:1.5px solid #e0c040;border-radius:50px;background:rgba(255,255,255,0.7);font-size:12px;font-weight:500;outline:none;"
+          onkeydown="if(event.key==='Enter')addStickyNote()"/>
+        <button onclick="addStickyNote()" style="padding:6px 12px;border-radius:50px;border:none;background:#f0c040;color:#5a4000;font-weight:700;font-size:12px;cursor:pointer;">+</button>
+      </div>
+    </div>
+  </div>
+  <!-- HERO -->
+  <div class="hero">
+    <!-- Score ring -->
+    <div class="score-card">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 130 130" width="130" height="130">
+          <defs>
+            <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#e85d3a"/>
+              <stop offset="100%" stop-color="#3a7a5a"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="65" cy="65" r="52"/>
+          <circle class="ring-fg" id="ringFg" cx="65" cy="65" r="52" stroke-dasharray="326.726" stroke-dashoffset="326.726"/>
+        </svg>
+        <div class="ring-num">
+          <div class="ring-pct" id="ringPct">—</div>
+          <div class="ring-lbl">score</div>
+        </div>
+      </div>
+      <div class="score-emoji" id="scoreEmoji">🎯</div>
+      <div class="score-msg" id="scoreMsg">Start logging your day</div>
+      <button onclick="toggleScoreBreakdown()" style="margin-top:10px;padding:5px 12px;border-radius:50px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;color:var(--text3);cursor:pointer;">📊 Scoring</button>
+    </div>
+
+    <!-- Quick metrics -->
+    <div class="metrics-bar" id="metricsBar">
+      <div class="metric-row">
+        <div class="metric-icon" style="background:var(--amberL)">🔥</div>
+        <div class="metric-info">
+          <div class="metric-name">Calories</div>
+          <div class="metric-val" id="mCal">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="mCalBar" style="background:var(--amber);width:0%"></div></div>
+          <div id="mDeficit" style="font-size:11px;margin-top:4px;font-weight:600;color:var(--text3);"></div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-icon" style="background:var(--sageL)">💪</div>
+        <div class="metric-info">
+          <div class="metric-name">Protein</div>
+          <div class="metric-val" id="mProt">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="mProtBar" style="background:var(--sage2);width:0%"></div></div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-icon" style="background:var(--skyL)">⚖️</div>
+        <div class="metric-info">
+          <div class="metric-name">Weight</div>
+          <div class="metric-val" id="mWeight">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="mWeightBar" style="background:var(--sky);width:0%"></div></div>
+        </div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-icon" style="background:var(--plumL)">📚</div>
+        <div class="metric-info">
+          <div class="metric-name">Study Total</div>
+          <div class="metric-val" id="mStudy">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="mStudyBar" style="background:var(--plum);width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Adalimumab -->
+    <div class="adal-card" onclick="openAdal()">
+      <div class="adal-top">
+        <div class="adal-badge ok" id="adalBadge">💉</div>
+        <div>
+          <div class="adal-title" id="adalTitle">Adalimumab</div>
+          <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace" id="adalNextDate">Click to set up</div>
+        </div>
+      </div>
+      <div class="adal-msg" id="adalMsg">Injection reminder</div>
+      <div class="adal-progress"><div class="adal-progress-fill" id="adalBar" style="width:50%"></div></div>
+      <div class="adal-dates"><span id="adalFrom">—</span><span id="adalTo">—</span></div>
+    </div>
+  </div>
+
+  <!-- FORM SECTIONS -->
+  <div class="sections">
+
+    <!-- GYM -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--sageL)">🏋️</div>
+        <div><div class="card-title">Gym Session</div><div class="card-sub">How was the workout?</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Session type</div>
+        <div class="chips" id="gym-chips">
+          <button class="chip" data-v="none" onclick="pick('gym','none',this,'ink')">😴 Rest day</button>
+          <button class="chip" data-v="skipped" onclick="pick('gym','skipped',this,'rose')">❌ Skipped</button>
+          <button class="chip" data-v="half" onclick="pick('gym','half',this,'amber')">⚡ Half session</button>
+          <button class="chip" data-v="full" onclick="pick('gym','full',this,'sage')">🔥 Full session</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOME EXERCISE -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--skyL)">🏠</div>
+        <div><div class="card-title">Home Exercise</div><div class="card-sub">Stretching, calisthenics, yoga, walks…</div></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Did you exercise at home?</div>
+        <div class="chips" id="home-exercise-chips">
+          <button class="chip" data-v="none" onclick="pick('home_exercise','none',this,'ink')">😐 None</button>
+          <button class="chip" data-v="half" onclick="pick('home_exercise','half',this,'sky')">🌿 Light / Short</button>
+          <button class="chip" data-v="full" onclick="pick('home_exercise','full',this,'sage')">💪 Full session</button>
+        </div>
+      </div>
+    </div>
+
+    

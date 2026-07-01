@@ -1,0 +1,75 @@
+<!-- STATS -->
+<style>
+.builder-preview{background:var(--cream2);border:1.5px solid var(--warm2);border-radius:var(--r2);padding:18px 18px 8px;margin-bottom:20px;}
+.builder-preview-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:10px;}
+.builder-preview .chart-wrap{height:260px;}
+.builder-preview-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-family:'Fraunces',serif;font-size:14px;text-align:center;pointer-events:none;}
+.builder-row-top{margin-bottom:18px;}
+.builder-btn-row{display:flex;gap:8px;}
+.builder-btn-row .add-chart-btn{white-space:nowrap;}
+.builder-y-section{border-top:1.5px solid var(--warm2);padding-top:14px;margin-bottom:8px;}
+.builder-y-section .builder-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.builder-clear-link{background:none;border:none;color:var(--text3);font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;padding:0;text-decoration:underline;}
+.builder-clear-link:hover{color:var(--coral);}
+</style>
+<div id="stats-view">
+  <!-- Insights row -->
+  <div class="insights" id="insightsRow"></div>
+
+  <!-- Chart builder -->
+  <div class="chart-builder">
+    <div class="builder-title">Build Your Own Chart</div>
+    <div class="builder-sub">Every variable you track — mix anything, find correlations, spot patterns.</div>
+    <div class="builder-preview">
+      <div class="builder-preview-label">Live Preview</div>
+      <div class="chart-wrap" id="builderPreviewWrap">
+        <canvas id="builderPreviewCanvas"></canvas>
+      </div>
+    </div>
+    <div class="builder-row builder-row-top">
+      <div>
+        <div class="builder-label">Chart Type</div>
+        <select class="builder-select" id="b-type">
+          <option value="line">📈 Line</option>
+          <option value="bar">📊 Bar</option>
+          <option value="scatter">⚬ Scatter</option>
+          <option value="doughnut">🍩 Donut</option>
+        </select>
+      </div>
+      <div>
+        <div class="builder-label">X Axis / Category</div>
+        <select class="builder-select" id="b-x">
+          <option value="date">Date (time series)</option>
+          <option value="gym">Gym attendance</option>
+          <option value="food">Food type</option>
+          <option value="socialized">Social</option>
+          <option value="skincare">Skincare</option>
+          <option value="fruit_veg">Fruits/Veggies</option>
+        </select>
+      </div>
+      <div>
+        <div class="builder-label">Chart Title</div>
+        <input type="text" class="builder-select" id="b-title" placeholder="My Chart"/>
+      </div>
+      <div class="builder-btn-row">
+        <button class="add-chart-btn" onclick="addChart()">+ Add Chart</button>
+        <button class="add-chart-btn" onclick="addPresetCharts()" style="background:var(--sage)">↺ Load Presets</button>
+      </div>
+    </div>
+    <div class="builder-y-section">
+      <div class="builder-label">Y Axis Metrics <span style="font-weight:400;color:var(--text3)">(pick any)</span>
+        <button class="builder-clear-link" onclick="document.querySelectorAll('.b-y-check').forEach(c=>c.checked=false);updateBuilderPreview();">Clear selection</button>
+      </div>
+      <div class="b-y-grid" id="bYGrid">
+        <!-- injected by JS via renderMetricPicker() -->
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:4px;">💡 Scatter uses first two checked metrics as X vs Y axes.</div>
+  </div>
+
+  <div class="charts-grid" id="chartsGrid">
+    <div class="chart-empty" style="grid-column:1/-1;background:#fff;border-radius:var(--r);border:1.5px dashed var(--warm);font-family:'Fraunces',serif;font-size:15px;">
+      Add a chart above or click "Load Presets" to get started ✦
+    </div>
+  </div>
+</div><!-- /stats-view -->

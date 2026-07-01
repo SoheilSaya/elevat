@@ -1,0 +1,855 @@
+<!-- ══════════════════════════════════════════════════════
+     CAR MAINTENANCE TAB  —  tab_car.html
+     Inject into index.html where other tab views live.
+     Show/hide with: document.getElementById('car-view')
+     Nav button: data-tab="car"
+     ══════════════════════════════════════════════════════ -->
+
+<style>
+/* ── Car tab specific styles ───────────────────────── */
+#car-view { display:none; }
+
+/* Racing-inspired accent header */
+.car-hero {
+  position:relative;
+  background:var(--ink);
+  border-radius:var(--r);
+  padding:28px 32px;
+  margin-bottom:24px;
+  overflow:hidden;
+  animation:fadeUp .4s ease .05s both;
+  border:1.5px solid #3a2f24;
+}
+.car-hero::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse 60% 80% at 90% 50%, rgba(232,93,58,0.18), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 5% 100%, rgba(212,130,26,0.12), transparent 60%);
+  pointer-events:none;
+}
+/* Racing stripe */
+.car-hero::after {
+  content:'';
+  position:absolute;
+  top:0; right:200px;
+  width:6px; height:100%;
+  background:var(--coral);
+  opacity:.6;
+  box-shadow: 12px 0 0 var(--amber), 22px 0 0 rgba(232,93,58,.2);
+}
+
+.car-hero-inner { position:relative; z-index:1; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; }
+.car-hero-left {}
+.car-hero-title {
+  font-family:'Fraunces',serif;
+  font-size:13px;
+  font-weight:400;
+  color:rgba(250,247,242,.5);
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  margin-bottom:6px;
+}
+.car-odometer {
+  font-family:'JetBrains Mono',monospace;
+  font-size:52px;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:-1px;
+  line-height:1;
+  text-shadow:0 2px 20px rgba(232,93,58,.4);
+}
+.car-odometer span { font-size:22px; font-weight:400; color:rgba(250,247,242,.6); margin-left:4px; }
+.car-km-sub { font-size:13px; color:rgba(250,247,242,.5); margin-top:8px; }
+
+.car-hero-stats { display:flex; flex-direction:column; gap:12px; min-width:200px; }
+.car-stat-pill {
+  background:rgba(250,247,242,.07);
+  border:1px solid rgba(250,247,242,.12);
+  border-radius:var(--r2);
+  padding:12px 16px;
+  backdrop-filter:blur(4px);
+}
+.car-stat-pill-label { font-size:10px; color:rgba(250,247,242,.5); text-transform:uppercase; letter-spacing:.1em; font-weight:600; margin-bottom:4px; }
+.car-stat-pill-val { font-family:'Fraunces',serif; font-size:20px; font-weight:700; color:#fff; }
+.car-stat-pill-sub { font-size:11px; color:rgba(250,247,242,.45); margin-top:2px; }
+
+/* Odometer update strip */
+.km-update-strip {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:rgba(250,247,242,.05);
+  border:1px solid rgba(250,247,242,.1);
+  border-radius:var(--r2);
+  padding:12px 16px;
+  margin-top:16px;
+  position:relative;
+  z-index:1;
+}
+.km-update-strip input {
+  flex:1;
+  background:rgba(250,247,242,.1);
+  border:1.5px solid rgba(250,247,242,.2);
+  border-radius:8px;
+  padding:8px 12px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:14px;
+  color:#fff;
+  outline:none;
+}
+.km-update-strip input::placeholder { color:rgba(250,247,242,.35); }
+.km-update-strip input:focus { border-color:var(--coral); }
+.km-update-btn {
+  padding:8px 20px;
+  border-radius:8px;
+  border:none;
+  background:var(--coral);
+  color:#fff;
+  font-family:'Bricolage Grotesque',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.km-update-btn:hover { background:var(--coral2); }
+
+/* ── Maintenance grid ──────────────────────────────── */
+.car-sections-grid {
+  display:grid;
+  grid-template-columns:1fr 320px;
+  gap:20px;
+  align-items:start;
+}
+
+/* Service items list */
+.service-list { display:flex; flex-direction:column; gap:14px; }
+
+.service-card {
+  background:#fff;
+  border:1.5px solid var(--warm);
+  border-radius:var(--r);
+  padding:20px 22px;
+  box-shadow:var(--shadow);
+  transition:all .2s;
+  animation:fadeUp .35s ease both;
+  position:relative;
+  overflow:hidden;
+}
+.service-card:hover { border-color:var(--warmD); box-shadow:var(--shadow2); }
+
+.service-card-status-bar {
+  position:absolute;
+  top:0; left:0;
+  width:4px; height:100%;
+  border-radius:var(--r) 0 0 var(--r);
+}
+.service-card-status-bar.ok     { background:var(--sage); }
+.service-card-status-bar.soon   { background:var(--amber); }
+.service-card-status-bar.due    { background:var(--coral); }
+.service-card-status-bar.unknown { background:var(--cream3); }
+
+.service-card-inner { padding-left:10px; }
+
+.service-card-top {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:14px;
+}
+.service-card-left { flex:1; }
+.service-icon {
+  width:40px; height:40px;
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px;
+  margin-bottom:10px;
+}
+.service-name {
+  font-family:'Fraunces',serif;
+  font-size:17px;
+  font-weight:700;
+  color:var(--ink);
+  margin-bottom:3px;
+}
+.service-desc { font-size:12px; color:var(--text3); }
+
+.service-status-badge {
+  padding:5px 12px;
+  border-radius:50px;
+  font-size:12px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.service-status-badge.ok     { background:var(--sageL); color:var(--sage); }
+.service-status-badge.soon   { background:var(--amberL); color:var(--amber); }
+.service-status-badge.due    { background:var(--coralL); color:var(--coral); }
+.service-status-badge.unknown { background:var(--cream2); color:var(--text3); }
+
+.service-km-grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-bottom:14px;
+}
+.service-km-box {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:10px 12px;
+  text-align:center;
+}
+.service-km-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.07em; font-weight:600; margin-bottom:4px; }
+.service-km-val { font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--ink); }
+.service-km-val.highlight { color:var(--coral); }
+.service-km-val.ok-text { color:var(--sage); }
+
+/* Progress bar in service card */
+.service-progress-wrap { margin-bottom:12px; }
+.service-progress-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+.service-progress-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+.service-progress-pct { font-family:'Fraunces',serif; font-size:14px; font-weight:700; color:var(--ink); }
+.service-progress-bar { height:8px; background:var(--cream3); border-radius:8px; overflow:hidden; }
+.service-progress-fill { height:100%; border-radius:8px; transition:width .6s; }
+
+.service-card-actions {
+  display:flex;
+  gap:8px;
+  padding-top:12px;
+  border-top:1.5px solid var(--cream2);
+}
+.service-action-btn {
+  flex:1;
+  padding:8px 14px;
+  border-radius:var(--r2);
+  border:1.5px solid var(--cream3);
+  background:transparent;
+  font-family:'Bricolage Grotesque',sans-serif;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text2);
+  cursor:pointer;
+  transition:all .15s;
+}
+.service-action-btn:hover { border-color:var(--coral); color:var(--coral); background:var(--coralL); }
+.service-action-btn.primary {
+  background:var(--coral);
+  border-color:var(--coral);
+  color:#fff;
+}
+.service-action-btn.primary:hover { background:var(--rose); border-color:var(--rose); }
+
+/* ── Right sidebar ─────────────────────────────────── */
+.car-sidebar { display:flex; flex-direction:column; gap:16px; }
+
+/* Gas log card */
+.car-panel {
+  background:#fff;
+  border:1.5px solid var(--warm);
+  border-radius:var(--r);
+  padding:20px;
+  box-shadow:var(--shadow);
+  animation:fadeUp .4s ease .1s both;
+}
+.car-panel-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:16px;
+  padding-bottom:12px;
+  border-bottom:1.5px solid var(--cream2);
+}
+.car-panel-title {
+  font-family:'Fraunces',serif;
+  font-size:16px;
+  font-weight:700;
+  color:var(--ink);
+}
+.car-panel-add {
+  padding:5px 14px;
+  border-radius:50px;
+  border:none;
+  background:var(--coral);
+  color:#fff;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .15s;
+}
+.car-panel-add:hover { background:var(--rose); }
+
+.gas-entry {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--cream2);
+}
+.gas-entry:last-child { border-bottom:none; padding-bottom:0; }
+.gas-icon { font-size:18px; flex-shrink:0; }
+.gas-info { flex:1; }
+.gas-date { font-size:11px; color:var(--text3); font-family:'JetBrains Mono',monospace; }
+.gas-km { font-size:13px; font-weight:600; color:var(--ink); }
+.gas-amount { font-family:'Fraunces',serif; font-size:16px; font-weight:700; color:var(--amber); white-space:nowrap; }
+.gas-liters { font-size:11px; color:var(--text3); text-align:right; }
+
+.gas-empty { text-align:center; padding:20px; color:var(--text3); font-size:13px; font-style:italic; }
+
+/* Stats mini-grid */
+.car-stats-mini {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.car-stat-mini {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:12px 14px;
+}
+.car-stat-mini-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.07em; font-weight:600; margin-bottom:4px; }
+.car-stat-mini-val { font-family:'Fraunces',serif; font-size:18px; font-weight:700; color:var(--ink); }
+.car-stat-mini-sub { font-size:11px; color:var(--text2); margin-top:2px; }
+
+/* ── Cost per KM section ───────────────────────────── */
+.cpk-section {
+  background:#fff;
+  border:1.5px solid var(--warm);
+  border-radius:var(--r);
+  padding:22px 24px;
+  margin-bottom:24px;
+  box-shadow:var(--shadow);
+  animation:fadeUp .4s ease .08s both;
+}
+.cpk-header {
+  display:flex;
+  align-items:baseline;
+  gap:12px;
+  margin-bottom:18px;
+}
+.cpk-title {
+  font-family:'Fraunces',serif;
+  font-size:18px;
+  font-weight:700;
+  color:var(--ink);
+}
+.cpk-subtitle { font-size:12px; color:var(--text3); }
+.cpk-stats-row {
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+.cpk-stat {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:14px 16px;
+  border:1.5px solid var(--cream3);
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+  transition:border-color .15s, box-shadow .15s;
+}
+.cpk-stat:hover { border-color:var(--warmD); box-shadow:var(--shadow2); }
+.cpk-stat::after {
+  content:'▾';
+  position:absolute;
+  bottom:6px; right:8px;
+  font-size:10px;
+  color:var(--text3);
+  opacity:.45;
+}
+.cpk-stat::before {
+  content:'';
+  position:absolute;
+  top:0; left:0;
+  width:3px; height:100%;
+  border-radius:var(--r2) 0 0 var(--r2);
+}
+.cpk-stat.total::before { background:var(--coral); }
+.cpk-stat.gas::before   { background:var(--amber); }
+.cpk-stat.maint::before { background:var(--sage); }
+.cpk-stat.dist::before  { background:#7b9acf; }
+.cpk-stat.fuel::before  { background:#9b6dbf; }
+.cpk-stat-label {
+  font-size:10px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:600;
+  margin-bottom:6px;
+}
+.cpk-stat-val {
+  font-family:'Fraunces',serif;
+  font-size:22px;
+  font-weight:700;
+  color:var(--ink);
+  line-height:1;
+}
+.cpk-stat-unit {
+  font-size:11px;
+  color:var(--text3);
+  font-family:'JetBrains Mono',monospace;
+  margin-top:4px;
+}
+
+/* Breakdown panel */
+.cpk-breakdown-panel {
+  background:var(--ink);
+  color:rgba(250,247,242,.88);
+  border-radius:var(--r2);
+  padding:18px 20px;
+  margin-bottom:14px;
+  font-size:13px;
+  line-height:1.6;
+  animation:fadeUp .18s ease both;
+}
+.cpk-bd-title {
+  font-family:'Fraunces',serif;
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  margin-bottom:6px;
+}
+.cpk-bd-formula {
+  font-size:11px;
+  color:rgba(250,247,242,.5);
+  font-style:italic;
+  margin-bottom:12px;
+}
+.cpk-bd-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:12px;
+  padding:5px 0;
+  border-bottom:1px solid rgba(250,247,242,.07);
+}
+.cpk-bd-row:last-child { border-bottom:none; }
+.cpk-bd-row.sm { font-size:12px; opacity:.8; }
+.cpk-bd-row.cpk-bd-total {
+  border-top:1px solid rgba(250,247,242,.2);
+  border-bottom:none;
+  margin-top:6px;
+  padding-top:10px;
+  font-weight:700;
+}
+.cpk-bd-val {
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  color:#fff;
+  text-align:right;
+  white-space:nowrap;
+}
+.cpk-bd-sub-title {
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:rgba(250,247,242,.4);
+  margin:12px 0 4px;
+  font-weight:700;
+}
+.cpk-bd-note {
+  background:rgba(232,93,58,.15);
+  border:1px solid rgba(232,93,58,.3);
+  border-radius:8px;
+  padding:10px 12px;
+  font-size:12px;
+  color:rgba(250,247,242,.75);
+  margin-top:10px;
+  line-height:1.5;
+}
+
+.cpk-chart-wrap {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:16px;
+  border:1.5px solid var(--cream3);
+}
+.cpk-chart-label {
+  font-size:11px;
+  font-weight:700;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-bottom:12px;
+}
+.cpk-chart-wrap svg { display:block; width:100%; }
+.cpk-no-data {
+  text-align:center;
+  padding:24px;
+  color:var(--text3);
+  font-size:13px;
+  font-style:italic;
+}
+
+/* Add service btn */
+.car-add-service-btn {
+  width:100%;
+  padding:14px;
+  border-radius:var(--r);
+  border:2px dashed var(--cream3);
+  background:transparent;
+  color:var(--text3);
+  font-family:'Bricolage Grotesque',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+.car-add-service-btn:hover { border-color:var(--coral); color:var(--coral); background:var(--coralL); }
+
+/* Service modal */
+#serviceModalOverlay .modal { max-width:520px; width:95%; max-height:88vh; overflow-y:auto; }
+#gasModalOverlay .modal { max-width:440px; width:95%; }
+
+.service-form-section {
+  background:var(--cream2);
+  border-radius:var(--r2);
+  padding:14px;
+  margin-bottom:12px;
+  border:1.5px solid var(--cream3);
+}
+.service-form-section-title {
+  font-size:10px;
+  font-weight:700;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-bottom:10px;
+}
+.car-form-row { display:grid; gap:10px; margin-bottom:10px; }
+.car-form-row.cols2 { grid-template-columns:1fr 1fr; }
+.car-form-row:last-child { margin-bottom:0; }
+
+/* History log in service card */
+.service-history { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+.service-hist-item {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  color:var(--text2);
+  padding:6px 10px;
+  background:var(--cream2);
+  border-radius:8px;
+}
+.service-hist-km { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--ink); min-width:80px; }
+.service-hist-note { flex:1; color:var(--text3); font-style:italic; }
+.service-hist-del { background:none; border:none; cursor:pointer; color:var(--text3); font-size:12px; padding:2px 5px; }
+.service-hist-del:hover { color:var(--coral); }
+</style>
+
+<div id="car-view">
+
+  <!-- ── Odometer hero ───────────────────── -->
+  <div class="car-hero">
+    <div class="car-hero-inner">
+      <div class="car-hero-left">
+        <div class="car-hero-title">🏎️ Current Odometer</div>
+        <div class="car-odometer" id="carOdoDisplay">—<span>KM</span></div>
+        <div class="car-km-sub" id="carOdoSub">Set your current mileage below</div>
+
+        <div class="km-update-strip">
+          <input type="number" id="carKmInput" placeholder="Enter current KM reading..." min="0"/>
+          <button class="km-update-btn" onclick="updateCarKm()">Update Odometer</button>
+        </div>
+      </div>
+
+      <div class="car-hero-stats">
+        <div class="car-stat-pill">
+          <div class="car-stat-pill-label">🔧 Total Maintenance Cost</div>
+          <div class="car-stat-pill-val" id="carTotalMaintCost">— K T</div>
+          <div class="car-stat-pill-sub" id="carServiceCount">0 services tracked</div>
+        </div>
+        <div class="car-stat-pill">
+          <div class="car-stat-pill-label">⛽ Total Gas Spend</div>
+          <div class="car-stat-pill-val" id="carTotalGas">— K T</div>
+          <div class="car-stat-pill-sub" id="carTotalGasFills">0 fill-ups logged</div>
+        </div>
+        <div class="car-stat-pill">
+          <div class="car-stat-pill-label">🔧 Overdue Services</div>
+          <div class="car-stat-pill-val" id="carOverdueCount" style="color:var(--coral)">0</div>
+          <div class="car-stat-pill-sub" id="carDueSoonCount">0 due soon</div>
+        </div>
+        <div class="car-stat-pill">
+          <div class="car-stat-pill-label">📅 Last Full Service</div>
+          <div class="car-stat-pill-val" id="carLastService">—</div>
+          <div class="car-stat-pill-sub" id="carLastServiceKm">at — KM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Cost per KM ────────────────────────── -->
+  <div id="carCpkSection"></div>
+
+  <!-- ── Main layout ─────────────────────── -->
+  <div class="car-sections-grid">
+
+    <!-- Left: service items -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--ink);">🔧 Maintenance Schedule</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">Track every service by mileage</div>
+        </div>
+        <button class="goal-add-btn" onclick="openServiceModal()">+ Add Service</button>
+      </div>
+
+      <div class="service-list" id="serviceList">
+        <!-- rendered by JS -->
+      </div>
+
+      <button class="car-add-service-btn" onclick="openServiceModal()" style="margin-top:14px;">
+        <span>⚙️</span> Add another service item
+      </button>
+    </div>
+
+    <!-- Right: sidebar -->
+    <div class="car-sidebar">
+
+      <!-- Gas log -->
+      <div class="car-panel">
+        <div class="car-panel-head">
+          <div class="car-panel-title">⛽ Gas Log</div>
+          <button class="car-panel-add" onclick="openGasModal()">+ Fill-up</button>
+        </div>
+
+        <div class="car-stats-mini" style="margin-bottom:16px;">
+          <div class="car-stat-mini">
+            <div class="car-stat-mini-label">This Month</div>
+            <div class="car-stat-mini-val" id="gasThisMonth">—</div>
+            <div class="car-stat-mini-sub">K Tomans</div>
+          </div>
+          <div class="car-stat-mini">
+            <div class="car-stat-mini-label">Avg per fill</div>
+            <div class="car-stat-mini-val" id="gasAvgFill">—</div>
+            <div class="car-stat-mini-sub">K Tomans</div>
+          </div>
+          <div class="car-stat-mini">
+            <div class="car-stat-mini-label">Total liters</div>
+            <div class="car-stat-mini-val" id="gasTotalLiters">—</div>
+            <div class="car-stat-mini-sub">liters logged</div>
+          </div>
+          <div class="car-stat-mini">
+            <div class="car-stat-mini-label">Avg L/100km</div>
+            <div class="car-stat-mini-val" id="gasEfficiency">—</div>
+            <div class="car-stat-mini-sub">fuel efficiency</div>
+          </div>
+        </div>
+
+        <div id="gasLogList">
+          <div class="gas-empty">No fill-ups logged yet. Hit + Fill-up to start.</div>
+        </div>
+      </div>
+
+      <!-- Notes panel -->
+      <div class="car-panel">
+        <div class="car-panel-head">
+          <div class="car-panel-title">📝 Car Notes</div>
+        </div>
+        <textarea id="carNotes" rows="5"
+          placeholder="Tire pressure, quirks, insurance renewal date, things to fix..."
+          style="width:100%;background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);
+            padding:12px;font-family:'Bricolage Grotesque',sans-serif;font-size:13px;color:var(--text);
+            outline:none;resize:vertical;line-height:1.6;"
+          oninput="carDebounceSave()"></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;">Auto-saves as you type</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SERVICE ITEM MODAL
+══════════════════════════════════════════ -->
+<div class="overlay" id="serviceModalOverlay">
+  <div class="modal">
+    <h3 id="serviceModalTitle">🔧 Add Service Item</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:18px;">Log when this service was last done and when the next one is due.</p>
+
+    <div class="service-form-section">
+      <div class="service-form-section-title">Service Details</div>
+      <div class="car-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Service name *</div>
+          <input type="text" class="modal-input" id="svcName" placeholder="e.g. Oil Change, Timing Belt..." style="margin:0;width:100%;"/>
+        </div>
+      </div>
+      <div class="car-form-row cols2">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Icon (emoji)</div>
+          <input type="text" class="modal-input" id="svcIcon" placeholder="🔧" style="margin:0;width:100%;text-align:center;font-size:20px;"/>
+        </div>
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Category</div>
+          <select class="builder-select" id="svcCategory" style="width:100%;font-size:13px;">
+            <option value="engine">Engine</option>
+            <option value="transmission">Transmission</option>
+            <option value="brakes">Brakes</option>
+            <option value="tires">Tires</option>
+            <option value="electrical">Electrical</option>
+            <option value="body">Body / Exterior</option>
+            <option value="fluids">Fluids</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="car-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Notes</div>
+          <input type="text" class="modal-input" id="svcNotes" placeholder="Brand, spec, shop name..." style="margin:0;width:100%;"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="service-form-section">
+      <div class="service-form-section-title">Mileage &amp; Cost</div>
+      <div class="car-form-row cols2">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Last done at (KM)</div>
+          <input type="number" class="modal-input" id="svcLastKm" placeholder="e.g. 100000" min="0" style="margin:0;width:100%;"/>
+        </div>
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Cost (K Tomans)</div>
+          <input type="number" class="modal-input" id="svcCost" placeholder="e.g. 850" min="0" style="margin:0;width:100%;"/>
+        </div>
+      </div>
+      <div class="car-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Last done date (Jalali)</div>
+          <div id="svcLastDatePicker"></div>
+          <input type="hidden" id="svcLastDate"/>
+        </div>
+      </div>
+
+      <!-- Interval type toggle -->
+      <div class="builder-label" style="margin-bottom:8px;">Next service interval</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;" id="svcIntervalTypeGroup">
+        <button class="goal-chip-sel sky active" data-val="km" onclick="selectGoalChip('svcIntervalTypeGroup',this);toggleSvcInterval()">By KM</button>
+        <button class="goal-chip-sel sage" data-val="fixed" onclick="selectGoalChip('svcIntervalTypeGroup',this);toggleSvcInterval()">Fixed KM target</button>
+      </div>
+
+      <!-- KM interval -->
+      <div id="svcIntervalKmRow" class="car-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Interval (KM)</div>
+          <input type="number" class="modal-input" id="svcIntervalKm" placeholder="e.g. 5000 for every 5,000 KM" min="0" style="margin:0;width:100%;"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">Next = last KM + this interval</div>
+        </div>
+      </div>
+      <!-- Fixed KM target -->
+      <div id="svcFixedKmRow" class="car-form-row" style="display:none;">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Next service at (KM)</div>
+          <input type="number" class="modal-input" id="svcFixedKm" placeholder="e.g. 109000" min="0" style="margin:0;width:100%;"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">Exact odometer reading for next service</div>
+        </div>
+      </div>
+
+      <div class="car-form-row">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">Warn me when this many KM away</div>
+          <input type="number" class="modal-input" id="svcWarnKm" placeholder="e.g. 1000" value="1000" min="0" style="margin:0;width:100%;"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeServiceModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveServiceItem()">Save Service</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GAS LOG MODAL
+══════════════════════════════════════════ -->
+<div class="overlay" id="gasModalOverlay">
+  <div class="modal">
+    <h3>⛽ Log Fill-up</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:18px;">Record your fuel stop details.</p>
+
+    <div class="car-form-row cols2">
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Date (Jalali)</div>
+        <div id="gasDatePicker"></div>
+        <input type="hidden" id="gasDate"/>
+      </div>
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Odometer at fill (KM)</div>
+        <input type="number" class="modal-input" id="gasOdoKm" placeholder="e.g. 102500" min="0" style="margin:0;width:100%;"/>
+      </div>
+    </div>
+    <div class="car-form-row cols2">
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Amount paid (K Tomans)</div>
+        <input type="number" class="modal-input" id="gasAmount" placeholder="e.g. 90" min="0" style="margin:0;width:100%;"/>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">
+          <button class="preset" onclick="document.getElementById('gasAmount').value=45">45</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=60">60</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=75">75</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=90">90</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=100">100</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=110">110</button>
+          <button class="preset" onclick="document.getElementById('gasAmount').value=120">120</button>
+        </div>
+      </div>
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Liters added</div>
+        <input type="number" class="modal-input" id="gasLiters" placeholder="e.g. 35" min="0" step="0.1" style="margin:0;width:100%;"/>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;">Optional — for efficiency tracking</div>
+      </div>
+    </div>
+    <div>
+      <div class="builder-label" style="margin-bottom:6px;">Note (optional)</div>
+      <input type="text" class="modal-input" id="gasNote" placeholder="e.g. highway, city driving, full tank..." style="width:100%;"/>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeGasModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveGasEntry()">Log Fill-up</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SERVICE LOG MODAL (mark as done)
+══════════════════════════════════════════ -->
+<div class="overlay" id="serviceLogModalOverlay">
+  <div class="modal" style="max-width:420px;">
+    <h3>✅ Mark as Done</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:18px;">Record when and where you did this service.</p>
+    <input type="hidden" id="svcLogId"/>
+    <div class="car-form-row cols2">
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Done at KM *</div>
+        <input type="number" class="modal-input" id="svcLogKm" placeholder="Current odometer" min="0" style="margin:0;width:100%;"/>
+      </div>
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Cost (K Tomans)</div>
+        <input type="number" class="modal-input" id="svcLogCost" placeholder="e.g. 850" min="0" style="margin:0;width:100%;"/>
+      </div>
+    </div>
+    <div class="car-form-row">
+      <div>
+        <div class="builder-label" style="margin-bottom:6px;">Date (Jalali)</div>
+        <div id="svcLogDatePicker"></div>
+        <input type="hidden" id="svcLogDate"/>
+      </div>
+    </div>
+    <div>
+      <div class="builder-label" style="margin-bottom:6px;">Note (optional)</div>
+      <input type="text" class="modal-input" id="svcLogNote" placeholder="e.g. Castrol 5W-40, at CarService shop" style="width:100%;"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('serviceLogModalOverlay').classList.remove('open')">Cancel</button>
+      <button class="btn-ok" onclick="confirmServiceDone()">Confirm Service</button>
+    </div>
+  </div>
+</div>
