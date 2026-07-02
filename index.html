@@ -7693,7 +7693,9 @@ function pplGraphSimStep(){
       const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
       const minD=(pplNodeRadius(a)+pplNodeRadius(b))+10;
       if(dist>=minD*4) continue;
-      const repForce=dist<minD ? 11000/(dist*dist) : 600/(dist*dist);
+      // Capped so a pile-up of overlapping nodes (e.g. right after adding several
+      // at once) can never produce a single-frame catapult like the old 1/d^2 term did.
+      const repForce=Math.min(dist<minD ? 11000/(dist*dist) : 600/(dist*dist), 500);
       const fx=(dx/dist)*repForce, fy=(dy/dist)*repForce;
       a.vx-=fx; a.vy-=fy; b.vx+=fx; b.vy+=fy;
     }
@@ -7718,6 +7720,9 @@ function pplGraphSimStep(){
     if(PPL_GRAPH.draggingCircle && n.circles && n.circles.includes(PPL_GRAPH.draggingCircle)) return;
     if(PPL_GRAPH.selDragOffsets && PPL_GRAPH.selDragOffsets[n.id]) return;
     n.vx*=damping; n.vy*=damping;
+    // Hard speed ceiling — belt-and-braces so no future force source can fling a node offscreen.
+    const _sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+    if(_sp>60){ n.vx=(n.vx/_sp)*60; n.vy=(n.vy/_sp)*60; }
     n.x+=n.vx*cooling; n.y+=n.vy*cooling;
   });
 
@@ -8176,18 +8181,32 @@ function pplGraphReset(){
 }
 
 function pplGraphRelax(){
-  // Smart layout: pre-position nodes into circle/category clusters, then let physics resolve
-  const nodes=PPL_GRAPH.nodes;
-  const N=nodes.length;
-  if(!N) return;
+  // Deterministic, self-contained relaxation.
+  //
+  // The old version pre-positioned nodes into tight cluster circles sized by a
+  // guessed constant (not actual node radii), then handed everything straight
+  // to the live physics loop. With many nodes that guess was too small, nodes
+  // started overlapping, and the live loop's repulsion force (~11000/dist^2)
+  // goes to infinity as dist→0 — one single frame could fling a whole cluster
+  // miles away ("catapult").
+  //
+  // This version instead: (1) packs every cluster's members on a sub-circle
+  // sized from their REAL radii so there is zero overlap at spawn, (2) packs
+  // the clusters themselves around a big circle sized so cluster bounding
+  // circles never overlap either, then (3) runs its own tiny internal
+  // simulation — fully synchronous, force-capped, velocity-clamped, and
+  // annealed (cools down over time) — to settle everything into a calm,
+  // balanced equilibrium *before* control is ever handed back to live physics.
+  // Nothing in this process can ever produce an unbounded force.
+  const nodes=PPL_GRAPH.nodes.filter(n=>!n.isMe);
+  const me=PPL_GRAPH.nodes.find(n=>n.isMe);
+  if(!nodes.length){ if(me){me.x=0;me.y=0;me.vx=0;me.vy=0;} pplGraphFitView(); return; }
 
-  // Build cluster groups
-  const clusters={}; // key → [nodeIds]
+  // ---- 1. Build cluster groups (same grouping rule as before) ----
+  const clusters={};
   if(PPL_GRAPH.showCircles && PPL.circles.length){
-    // Group by first circle membership
     const unassigned=[];
     nodes.forEach(n=>{
-      if(n.isMe){return;}
       const firstCircle=(n.circles||[]).find(cid=>PPL.circles.some(c=>c.id===cid));
       if(firstCircle)(clusters[firstCircle]=clusters[firstCircle]||[]).push(n);
       else unassigned.push(n);
@@ -8195,37 +8214,116 @@ function pplGraphRelax(){
     if(unassigned.length) clusters['__none__']=unassigned;
   } else {
     nodes.forEach(n=>{
-      if(n.isMe) return;
       const k=n.category||'other';
       (clusters[k]=clusters[k]||[]).push(n);
     });
   }
-
   const clusterKeys=Object.keys(clusters);
-  const numClusters=clusterKeys.length;
-  const spreadR=Math.max(250, numClusters*130);
+  const GAP=14; // minimum gap kept between adjacent node edges
 
-  // Arrange cluster centers in a circle
-  clusterKeys.forEach((key,ci)=>{
-    const angle=(ci/numClusters)*Math.PI*2 - Math.PI/2;
-    const cx=Math.cos(angle)*spreadR;
-    const cy=Math.sin(angle)*spreadR;
+  // ---- 2. Pack each cluster's members on a sub-circle sized from real radii (no overlap) ----
+  const clusterInfo=clusterKeys.map(key=>{
     const members=clusters[key];
-    // Arrange members in a tight sub-circle around cluster center
-    members.forEach((n,mi)=>{
-      const a=(mi/members.length)*Math.PI*2;
-      const r=Math.max(60, members.length*28);
-      n.x=cx+Math.cos(a)*r;
-      n.y=cy+Math.sin(a)*r;
+    const radii=members.map(n=>pplNodeRadius(n));
+    const maxR=Math.max(...radii);
+    const subR=members.length===1 ? 0 :
+      Math.max(radii.reduce((s,r)=>s+2*r+GAP,0)/(Math.PI*2), maxR+30);
+    return {key,members,radii,maxR,subR,outerR:subR+maxR+40};
+  });
+
+  // ---- 3. Place cluster centers around a big circle, sized so cluster bounding circles never touch ----
+  clusterInfo.sort((a,b)=>b.outerR-a.outerR);
+  const CGAP=60;
+  const totalArc=clusterInfo.reduce((s,c)=>s+2*c.outerR+CGAP,0);
+  const bigR=Math.max(220, totalArc/(Math.PI*2));
+
+  let angleCursor=-Math.PI/2;
+  clusterInfo.forEach(c=>{
+    const arcSpan=(2*c.outerR+CGAP)/bigR;
+    const angle=angleCursor+arcSpan/2;
+    c.cx=Math.cos(angle)*bigR;
+    c.cy=Math.sin(angle)*bigR;
+    angleCursor+=arcSpan;
+
+    c.members.forEach((n,mi)=>{
+      const a=(mi/c.members.length)*Math.PI*2;
+      n.x=c.cx+Math.cos(a)*c.subR;
+      n.y=c.cy+Math.sin(a)*c.subR;
       n.vx=0;n.vy=0;
+      n._relaxHomeX=n.x; n._relaxHomeY=n.y; // anchor used by the cohesion spring below
     });
   });
 
-  // ME stays center
-  const me=nodes.find(n=>n.isMe);
   if(me){me.x=0;me.y=0;me.vx=0;me.vy=0;}
 
-  // Reset tick and re-enable physics for a clean settle
+  // ---- 4. Internal mini-simulation: settle into a calm, harmonic equilibrium ----
+  // Runs entirely synchronously (not tied to the render loop), with every
+  // force explicitly capped and velocity explicitly clamped — so by
+  // construction nothing can ever be flung anywhere. It only converges.
+  const allNodes=me?[me,...nodes]:nodes;
+  const ITERS=220;
+  const MAX_SPEED=14;   // hard velocity ceiling per iteration
+  const REP_CAP=90;     // hard repulsion force ceiling (this is what kills the old 1/d^2 blowup)
+  const HOME_K=0.012;   // gentle pull back toward the assigned cluster slot (keeps groups cohesive/uniform)
+  const EDGE_K=0.05;
+
+  for(let it=0; it<ITERS; it++){
+    const anneal=1-it/ITERS; // 1 → 0, cools the system so it settles instead of jittering forever
+    const damping=0.72;
+
+    // repulsion — capped, so overlaps resolve gently instead of exploding
+    for(let i=0;i<allNodes.length;i++){
+      for(let j=i+1;j<allNodes.length;j++){
+        const a=allNodes[i], b=allNodes[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
+        const minD=pplNodeRadius(a)+pplNodeRadius(b)+GAP;
+        if(dist>=minD*3) continue;
+        const raw=dist<minD ? (minD-dist)*6 : 300/(dist*dist);
+        const f=Math.min(raw, REP_CAP);
+        const fx=(dx/dist)*f, fy=(dy/dist)*f;
+        if(a!==me){a.vx-=fx; a.vy-=fy;}
+        if(b!==me){b.vx+=fx; b.vy+=fy;}
+      }
+    }
+
+    // edge springs — pull bonded pairs toward their natural resting length
+    PPL_GRAPH.edges.forEach(e=>{
+      const src=allNodes.find(n=>n.id===e.from), tgt=allNodes.find(n=>n.id===e.to);
+      if(!src||!tgt) return;
+      const dx=tgt.x-src.x, dy=tgt.y-src.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
+      const targetLen=e.isMyRel?190:140;
+      const force=Math.max(-REP_CAP,Math.min(REP_CAP,(dist-targetLen)*EDGE_K));
+      const fx=(dx/dist)*force, fy=(dy/dist)*force;
+      if(src!==me){src.vx+=fx; src.vy+=fy;}
+      if(tgt!==me){tgt.vx-=fx; tgt.vy-=fy;}
+    });
+
+    // gentle pull back toward the assigned cluster slot — keeps everything uniform/balanced
+    nodes.forEach(n=>{
+      if(n._relaxHomeX===undefined) return;
+      n.vx+=(n._relaxHomeX-n.x)*HOME_K;
+      n.vy+=(n._relaxHomeY-n.y)*HOME_K;
+    });
+
+    // integrate with damping + a hard velocity clamp that shrinks as the system cools
+    allNodes.forEach(n=>{
+      if(n===me) return;
+      n.vx*=damping; n.vy*=damping;
+      const speed=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+      const cap=MAX_SPEED*(0.3+0.7*anneal);
+      if(speed>cap){ n.vx=(n.vx/speed)*cap; n.vy=(n.vy/speed)*cap; }
+      n.x+=n.vx; n.y+=n.vy;
+    });
+  }
+
+  // cleanup
+  nodes.forEach(n=>{ n.vx=0; n.vy=0; delete n._relaxHomeX; delete n._relaxHomeY; });
+  if(me){me.x=0;me.y=0;me.vx=0;me.vy=0;}
+
+  // Layout is already calm and overlap-free — physics only needs to maintain it now,
+  // not fight its way out of a pile-up, so no catapult can happen on hand-off.
   PPL_GRAPH.tick=0;
   if(!PPL_GRAPH.physicsOn){PPL_GRAPH.physicsOn=true;pplUpdatePhysicsBtn();}
   pplGraphFitView();
