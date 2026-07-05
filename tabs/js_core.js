@@ -278,7 +278,7 @@ function updateMetrics(){
 
 // ─── SCORE ─────────────────────────────────────────
 function updateScore(s){
-  document.getElementById('ringPct').textContent=s+'%';
+  document.getElementById('ringPct').textContent=s;
   const circ=2*Math.PI*52;
   document.getElementById('ringFg').style.strokeDashoffset=circ-(s/100)*circ;
   const e=s>=90?'🔥':s>=75?'⚡':s>=60?'✅':s>=40?'📈':'🌱';
@@ -366,7 +366,7 @@ async function saveAll(){
   const d=await r.json();
   updateScore(d.score);
   const label = activeDate ? '✏️ Past day saved!' : 'Saved';
-  showToast(label+' — Score: '+d.score+'%','success');
+  showToast(label+' — Score: '+d.score,'success');
   updateMetrics();
   renderDateSwitcher(); // refresh dots
 }

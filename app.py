@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "habits.json")
+SCORE_CONFIG_FILE = os.path.join(BASE_DIR, "score_config.json")
 HOSTS_FILE = r"C:\Windows\System32\drivers\etc\hosts"
 MARKER_START = "# === ELEVATE BLOCKER START ==="
 MARKER_END   = "# === ELEVATE BLOCKER END ==="
@@ -14,7 +15,8 @@ _blocker_lock = threading.Lock()
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 JSON_FILES = ["habits.json","budget.json","calendar.json","food.json","people.json","sleep.json","sticky.json",
     "goals.json",   
-    "car.json"     ]
+    "car.json",
+    "score_config.json"]
 _backup_lock = threading.Lock()
 _last_sizes = {}  # filename → last known size
 
@@ -174,62 +176,109 @@ def save_db(data):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=True)
 
-def compute_score(entry):
-    score = 0; mx = 0
-    # Gym: 20pts max. Skipped = -5 penalty (supposed to go, didn't)
-    mx+=20; gym=entry.get("gym","none")
-    if gym=="full": score+=20
-    elif gym=="half": score+=10
+# ── Tweakable scoring weights ────────────────────────
+# Every number the score formula uses lives here. Edit via the
+# "Scoring" modal in the UI (persisted to score_config.json), or
+# just change the defaults below.
+SCORE_DEFAULTS = {
+    "gym_full": 20, "gym_half": 10, "gym_skipped": -5,
+    "home_full": 10, "home_half": 5,
+    "food_homemade": 12, "food_healthy_out": 8, "food_junk": 2,
+    "cal_target": 1500,
+    "cal_over_amount": 150, "cal_over_cost": 1,
+    "cal_under_amount": 150, "cal_under_reward": 1,
+    "prot_max": 5, "prot_target": 176,
+    "weight_logged": 2,
+    "car_max": 8, "car_target_mins": 60,
+    "uni_max": 12, "uni_target_mins": 120,
+    "selfdev_max": 8, "selfdev_target_mins": 60,
+    "skincare_full": 6, "skincare_half": 3,
+    "pills": 8,
+    "mood_max": 6,
+    "pain_max": 5,
+    "social_irl": 8, "social_chat": 4,
+    "soda_free": 4,
+    "fruit_veg": 4,
+    "teeth_per_brush": 2, "teeth_max": 4,
+    "meditation": 4,
+    "sleep_max": 6,
+}
+
+def load_score_config():
+    if not os.path.exists(SCORE_CONFIG_FILE):
+        return dict(SCORE_DEFAULTS)
+    try:
+        with open(SCORE_CONFIG_FILE, encoding="utf-8") as f:
+            saved = json.load(f)
+        cfg = dict(SCORE_DEFAULTS)
+        cfg.update({k: v for k, v in saved.items() if k in SCORE_DEFAULTS})
+        return cfg
+    except (json.JSONDecodeError, ValueError):
+        return dict(SCORE_DEFAULTS)
+
+def save_score_config(cfg):
+    with open(SCORE_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=True)
+
+def compute_score(entry, cfg=None):
+    if cfg is None: cfg = load_score_config()
+    score = 0
+    # Gym: skipped (supposed to go, didn't) is a penalty
+    gym=entry.get("gym","none")
+    if gym=="full": score+=cfg["gym_full"]
+    elif gym=="half": score+=cfg["gym_half"]
     elif gym=="none": score+=0      # planned rest, neutral
-    elif gym=="skipped": score+=-5  # missed session, penalty
-    # Home exercise: 10pts max (no penalty for none — it's a bonus)
-    mx+=10; home=entry.get("home_exercise","none")
-    if home=="full": score+=10
-    elif home=="half": score+=5
-    # Food: 12pts
-    mx+=12; food=entry.get("food","")
-    if food=="homemade": score+=12
-    elif food=="healthy_out": score+=8
-    elif food=="junk": score+=2
-    # Calories (target 1500 for deficit): 5pts
-    mx+=10; cal=entry.get("calories",0) or 0; prot=entry.get("protein",0) or 0
-    if cal>0: score+=max(0,5-abs(cal-1500)/150)
-    if prot>0: score+=min(5,(prot/176)*5)
-    # Weight logged: 2pts
-    mx+=2
-    if entry.get("weight"): score+=2
-    # Study: car 8pts, uni 12pts, selfdev 8pts
-    mx+=8; score+=min(8,((entry.get("car_courses_mins",0) or 0)/60)*8)
-    mx+=12; score+=min(12,((entry.get("uni_study_mins",0) or 0)/120)*12)
-    mx+=8; score+=min(8,((entry.get("selfdev_mins",0) or 0)/60)*8)
-    # Skincare: 6pts
-    mx+=6; sk=entry.get("skincare","none")
-    if sk=="full": score+=6
-    elif sk=="half": score+=3
-    # Pills: 8pts
-    mx+=8
-    if entry.get("pills"): score+=8
-    # Mood: 6pts, Pain (inverse): 5pts
-    mx+=6; score+=((entry.get("mood",5) or 5)/10)*6
-    mx+=5; score+=(((10-(entry.get("pain",5) or 5))/10)*5)
-    # Social: 8pts
-    mx+=8; soc=entry.get("socialized","none")
-    if soc=="irl": score+=8
-    elif soc=="chat": score+=4
-    # No soda: 4pts
-    mx+=4
-    if not entry.get("soda",False): score+=4
-    # Teeth: 4pts (2 per brush)
-    mx+=4; teeth=entry.get("teeth_brushed",0) or 0
-    score+=min(4,teeth*2)
-    # Meditation: 4pts
-    mx+=4
-    if entry.get("meditated"): score+=4
-    # Sleep score: 6pts - reward sleeping before 00:30 and waking 06:00-09:30
-    mx+=6
+    elif gym=="skipped": score+=cfg["gym_skipped"]
+    # Home exercise (no penalty for none — it's a bonus)
+    home=entry.get("home_exercise","none")
+    if home=="full": score+=cfg["home_full"]
+    elif home=="half": score+=cfg["home_half"]
+    # Food
+    food=entry.get("food","")
+    if food=="homemade": score+=cfg["food_homemade"]
+    elif food=="healthy_out": score+=cfg["food_healthy_out"]
+    elif food=="junk": score+=cfg["food_junk"]
+    # Calories: every cal_over_amount over target costs cal_over_cost;
+    # every cal_under_amount under target rewards cal_under_reward. No caps.
+    cal=entry.get("calories",0) or 0; prot=entry.get("protein",0) or 0
+    if cal>0:
+        if cal>cfg["cal_target"]:
+            score -= ((cal-cfg["cal_target"])/cfg["cal_over_amount"])*cfg["cal_over_cost"]
+        elif cal<cfg["cal_target"]:
+            score += ((cfg["cal_target"]-cal)/cfg["cal_under_amount"])*cfg["cal_under_reward"]
+    if prot>0: score+=min(cfg["prot_max"],(prot/cfg["prot_target"])*cfg["prot_max"])
+    # Weight logged
+    if entry.get("weight"): score+=cfg["weight_logged"]
+    # Study: car, uni, selfdev
+    score+=min(cfg["car_max"],((entry.get("car_courses_mins",0) or 0)/cfg["car_target_mins"])*cfg["car_max"])
+    score+=min(cfg["uni_max"],((entry.get("uni_study_mins",0) or 0)/cfg["uni_target_mins"])*cfg["uni_max"])
+    score+=min(cfg["selfdev_max"],((entry.get("selfdev_mins",0) or 0)/cfg["selfdev_target_mins"])*cfg["selfdev_max"])
+    # Skincare
+    sk=entry.get("skincare","none")
+    if sk=="full": score+=cfg["skincare_full"]
+    elif sk=="half": score+=cfg["skincare_half"]
+    # Pills
+    if entry.get("pills"): score+=cfg["pills"]
+    # Mood, Pain (inverse)
+    score+=((entry.get("mood",5) or 5)/10)*cfg["mood_max"]
+    score+=(((10-(entry.get("pain",5) or 5))/10)*cfg["pain_max"])
+    # Social
+    soc=entry.get("socialized","none")
+    if soc=="irl": score+=cfg["social_irl"]
+    elif soc=="chat": score+=cfg["social_chat"]
+    # No soda
+    if not entry.get("soda",False): score+=cfg["soda_free"]
+    # Fruit/veg
+    if entry.get("fruit_veg",False): score+=cfg["fruit_veg"]
+    # Teeth
+    teeth=entry.get("teeth_brushed",0) or 0
+    score+=min(cfg["teeth_max"],teeth*cfg["teeth_per_brush"])
+    # Meditation
+    if entry.get("meditated"): score+=cfg["meditation"]
+    # Sleep score - reward sleeping before 00:30 and waking 06:00-09:30
     sleep_score_pts = entry.get("sleep_score",None)
-    if sleep_score_pts is not None: score+=min(6,max(0,sleep_score_pts))
-    return round((score/mx)*100) if mx>0 else 0
+    if sleep_score_pts is not None: score+=min(cfg["sleep_max"],max(0,sleep_score_pts))
+    return round(score)
 
 def adal_reminder(db):
     adal=db.get("adalimumab",{}); last=adal.get("last_injection"); interval=adal.get("interval_days",14)
@@ -245,6 +294,23 @@ API_VERSION = "2026-06-22-v7-goals-car"
 @app.route("/api/version")
 def get_version():
     return jsonify({"version": API_VERSION})
+
+@app.route("/api/score_config", methods=["GET","POST"])
+def score_config_api():
+    if request.method == "GET":
+        return jsonify(load_score_config())
+    data = request.json or {}
+    if data.get("action") == "reset":
+        cfg = dict(SCORE_DEFAULTS)
+    else:
+        cfg = load_score_config()
+        for k, v in data.items():
+            if k not in SCORE_DEFAULTS: continue
+            try: cfg[k] = float(v)
+            except (TypeError, ValueError): continue
+            if cfg[k] == int(cfg[k]): cfg[k] = int(cfg[k])
+    save_score_config(cfg)
+    return jsonify({"ok":True,"config":cfg})
 
 @app.route("/")
 def index():
@@ -297,10 +363,11 @@ def set_adal():
 @app.route("/api/stats")
 def get_stats():
     db=load_db(); days=sorted(db["entries"].keys())[-90:]
+    cfg=load_score_config()
     result=[]
     for d in days:
         e=db["entries"][d]
-        result.append({"date":d,"score":compute_score(e),"gym":e.get("gym","none"),"food":e.get("food",""),
+        result.append({"date":d,"score":compute_score(e,cfg),"gym":e.get("gym","none"),"food":e.get("food",""),
             "calories":e.get("calories",0) or 0,"protein":e.get("protein",0) or 0,"weight":e.get("weight",None),
             "car_courses_mins":e.get("car_courses_mins",0) or 0,"uni_study_mins":e.get("uni_study_mins",0) or 0,
             "selfdev_mins":e.get("selfdev_mins",0) or 0,"skincare":e.get("skincare","none"),
@@ -312,8 +379,8 @@ def get_stats():
 
 @app.route("/api/history")
 def get_history():
-    db=load_db()
-    return jsonify({d:{**e,"score":compute_score(e)} for d,e in db["entries"].items()})
+    db=load_db(); cfg=load_score_config()
+    return jsonify({d:{**e,"score":compute_score(e,cfg)} for d,e in db["entries"].items()})
 
 
 @app.route("/api/full_history")
@@ -389,12 +456,13 @@ def get_full_history():
     # Collect all dates across all sources
     all_dates = set(habits_db["entries"].keys()) | set(sleep_by_date.keys()) |                 set(food_by_date.keys()) | set(budget_by_gdate.keys()) | set(cal_by_date.keys())
 
+    score_cfg = load_score_config()
     result = {}
     for d in all_dates:
         e = habits_db["entries"].get(d, {})
         result[d] = {
             # habits
-            "score":            compute_score(e),
+            "score":            compute_score(e, score_cfg),
             "gym":              e.get("gym","none"),
             "food_type":        e.get("food",""),
             "skincare":         e.get("skincare","none"),
@@ -480,6 +548,7 @@ def get_full_stats():
                        set(food_by_date.keys()) |
                        set(budget_by_gdate.keys()))[-180:]
 
+    score_cfg = load_score_config()
     result = []
     for d in all_dates:
         e  = habits_db["entries"].get(d, {})
@@ -487,7 +556,7 @@ def get_full_stats():
         fo = food_by_date.get(d, {})
         result.append({
             "date":                d,
-            "score":               compute_score(e),
+            "score":               compute_score(e, score_cfg),
             "gym":                 e.get("gym","none"),
             "food_type":           e.get("food",""),
             "skincare":            e.get("skincare","none"),
@@ -1300,17 +1369,6 @@ def manage_people():
                 p["notes"] = data.get("notes", "")
                 break
 
-    elif action == "update_person":
-        for p in db["people"]:
-            if p["id"] == data["id"]:
-                name = data.get("name", "").strip()
-                if name:
-                    p["name"] = name
-                p["category"] = data.get("category", p.get("category", "friend"))
-                p["importance"] = data.get("importance", p.get("importance", 0))
-                p["contact"] = data.get("contact", "")
-                break
-
     elif action == "update_me_photo":
         db["me_photo"] = data.get("photo", "")
 
@@ -1417,11 +1475,10 @@ def goals_api():
 # CAR API
 # ─────────────────────────────────────────────────────
 
-def loadcar():
+def load_car():
     if not os.path.exists(CAR_FILE):
         return {"km": 0, "services": [], "gas": [], "notes": ""}
     try:
-        print('sdifhiosdf')
         with open(CAR_FILE, encoding="utf-8") as f:
             d = json.load(f)
         d.setdefault("km", 0)
@@ -1439,11 +1496,11 @@ def save_car(data):
 @app.route("/api/car", methods=["GET", "POST"])
 def car_api():
     if request.method == "GET":
-        return jsonify(loadcar())
+        return jsonify(load_car())
     data = request.json
     if not isinstance(data, dict):
         return jsonify({"ok": False, "error": "expected a dict"}), 400
-    existing = loadcar()
+    existing = load_car()
     # Only update known keys to protect data
     for key in ("km", "services", "gas", "notes"):
         if key in data:

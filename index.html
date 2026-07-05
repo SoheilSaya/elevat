@@ -3010,60 +3010,184 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 </div><!-- /app -->
 
 
-<!-- Score Breakdown Modal -->
+<!-- Score Breakdown Modal (editable) -->
+<style>
+  .score-input{width:52px;padding:4px 6px;border:1.5px solid var(--cream3);border-radius:6px;font-size:12px;font-weight:700;text-align:center;font-family:'JetBrains Mono',monospace;background:#fff;}
+  .score-input.wide{width:66px;}
+  .score-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+</style>
 <div class="overlay" id="scoreBreakdownOverlay">
-  <div class="modal" style="max-width:520px;max-height:80vh;overflow-y:auto;">
+  <div class="modal" style="max-width:560px;max-height:80vh;overflow-y:auto;">
     <h3>📊 How Scoring Works</h3>
-    <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">Total 100 points across all categories. Here's what each thing is worth:</p>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">Every number below is yours to tweak — percentages auto-normalize to 100, whatever you set.</p>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <div style="background:var(--sageL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🏋️ Gym Session — 20 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full session: <b>20 pts</b> · Half session: <b>10 pts</b> · Rest day: <b>0 pts</b> · Skipped (should've gone): <b>−5 pts penalty</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🏋️ Gym Session</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Full <input class="score-input" type="number" data-key="gym_full" step="1"> ·
+          Half <input class="score-input" type="number" data-key="gym_half" step="1"> ·
+          Rest day 0 (fixed) ·
+          Skipped <input class="score-input" type="number" data-key="gym_skipped" step="1"> (penalty)
+        </div>
       </div>
       <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🏠 Home Exercise — 10 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full session: <b>10 pts</b> · Light / Short: <b>5 pts</b> · None: <b>0 pts</b> (no penalty)</div>
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🏠 Home Exercise</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Full <input class="score-input" type="number" data-key="home_full" step="1"> ·
+          Light/Short <input class="score-input" type="number" data-key="home_half" step="1"> ·
+          None 0 (no penalty)
+        </div>
       </div>
       <div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🍽️ Food — 12 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Homemade: <b>12 pts</b> · Healthy out: <b>8 pts</b> · Junk food: <b>2 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🍽️ Food</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Homemade <input class="score-input" type="number" data-key="food_homemade" step="1"> ·
+          Healthy out <input class="score-input" type="number" data-key="food_healthy_out" step="1"> ·
+          Junk <input class="score-input" type="number" data-key="food_junk" step="1">
+        </div>
       </div>
       <div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🔥 Calories + 💪 Protein — 10 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Calories near 1500 target: up to <b>5 pts</b> · Protein near 176g target: up to <b>5 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🔥 Calories + 💪 Protein</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Calories: target <input class="score-input wide" type="number" data-key="cal_target" step="10"> kcal — every <input class="score-input wide" type="number" data-key="cal_over_amount" step="10"> kcal <b>over</b> costs <input class="score-input" type="number" data-key="cal_over_cost" step="0.5"> pts, every <input class="score-input wide" type="number" data-key="cal_under_amount" step="10"> kcal <b>under</b> rewards <input class="score-input" type="number" data-key="cal_under_reward" step="0.5"> pts (no cap either way)
+        </div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
+          Protein: up to <input class="score-input" type="number" data-key="prot_max" step="1"> pts at target <input class="score-input wide" type="number" data-key="prot_target" step="1">g
+        </div>
       </div>
       <div style="background:var(--plumL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">📚 Study — 28 pts total</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Uni study: up to <b>12 pts</b> (full at 2h) · Car courses: up to <b>8 pts</b> (full at 1h) · Self dev: up to <b>8 pts</b> (full at 1h)</div>
+        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">📚 Study</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Uni study: up to <input class="score-input" type="number" data-key="uni_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="uni_target_mins" step="5"> min)
+        </div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
+          Car courses: up to <input class="score-input" type="number" data-key="car_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="car_target_mins" step="5"> min)
+        </div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
+          Self dev: up to <input class="score-input" type="number" data-key="selfdev_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="selfdev_target_mins" step="5"> min)
+        </div>
       </div>
       <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">💊 Pills + ⚖️ Weight — 10 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Pills taken: <b>8 pts</b> · Weight logged: <b>2 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">💊 Pills + ⚖️ Weight</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Pills taken <input class="score-input" type="number" data-key="pills" step="1"> ·
+          Weight logged <input class="score-input" type="number" data-key="weight_logged" step="1">
+        </div>
       </div>
       <div style="background:var(--roseL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--rose);margin-bottom:6px;">✨ Skincare — 6 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Full routine: <b>6 pts</b> · Half done: <b>3 pts</b> · Skipped: <b>0 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--rose);margin-bottom:6px;">✨ Skincare</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Full routine <input class="score-input" type="number" data-key="skincare_full" step="1"> ·
+          Half done <input class="score-input" type="number" data-key="skincare_half" step="1"> ·
+          Skipped 0 (fixed)
+        </div>
       </div>
       <div style="background:var(--sageL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🧠 Mood + Pain — 11 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Mood (1–10): up to <b>6 pts</b> · Low pain score: up to <b>5 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--sage);margin-bottom:6px;">🧠 Mood + Pain</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Mood (1–10): up to <input class="score-input" type="number" data-key="mood_max" step="1"> pts ·
+          Low pain: up to <input class="score-input" type="number" data-key="pain_max" step="1"> pts
+        </div>
       </div>
-<div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
-  <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🤝 Social + 💧 No Soda + 🍎 Fruit/Veg — 16 pts</div>
-  <div style="font-size:12px;color:var(--text2);line-height:1.7;">Met IRL: <b>8 pts</b> · Chatted: <b>4 pts</b> · Solo: <b>0 pts</b> · No soda: <b>4 pts</b> · Fruit/veg: <b>4 pts</b></div>
-</div>
+      <div style="background:var(--amberL);border-radius:var(--r2);padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--amber);margin-bottom:6px;">🤝 Social + 💧 No Soda + 🍎 Fruit/Veg</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Met IRL <input class="score-input" type="number" data-key="social_irl" step="1"> ·
+          Chatted <input class="score-input" type="number" data-key="social_chat" step="1"> ·
+          Solo 0 (fixed) ·
+          No soda <input class="score-input" type="number" data-key="soda_free" step="1"> ·
+          Fruit/veg <input class="score-input" type="number" data-key="fruit_veg" step="1">
+        </div>
+      </div>
       <div style="background:var(--skyL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🪥 Teeth + 🧘 Meditation — 8 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Brushed twice: <b>4 pts</b> · Once: <b>2 pts</b> · Meditated: <b>4 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--sky);margin-bottom:6px;">🪥 Teeth + 🧘 Meditation</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Per brush <input class="score-input" type="number" data-key="teeth_per_brush" step="1"> (cap <input class="score-input" type="number" data-key="teeth_max" step="1">) ·
+          Meditated <input class="score-input" type="number" data-key="meditation" step="1">
+        </div>
       </div>
       <div style="background:var(--plumL);border-radius:var(--r2);padding:12px 14px;">
-        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">😴 Sleep — 6 pts</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Sleeping before midnight + waking 7–9am = up to <b>6 pts</b></div>
+        <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">😴 Sleep</div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);">
+          Sleeping before midnight + waking 7–9am: up to <input class="score-input" type="number" data-key="sleep_max" step="1"> pts
+        </div>
       </div>
     </div>
-    <div class="modal-btns" style="margin-top:16px;">
-      <button class="btn-ok" onclick="document.getElementById('scoreBreakdownOverlay').classList.remove('open')">Got it</button>
+    <div id="scoreConfigMsg" style="font-size:11px;color:var(--text3);margin-top:10px;min-height:14px;"></div>
+    <div class="modal-btns" style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn-cancel" onclick="resetScoreConfig()">↺ Reset to defaults</button>
+      <button class="btn-cancel" onclick="document.getElementById('scoreBreakdownOverlay').classList.remove('open')">Close</button>
+      <button class="btn-ok" onclick="saveScoreConfig()">Save Weights</button>
     </div>
+    <script>
+    (function(){
+      const overlay = document.getElementById('scoreBreakdownOverlay');
+      const msgEl = document.getElementById('scoreConfigMsg');
+
+      function fillInputs(cfg){
+        overlay.querySelectorAll('.score-input').forEach(inp=>{
+          const k = inp.dataset.key;
+          if(k in cfg) inp.value = cfg[k];
+        });
+      }
+
+      window.loadScoreConfig = async function(){
+        try{
+          const res = await fetch('/api/score_config');
+          const cfg = await res.json();
+          fillInputs(cfg);
+        }catch(e){ console.error('score config load failed', e); }
+      };
+
+      window.saveScoreConfig = async function(){
+        const payload = {};
+        overlay.querySelectorAll('.score-input').forEach(inp=>{
+          const v = parseFloat(inp.value);
+          if(!isNaN(v)) payload[inp.dataset.key] = v;
+        });
+        try{
+          const res = await fetch('/api/score_config', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if(data.ok){
+            fillInputs(data.config);
+            msgEl.textContent = 'Saved. Scores everywhere now use these weights.';
+            if(typeof loadToday === 'function') loadToday();
+            if(typeof refreshStats === 'function') refreshStats();
+          }else{
+            msgEl.textContent = 'Save failed.';
+          }
+        }catch(e){
+          console.error('score config save failed', e);
+          msgEl.textContent = 'Save failed — check connection.';
+        }
+      };
+
+      window.resetScoreConfig = async function(){
+        if(!confirm('Reset all scoring weights to their defaults?')) return;
+        try{
+          const res = await fetch('/api/score_config', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'reset'})
+          });
+          const data = await res.json();
+          if(data.ok){
+            fillInputs(data.config);
+            msgEl.textContent = 'Reset to defaults.';
+            if(typeof loadToday === 'function') loadToday();
+            if(typeof refreshStats === 'function') refreshStats();
+          }
+        }catch(e){ console.error('score config reset failed', e); }
+      };
+
+      // Populate on initial page load, and again every time this modal is opened
+      // (covers being opened more than once without a page reload).
+      document.addEventListener('DOMContentLoaded', loadScoreConfig);
+      new MutationObserver(muts=>{
+        if(overlay.classList.contains('open')) loadScoreConfig();
+      }).observe(overlay, {attributes:true, attributeFilter:['class']});
+    })();
+    </script>
   </div>
 </div>
 
@@ -3489,7 +3613,7 @@ function updateMetrics(){
 
 // ─── SCORE ─────────────────────────────────────────
 function updateScore(s){
-  document.getElementById('ringPct').textContent=s+'%';
+  document.getElementById('ringPct').textContent=s;
   const circ=2*Math.PI*52;
   document.getElementById('ringFg').style.strokeDashoffset=circ-(s/100)*circ;
   const e=s>=90?'🔥':s>=75?'⚡':s>=60?'✅':s>=40?'📈':'🌱';
@@ -3577,7 +3701,7 @@ async function saveAll(){
   const d=await r.json();
   updateScore(d.score);
   const label = activeDate ? '✏️ Past day saved!' : 'Saved';
-  showToast(label+' — Score: '+d.score+'%','success');
+  showToast(label+' — Score: '+d.score,'success');
   updateMetrics();
   renderDateSwitcher(); // refresh dots
 }
