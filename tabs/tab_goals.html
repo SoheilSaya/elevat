@@ -20,13 +20,33 @@
   background:#fff;
   border:1.5px solid var(--warm);
   border-radius:var(--r);
-  padding:20px 18px;
+  padding:18px 18px 16px;
   box-shadow:var(--shadow);
-  text-align:center;
+  position:relative;
+  overflow:hidden;
 }
+.goal-stat-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:3px;
+}
+.goal-stat-card.st-total::before  { background:var(--sky); }
+.goal-stat-card.st-done::before   { background:var(--sage); }
+.goal-stat-card.st-active::before { background:var(--coral); }
+.goal-stat-card.st-budget::before { background:var(--amber); }
+.goal-stat-icon {
+  width:30px; height:30px;
+  border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:12px;
+}
+.goal-stat-icon svg { width:15px; height:15px; display:block; }
+.st-total .goal-stat-icon  { background:var(--skyL);   color:var(--sky); }
+.st-done .goal-stat-icon   { background:var(--sageL);  color:var(--sage); }
+.st-active .goal-stat-icon { background:var(--coralL); color:var(--coral); }
+.st-budget .goal-stat-icon { background:var(--amberL); color:var(--amber); }
 .goal-stat-num {
   font-family:'Fraunces',serif;
-  font-size:36px;
+  font-size:34px;
   font-weight:700;
   color:var(--ink);
   line-height:1;
@@ -36,7 +56,7 @@
   color:var(--text3);
   text-transform:uppercase;
   letter-spacing:.08em;
-  margin-top:6px;
+  margin-top:7px;
   font-weight:600;
 }
 .goal-stat-sub {
@@ -90,144 +110,159 @@
 /* Goal cards grid */
 .goals-grid {
   display:grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap:18px;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap:20px;
 }
 
 .goal-card {
   background:#fff;
   border:1.5px solid var(--warm);
   border-radius:var(--r);
-  padding:22px;
   box-shadow:var(--shadow);
-  transition:all .2s;
+  transition:transform .2s, box-shadow .2s, border-color .2s;
   animation:fadeUp .35s ease both;
   position:relative;
   overflow:hidden;
+  display:flex;
 }
-.goal-card:hover { border-color:var(--warmD); transform:translateY(-2px); box-shadow:var(--shadow2); }
+.goal-card:hover { border-color:var(--warmD); transform:translateY(-3px); box-shadow:var(--shadow2); }
+.goal-card[draggable="true"] { cursor:grab; }
+.goal-card.dragging { opacity:.4; }
+.goal-card.drag-over { border-color:var(--coral); box-shadow:0 0 0 3px var(--coralL); }
+.goal-card.pinned { box-shadow:0 0 0 2px var(--amberL), var(--shadow); }
+.goal-card.is-done { opacity:.82; }
 
-.goal-card-accent {
-  position:absolute;
-  top:0; left:0; right:0;
-  height:3px;
-  border-radius:var(--r) var(--r) 0 0;
+.goal-card-spine { width:5px; flex-shrink:0; }
+
+.goal-card-inner {
+  flex:1;
+  min-width:0;
+  padding:20px 22px 22px;
 }
 
-.goal-card-top {
+.goal-card-head {
   display:flex;
   align-items:flex-start;
-  justify-content:space-between;
-  margin-bottom:14px;
+  gap:12px;
+  margin-bottom:16px;
 }
+.goal-card-badge {
+  width:40px; height:40px;
+  border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.goal-card-badge svg { width:19px; height:19px; }
+.goal-card-badge.cat-financial     { background:var(--sageL);  color:var(--sage); }
+.goal-card-badge.cat-professional  { background:var(--skyL);   color:var(--sky); }
+.goal-card-badge.cat-looks         { background:var(--roseL);  color:var(--rose); }
+.goal-card-badge.cat-social        { background:var(--amberL); color:var(--amber); }
+
+.goal-card-headtext { flex:1; min-width:0; }
 .goal-card-title {
   font-family:'Fraunces',serif;
   font-size:17px;
   font-weight:700;
   color:var(--ink);
   line-height:1.3;
-  flex:1;
-  padding-right:10px;
 }
-.goal-card-actions {
+.goal-card-title.is-done { text-decoration:line-through; text-decoration-color:var(--sage); text-decoration-thickness:2px; }
+.goal-card-eyebrow {
   display:flex;
+  align-items:center;
   gap:6px;
-  flex-shrink:0;
+  margin-top:6px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  flex-wrap:wrap;
 }
+.goal-card-eyebrow svg { width:12px; height:12px; display:block; }
+.goal-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.eyebrow-sep { color:var(--cream3); }
+
+.goal-card-actions { display:flex; gap:5px; flex-shrink:0; }
 .goal-icon-btn {
-  width:30px; height:30px;
+  width:28px; height:28px;
   border-radius:8px;
   border:1.5px solid var(--cream3);
   background:transparent;
   cursor:pointer;
-  font-size:14px;
   display:flex; align-items:center; justify-content:center;
   transition:all .15s;
   color:var(--text3);
+  padding:0;
 }
+.goal-icon-btn svg { width:14px; height:14px; display:block; }
 .goal-icon-btn:hover { background:var(--coralL); border-color:var(--coral); color:var(--coral); }
-.goal-icon-btn.done-btn:hover { background:var(--sageL); border-color:var(--sage); color:var(--sage); }
+.goal-icon-btn.done-btn.is-done { background:var(--sageL); border-color:var(--sage); color:var(--sage); }
+.goal-icon-btn.done-btn:hover   { background:var(--sageL); border-color:var(--sage); color:var(--sage); }
+.goal-icon-btn.pin-btn.active   { background:var(--amberL); border-color:var(--amber); color:var(--amber); }
 
-.goal-tags {
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-  margin-bottom:14px;
+/* Progress bar */
+.goal-progress-wrap { margin-bottom:14px; }
+.goal-progress-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; }
+.goal-progress-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:.06em; display:inline-flex; align-items:center; gap:6px; }
+.goal-progress-auto-badge {
+  font-size:9px; font-weight:700; color:var(--sage); background:var(--sageL);
+  padding:1px 6px; border-radius:50px; text-transform:uppercase; letter-spacing:.05em;
 }
-.goal-tag {
-  padding:3px 10px;
-  border-radius:50px;
-  font-size:11px;
-  font-weight:600;
+.goal-progress-pct { font-family:'Fraunces',serif; font-size:19px; font-weight:700; }
+.goal-progress-bar { height:8px; background:var(--cream2); border-radius:6px; overflow:hidden; }
+.goal-progress-fill { height:100%; border-radius:6px; transition:width .6s ease; position:relative; overflow:hidden; }
+.goal-progress-fill::after {
+  content:'';
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 70%);
 }
-.goal-tag.importance-high { background:var(--coralL); color:var(--coral); }
-.goal-tag.importance-med  { background:var(--amberL); color:var(--amber); }
-.goal-tag.importance-low  { background:var(--sageL);  color:var(--sage); }
-.goal-tag.diff-hard   { background:var(--plumL); color:var(--plum); }
-.goal-tag.diff-medium { background:var(--skyL);  color:var(--sky); }
-.goal-tag.diff-easy   { background:var(--sageL); color:var(--sage); }
-.goal-tag.status-done { background:var(--sageL); color:var(--sage); }
-.goal-tag.status-active { background:var(--skyL); color:var(--sky); }
-.goal-tag.status-paused { background:var(--amberL); color:var(--amber); }
-.goal-tag.cat-financial   { background:var(--sageL);  color:var(--sage); }
-.goal-tag.cat-professional{ background:var(--skyL);   color:var(--sky); }
-.goal-tag.cat-looks       { background:var(--roseL);  color:var(--rose); }
-.goal-tag.cat-social      { background:var(--amberL); color:var(--amber); }
+.goal-progress-note { font-size:10.5px; color:var(--text3); margin-top:5px; }
 
-.goal-meta-grid {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-bottom:14px;
-}
-.goal-meta-item {
+/* Meta grid */
+.goal-meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.goal-meta-item { display:flex; align-items:center; gap:10px; background:var(--cream2); border-radius:var(--r2); padding:10px 12px; }
+.goal-meta-icon { width:26px; height:26px; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--text3); }
+.goal-meta-icon svg { width:13px; height:13px; display:block; }
+.goal-meta-label { font-size:9.5px; color:var(--text3); text-transform:uppercase; letter-spacing:.07em; font-weight:700; }
+.goal-meta-val { font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink); margin-top:1px; }
+.goal-meta-val.empty { color:var(--text3); font-weight:500; font-family:inherit; font-size:12.5px; }
+
+/* Daily task CTA */
+.goal-daily-task {
+  display:flex; align-items:center; gap:12px;
   background:var(--cream2);
+  border:1.5px dashed var(--cream3);
   border-radius:var(--r2);
-  padding:10px 12px;
+  padding:11px 13px;
+  margin-bottom:12px;
+  transition:all .15s;
 }
-.goal-meta-label {
-  font-size:10px;
-  color:var(--text3);
-  text-transform:uppercase;
-  letter-spacing:.07em;
-  font-weight:600;
-  margin-bottom:3px;
+.goal-daily-task.done { background:var(--sageL); border:1.5px solid var(--sage); }
+.goal-daily-check {
+  width:32px; height:32px; flex-shrink:0;
+  border-radius:50%;
+  border:2px solid var(--cream3);
+  background:#fff;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+  color:transparent;
 }
-.goal-meta-val {
-  font-family:'Fraunces',serif;
-  font-size:15px;
-  font-weight:600;
-  color:var(--ink);
-}
-
-/* Progress bar on card */
-.goal-progress-wrap { margin-bottom:10px; }
-.goal-progress-header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:6px;
-}
-.goal-progress-label { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
-.goal-progress-pct { font-family:'Fraunces',serif; font-size:15px; font-weight:700; color:var(--ink); }
-.goal-progress-bar {
-  height:6px;
-  background:var(--cream3);
-  border-radius:6px;
-  overflow:hidden;
-}
-.goal-progress-fill {
-  height:100%;
-  border-radius:6px;
-  transition:width .6s;
-}
+.goal-daily-check:hover { border-color:var(--sage); }
+.goal-daily-check svg { width:15px; height:15px; display:block; }
+.goal-daily-task.done .goal-daily-check { background:var(--sage); border-color:var(--sage); color:#fff; }
+.goal-daily-task-text { flex:1; }
+.goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
+.goal-daily-task.done .goal-daily-task-label { color:var(--sage); }
+.goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
 
 .goal-notes {
   font-size:12px;
   color:var(--text2);
   line-height:1.6;
-  margin-top:10px;
-  padding-top:10px;
+  margin-top:2px;
+  padding-top:12px;
   border-top:1.5px solid var(--cream2);
   font-style:italic;
 }
@@ -242,6 +277,7 @@
   border-radius:50px;
   margin-top:8px;
 }
+.goal-deadline-pill svg { width:11px; height:11px; display:block; }
 .goal-deadline-pill.on-track { background:var(--sageL); color:var(--sage); }
 .goal-deadline-pill.at-risk  { background:var(--amberL); color:var(--amber); }
 .goal-deadline-pill.overdue  { background:var(--coralL); color:var(--coral); }
@@ -308,22 +344,26 @@
 <div id="goals-view">
   <!-- ── Stats hero ──────────────────────── -->
   <div class="goals-hero" id="goalsHero">
-    <div class="goal-stat-card">
+    <div class="goal-stat-card st-total">
+      <div class="goal-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg></div>
       <div class="goal-stat-num" id="gStatTotal">0</div>
       <div class="goal-stat-label">Total Goals</div>
       <div class="goal-stat-sub">across all categories</div>
     </div>
-    <div class="goal-stat-card">
+    <div class="goal-stat-card st-done">
+      <div class="goal-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"/></svg></div>
       <div class="goal-stat-num" style="color:var(--sage)" id="gStatDone">0</div>
-      <div class="goal-stat-label">Achieved ✅</div>
+      <div class="goal-stat-label">Achieved</div>
       <div class="goal-stat-sub" id="gStatDonePct">— % completion</div>
     </div>
-    <div class="goal-stat-card">
+    <div class="goal-stat-card st-active">
+      <div class="goal-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4-.7 6-3.6 6-7.3 0-1.9-.8-3.5-1.8-4.7.1 1.8-.8 2.7-1.7 2.7.2-2.7-.9-5.4-3.5-7.2.3 2.6-1.4 4.4-3 6.7-1 1.5-1.8 2.8-1.8 5.1 0 3.5 2.6 4.7 5.8 4.7z"/></svg></div>
       <div class="goal-stat-num" style="color:var(--coral)" id="gStatActive">0</div>
-      <div class="goal-stat-label">Active Now 🔥</div>
+      <div class="goal-stat-label">Active Now</div>
       <div class="goal-stat-sub">in progress</div>
     </div>
-    <div class="goal-stat-card">
+    <div class="goal-stat-card st-budget">
+      <div class="goal-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.3c0-1.3 1.3-2.3 3-2.3s3 .8 3 1.9c0 2.5-6 1.5-6 4 0 1.3 1.3 2.1 3 2.1s3-.9 3-2.2"/></svg></div>
       <div class="goal-stat-num" style="color:var(--amber)" id="gStatBudget">0</div>
       <div class="goal-stat-label">Total Budget</div>
       <div class="goal-stat-sub" id="gStatBudgetUnit">Million T</div>
@@ -467,6 +507,18 @@
             <input type="number" class="modal-input" id="gTimeSpent" placeholder="0" min="0" style="margin:0;flex:1;" oninput="goalsUpdateProgressMode()"/>
             <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Daily task: only relevant when total hours is set (shown/hidden via goalsUpdateProgressMode) -->
+      <div class="goal-form-row" id="gDailyTaskWrap" style="display:none;">
+        <div>
+          <div class="builder-label" style="margin-bottom:6px;">📌 Daily task (hrs/day)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="modal-input" id="gDailyHours" placeholder="e.g. 1" min="0" step="0.25" style="margin:0;flex:1;"/>
+            <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs/day</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">Adds a checkbox to the goal card — tick it once a day to log these hours automatically.</div>
         </div>
       </div>
 

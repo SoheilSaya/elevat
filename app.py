@@ -1300,6 +1300,17 @@ def manage_people():
                 p["notes"] = data.get("notes", "")
                 break
 
+    elif action == "update_person":
+        for p in db["people"]:
+            if p["id"] == data["id"]:
+                name = data.get("name", "").strip()
+                if name:
+                    p["name"] = name
+                p["category"] = data.get("category", p.get("category", "friend"))
+                p["importance"] = data.get("importance", p.get("importance", 0))
+                p["contact"] = data.get("contact", "")
+                break
+
     elif action == "update_me_photo":
         db["me_photo"] = data.get("photo", "")
 

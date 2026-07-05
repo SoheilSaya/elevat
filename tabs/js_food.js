@@ -202,6 +202,11 @@ function renderFoodView() {
               <button class="m-btn sage" onclick="addIngredient()" style="white-space:nowrap;">+ Add</button>
             </div>
             <input type="text" class="m-input" id="newIngrCustomUnit" placeholder='Describe unit e.g. "10 inch pizza", "پرس چلوکباب"' style="display:none;width:100%;"/>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <input type="number" class="m-input" id="newIngrCalories" placeholder="kcal per unit" step="0.1" min="0" style="width:100%;"/>
+              <input type="number" class="m-input" id="newIngrProtein" placeholder="Protein g per unit" step="0.1" min="0" style="width:100%;"/>
+            </div>
+            <div style="font-size:11px;color:var(--text4);font-style:italic;">Calories get +10% bumped automatically on save, to keep estimates cautious</div>
           </div>
         </div>
       </div>
@@ -238,7 +243,7 @@ function renderMealBlock(mealDef) {
             <div class="meal-item-name">${item.name}</div>
             ${item.note ? '<div class="meal-item-detail">'+item.note+'</div>' : ''}
           </div>
-          <div class="meal-item-qty">${item.qty} ${item.unit}</div>
+          <div class="meal-item-qty">${item.qty} ${item.unit}${item.calories?' · '+item.calories+'kcal':''}${item.protein?' · '+item.protein+'g P':''}</div>
           <button class="meal-item-del" onclick="removeMealItem('${mealDef.id}',${i})">×</button>
         </div>`).join('') : '<div class="meal-empty">Nothing added yet</div>'}
     </div>
@@ -252,7 +257,7 @@ function renderIngrGrid() {
       <div class="ingr-card-icon">${i.icon}</div>
       <div class="ingr-card-info">
         <div class="ingr-card-name">${i.name}</div>
-        <div class="ingr-card-unit">${i.unit} · ${i.category}</div>
+        <div class="ingr-card-unit">${i.unit} · ${i.category}${(i.calories||i.protein)?' · '+(i.calories||0)+'kcal/'+(i.protein||0)+'g P per '+i.unit:''}</div>
       </div>
       <button class="ingr-card-del" onclick="event.stopPropagation();deleteIngredient('${i.id}')" title="Delete">×</button>
     </div>`).join('');
@@ -425,13 +430,18 @@ async function addIngredient() {
   const customUnitVal = document.getElementById('newIngrCustomUnit')?.value.trim() || '';
   const unit = unitSel === 'custom' ? (customUnitVal || 'عدد') : unitSel;
   const category = document.getElementById('newIngrCategory').value;
+  const rawCal = parseFloat(document.getElementById('newIngrCalories').value) || 0;
+  const protein = parseFloat(document.getElementById('newIngrProtein').value) || 0;
+  const calories = Math.round(rawCal * 1.1 * 10) / 10; // +10% caution buffer on calories only
   if (!name) { showToast('Enter ingredient name',''); return; }
   const r = await fetch('/api/food/ingredients', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'add', name, icon, unit, category }) });
+    body: JSON.stringify({ action:'add', name, icon, unit, category, calories, protein }) });
   const d = await r.json();
   F.ingredients = d.ingredients;
   document.getElementById('newIngrName').value = '';
   document.getElementById('newIngrIcon').value = '';
+  document.getElementById('newIngrCalories').value = '';
+  document.getElementById('newIngrProtein').value = '';
   const ci = document.getElementById('newIngrCustomUnit');
   if (ci) { ci.value = ''; ci.style.display = 'none'; }
   document.getElementById('newIngrUnit').value = 'g';
@@ -581,20 +591,35 @@ async function confirmFoodItem() {
   const isCustom = ingr.unit === 'custom';
   const customDesc = isCustom ? (document.getElementById('foodCustomUnitInput')?.value.trim() || '') : '';
   const displayUnit = isCustom ? (customDesc || 'عدد') : ingr.unit;
+  const itemCal = Math.round((ingr.calories||0) * qty);
+  const itemProt = Math.round((ingr.protein||0) * qty * 10) / 10;
   let mealEntry = F.entry.meals.find(m => m.meal_id === F.addingToMeal);
   if (!mealEntry) { mealEntry = { meal_id: F.addingToMeal, items: [] }; F.entry.meals.push(mealEntry); }
-  mealEntry.items.push({ ingredient_id: ingr.id, name: ingr.name, icon: ingr.icon, unit: displayUnit, qty, note });
+  mealEntry.items.push({ ingredient_id: ingr.id, name: ingr.name, icon: ingr.icon, unit: displayUnit, qty, note, calories: itemCal, protein: itemProt });
+  recalcMacrosFromItems();
   closeFoodItemModal();
   await saveFoodEntry();
   renderFoodView();
-  showToast('Added ✓','success');
+  showToast('Added ✓ +'+itemCal+' kcal · +'+itemProt+'g protein','success');
 }
 
 async function removeMealItem(mealId, idx) {
   const mealEntry = F.entry.meals.find(m => m.meal_id === mealId);
   if (mealEntry) mealEntry.items.splice(idx, 1);
+  recalcMacrosFromItems();
   await saveFoodEntry();
   renderFoodView();
+}
+
+// Sum calories/protein across all logged items for the day and set as the day's totals
+function recalcMacrosFromItems() {
+  let cal = 0, prot = 0;
+  (F.entry.meals||[]).forEach(m => (m.items||[]).forEach(it => {
+    cal += it.calories || 0;
+    prot += it.protein || 0;
+  }));
+  F.entry.calories = Math.round(cal);
+  F.entry.protein = Math.round(prot * 10) / 10;
 }
 
 // ── Macros ────────────────────────────────────────

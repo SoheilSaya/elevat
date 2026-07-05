@@ -452,6 +452,34 @@ function pplPickCat(cat,btn) {
   btn.className='chip sel-'+({family:'coral',friend:'sage',online:'sky',date:'rose'}[cat]||'ink');
 }
 
+function pplToggleEditInfo(id){
+  const form=document.getElementById('pdEditForm_'+id);
+  if(!form) return;
+  form.style.display=form.style.display==='none'?'block':'none';
+}
+
+function pplEditPickCat(id,cat,btn){
+  PPL['_editCat_'+id]=cat;
+  document.querySelectorAll('#pdEditCatChips_'+id+' .chip').forEach(c=>{c.className='chip';});
+  btn.className='chip sel-'+({family:'coral',friend:'sage',online:'sky',date:'rose'}[cat]||'ink');
+}
+
+async function savePersonInfo(id){
+  const p=PPL.people.find(x=>x.id===id);
+  if(!p) return;
+  const name=document.getElementById('pdEditName_'+id).value.trim();
+  if(!name){showToast('Name can\'t be empty','');return;}
+  const category=PPL['_editCat_'+id]||p.category||'friend';
+  const importance=parseInt(document.getElementById('pdEditImportance_'+id).value)||0;
+  const contact=document.getElementById('pdEditContact_'+id).value.trim();
+  await fetch('/api/people',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'update_person',id,name,category,importance,contact})});
+  delete PPL['_editCat_'+id];
+  await pplLoad();
+  pplShowDetail(id);
+  showToast('Saved ✓','success');
+}
+
 function pplFilterCat(cat,btn) {
   PPL.filterCat=cat;
   document.querySelectorAll('.ppl-cat').forEach(c=>c.classList.remove('sel'));
@@ -594,7 +622,38 @@ function pplShowDetail(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
         <div style="font-size:11px;font-weight:700;color:${alertColors[alert]||'var(--text3)'};">${alertLabels[alert]||''}</div>
+        <button class="pd-action-btn" onclick="pplToggleEditInfo('${id}')" id="pdEditToggle_${id}" style="color:var(--sky);border-color:var(--sky);font-size:12px;">✎ Edit</button>
         <button class="pd-action-btn" onclick="deletePerson('${id}')" style="color:var(--coral);border-color:var(--coral);font-size:12px;">Remove</button>
+      </div>
+    </div>
+
+    <div id="pdEditForm_${id}" style="display:none;margin-bottom:20px;padding:16px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);">
+      <div class="fgroup">
+        <div class="flabel">Name</div>
+        <input class="m-input" id="pdEditName_${id}" value="${(p.name||'').replace(/"/g,'&quot;')}" style="width:100%"/>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Status / category</div>
+        <div class="chips" id="pdEditCatChips_${id}">
+          <button type="button" class="chip${p.category==='family'?' sel-coral':''}" onclick="pplEditPickCat('${id}','family',this)">❤️ Family</button>
+          <button type="button" class="chip${p.category==='friend'?' sel-sage':''}" onclick="pplEditPickCat('${id}','friend',this)">🤝 Friend</button>
+          <button type="button" class="chip${p.category==='online'?' sel-sky':''}" onclick="pplEditPickCat('${id}','online',this)">💬 Online</button>
+          <button type="button" class="chip${p.category==='date'?' sel-rose':''}" onclick="pplEditPickCat('${id}','date',this)">💘 Date</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Closeness level <span id="pdEditImpDisplay_${id}" style="color:var(--sage);font-weight:800;">${imp}</span>/±5</div>
+        <input type="range" class="smart-slider" id="pdEditImportance_${id}" min="-5" max="5" step="1" value="${imp}"
+          oninput="const v=+this.value;const d=document.getElementById('pdEditImpDisplay_${id}');d.textContent=v;d.style.color=v>0?'var(--sage)':v<0?'var(--coral)':'var(--text3)';"
+          style="width:100%;"/>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Contact number</div>
+        <input class="m-input" id="pdEditContact_${id}" value="${(p.contact||'').replace(/"/g,'&quot;')}" placeholder="Phone, username…" style="width:100%"/>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="m-btn sage" onclick="savePersonInfo('${id}')" style="flex:1;">Save changes</button>
+        <button class="m-btn" onclick="pplToggleEditInfo('${id}')" style="flex:1;">Cancel</button>
       </div>
     </div>
 
@@ -941,53 +1000,115 @@ function pplCircleHullGeom(circleId){
   return {cx,cy,rx,ry};
 }
 
+// After this many ticks the layout is considered fully settled and the
+// soft simulation (repulsion + springs) stops being computed entirely —
+// nodes hold their exact position instead of jittering forever. The old
+// cooling factor floored at 0.12 and never reached zero, so the system
+// was *driven* forever, not decaying — that's what made it feel restless.
+const PPL_SIM_SETTLE_TICKS = 420; // ~7s at 60fps
+
+// True if two (non-ME) nodes are both members of at least one shared, visible circle.
+// ME is never considered "inside" a circle for this purpose.
+function pplNodesShareCircle(a,b){
+  if(a.isMe||b.isMe) return false;
+  if(!a.circles||!b.circles||!a.circles.length||!b.circles.length) return false;
+  return a.circles.some(cid=>b.circles.includes(cid) && !(PPL.circles.find(c=>c.id===cid)||{})._hidden);
+}
+
+// A spring with slack: no force at all until the deviation from the target
+// length exceeds a tolerance band, then a capped linear pull beyond that.
+// This is the fix for the "everything is cramping/jiggling" complaint — a rigid
+// spring that's always active fights the hard circle clamp on every single frame
+// for any bond that crosses a circle boundary (near-constant tug of war). A spring
+// with slack + a low cap means small, healthy variation in bond length costs
+// nothing, and only genuinely stretched-out bonds get a gentle (capped) pull.
+function pplSpringForce(dist, targetLen, k, cap){
+  const slack=targetLen*0.28; // ±28% of the target length is "free" — no tension at all
+  const diff=dist-targetLen;
+  if(Math.abs(diff)<slack) return 0;
+  const beyond=diff-Math.sign(diff)*slack;
+  return Math.max(-cap, Math.min(cap, beyond*k));
+}
+
 function pplGraphSimStep(){
   const nodes=PPL_GRAPH.nodes, edges=PPL_GRAPH.edges;
-  const cooling=Math.max(0.12, 1-PPL_GRAPH.tick/1200);
-  const damping=0.5;
+  const settled = PPL_GRAPH.tick >= PPL_SIM_SETTLE_TICKS;
 
-  // ── 1. Node-node repulsion (local only, no gravity) ──
-  for(let i=0;i<nodes.length;i++){
-    for(let j=i+1;j<nodes.length;j++){
-      const a=nodes[i], b=nodes[j];
-      const dx=b.x-a.x, dy=b.y-a.y;
-      const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
-      const minD=(pplNodeRadius(a)+pplNodeRadius(b))+10;
-      if(dist>=minD*4) continue;
-      // Capped so a pile-up of overlapping nodes (e.g. right after adding several
-      // at once) can never produce a single-frame catapult like the old 1/d^2 term did.
-      const repForce=Math.min(dist<minD ? 11000/(dist*dist) : 600/(dist*dist), 500);
-      const fx=(dx/dist)*repForce, fy=(dy/dist)*repForce;
-      a.vx-=fx; a.vy-=fy; b.vx+=fx; b.vy+=fy;
+  if(!settled){
+    // Quadratic ease-out: smoothly reaches exactly 0 at the settle point,
+    // instead of the old linear ramp that floored at 0.12 and stayed there forever.
+    const t=Math.max(0, 1-PPL_GRAPH.tick/PPL_SIM_SETTLE_TICKS);
+    const cooling=t*t;
+    const damping=0.6;
+
+    // Degree map — used to normalize spring pull per node below.
+    const degree={};
+    edges.forEach(e=>{ degree[e.from]=(degree[e.from]||0)+1; degree[e.to]=(degree[e.to]||0)+1; });
+
+    // ── 1. Node-node repulsion (local only, no gravity) ──
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i], b=nodes[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
+        const minD=(pplNodeRadius(a)+pplNodeRadius(b))+10;
+        if(dist>=minD*4) continue;
+        // Capped so a pile-up of overlapping nodes (e.g. right after adding several
+        // at once) can never produce a single-frame catapult like the old 1/d^2 term did.
+        const repForce=Math.min(dist<minD ? 11000/(dist*dist) : 600/(dist*dist), 500);
+        const fx=(dx/dist)*repForce, fy=(dy/dist)*repForce;
+        a.vx-=fx; a.vy-=fy; b.vx+=fx; b.vy+=fy;
+      }
     }
+
+    // ── 2. Edge springs — normalized by bond count, slack zone, capped, and
+    // near-silent for any bond that crosses a circle boundary (or touches ME) ──
+    // Three separate fixes for the "chaotic/cramping" complaint live here:
+    //  a) degree normalization — a node with 10 bonds no longer gets 10x the pull
+    //     of a node with 1 bond, so hubs stop being torn in every direction at once.
+    //  b) slack zone + cap (see pplSpringForce) — small natural variation in bond
+    //     length costs nothing, only real stretching gets a gentle capped pull.
+    //  c) cross-circle weakening — a bond between two people in different circles
+    //     (or any bond touching ME) is fighting the hard circle clamp by design:
+    //     the spring wants them close, the clamp requires them on opposite sides
+    //     of a boundary. That fight is what caused the constant jiggling. Cutting
+    //     the spring constant to ~6% for these bonds lets the clamp simply win.
+    edges.forEach(e=>{
+      const src=nodes.find(n=>n.id===e.from), tgt=nodes.find(n=>n.id===e.to);
+      if(!src||!tgt) return;
+      const dx=tgt.x-src.x, dy=tgt.y-src.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
+      const targetLen=e.isMyRel?190:140;
+      if(dist<6) return;
+      const crossesBoundary=PPL_GRAPH.showCircles && !pplNodesShareCircle(src,tgt);
+      const k=0.038*(crossesBoundary?0.06:1);
+      const force=pplSpringForce(dist, targetLen, k, 40);
+      if(force===0) return;
+      const fx=(dx/dist)*force, fy=(dy/dist)*force;
+      const srcN=Math.sqrt(degree[src.id]||1), tgtN=Math.sqrt(degree[tgt.id]||1);
+      src.vx+=fx/srcN; src.vy+=fy/srcN;
+      tgt.vx-=fx/tgtN; tgt.vy-=fy/tgtN;
+    });
+
+    // ── 3. Integrate positions (no gravity) ──
+    nodes.forEach(n=>{
+      if(PPL_GRAPH.dragging===n.id) return;
+      if(PPL_GRAPH.draggingCircle && n.circles && n.circles.includes(PPL_GRAPH.draggingCircle)) return;
+      if(PPL_GRAPH.selDragOffsets && PPL_GRAPH.selDragOffsets[n.id]) return;
+      n.vx*=damping; n.vy*=damping;
+      // Hard speed ceiling — belt-and-braces so no future force source can fling a node offscreen.
+      const _sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+      if(_sp>60){ n.vx=(n.vx/_sp)*60; n.vy=(n.vy/_sp)*60; }
+      n.x+=n.vx*cooling; n.y+=n.vy*cooling;
+    });
+  } else {
+    // Fully settled: hold position exactly. Zeroing velocity here means a stray
+    // leftover twitch (e.g. right after a drag-release) can't slowly re-accumulate
+    // into drift — the graph is genuinely at rest, not just moving very slowly.
+    nodes.forEach(n=>{ n.vx=0; n.vy=0; });
   }
 
-  // ── 2. Edge springs ──
-  edges.forEach(e=>{
-    const src=nodes.find(n=>n.id===e.from), tgt=nodes.find(n=>n.id===e.to);
-    if(!src||!tgt) return;
-    const dx=tgt.x-src.x, dy=tgt.y-src.y;
-    const dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const targetLen=e.isMyRel?190:140;
-    if(dist<6) return;
-    const force=(dist-targetLen)*0.038;
-    const fx=(dx/dist)*force, fy=(dy/dist)*force;
-    src.vx+=fx; src.vy+=fy; tgt.vx-=fx; tgt.vy-=fy;
-  });
-
-  // ── 3. Integrate positions (no gravity) ──
-  nodes.forEach(n=>{
-    if(PPL_GRAPH.dragging===n.id) return;
-    if(PPL_GRAPH.draggingCircle && n.circles && n.circles.includes(PPL_GRAPH.draggingCircle)) return;
-    if(PPL_GRAPH.selDragOffsets && PPL_GRAPH.selDragOffsets[n.id]) return;
-    n.vx*=damping; n.vy*=damping;
-    // Hard speed ceiling — belt-and-braces so no future force source can fling a node offscreen.
-    const _sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
-    if(_sp>60){ n.vx=(n.vx/_sp)*60; n.vy=(n.vy/_sp)*60; }
-    n.x+=n.vx*cooling; n.y+=n.vy*cooling;
-  });
-
-  // ── 4. HARD positional clamp — run AFTER integration ──
+  // ── 4. HARD positional clamp — always runs, every frame, settled or not ──
   // This is the wall. It is not a force. It teleports nodes that crossed the boundary.
   if(PPL_GRAPH.showCircles){
     PPL.circles.forEach(circle=>{
@@ -1043,6 +1164,29 @@ function pplGraphSimStep(){
         }
       });
     });
+  }
+
+  // ── 5. HARD no-overlap correction — always runs, every frame, settled or not ──
+  // Like the circle clamp above, this is a direct positional fix, not a force.
+  // Repulsion (step 1) can, in principle, leave a hair of residual overlap once
+  // the system is settled and forces have stopped being computed. This pass
+  // guarantees that never shows visually: any two nodes still touching get
+  // pushed apart by exactly half the overlap each, once, with no velocity
+  // involved — so it can never reintroduce jitter, it just quietly holds the
+  // "no overlap" guarantee true at all times.
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i], b=nodes[j];
+      if(PPL_GRAPH.dragging===a.id||PPL_GRAPH.dragging===b.id) continue;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
+      const minD=(pplNodeRadius(a)+pplNodeRadius(b))+8;
+      if(dist>=minD) continue;
+      const push=(minD-dist)/2;
+      const ux=dx/dist, uy=dy/dist;
+      a.x-=ux*push; a.y-=uy*push;
+      b.x+=ux*push; b.y+=uy*push;
+    }
   }
 }
 
@@ -1281,6 +1425,7 @@ function pplCircleAt(wx, wy){
 function pplGraphSetupEvents(canvas){
   let isPanning=false, panStart={x:0,y:0}, panOrigin={x:0,y:0};
   let isSelecting=false, selStart={x:0,y:0};
+  let clickCandidateId=null, clickStartPos={x:0,y:0};
 
   function nodeAt(cx,cy){
     const W=canvas.width,H=canvas.height;
@@ -1298,6 +1443,8 @@ function pplGraphSetupEvents(canvas){
     const {x,y}=xy(e);
     const w=worldXY(x,y);
     const node=nodeAt(x,y);
+    clickCandidateId=node?node.id:null;
+    clickStartPos={x,y};
 
     if(node){
       // Ctrl+click: toggle selection
@@ -1309,6 +1456,7 @@ function pplGraphSetupEvents(canvas){
       // Click on already-selected node: drag the whole selection
       if(PPL_GRAPH.selection.has(node.id) && PPL_GRAPH.selection.size>1){
         PPL_GRAPH.dragging=node.id;
+        PPL_GRAPH.tick=0; // reheat: let neighbors settle around the new position once dragging ends
         // store drag offsets for all selected nodes relative to clicked node
         PPL_GRAPH.selDragRef={x:w.x,y:w.y};
         PPL_GRAPH.selDragOffsets={};
@@ -1322,6 +1470,7 @@ function pplGraphSetupEvents(canvas){
       // Normal single-node drag
       PPL_GRAPH.selection.clear();
       PPL_GRAPH.dragging=node.id;
+      PPL_GRAPH.tick=0; // reheat: let neighbors settle around the new position once dragging ends
       canvas.classList.add('grabbing');
       return;
     }
@@ -1331,6 +1480,7 @@ function pplGraphSetupEvents(canvas){
       const hit=pplCircleAt(w.x,w.y);
       if(hit && !e.ctrlKey){
         PPL_GRAPH.draggingCircle=hit.circle.id;
+        PPL_GRAPH.tick=0; // reheat: let members re-settle around the moved circle
         // _circleDragStart already set by capture-phase handler above
         canvas.classList.add('grabbing');
         return;
@@ -1390,7 +1540,7 @@ function pplGraphSetupEvents(canvas){
     }
   });
 
-  window.addEventListener('mouseup',()=>{
+  window.addEventListener('mouseup',e=>{
     if(isSelecting && PPL_GRAPH.selRect){
       const r=PPL_GRAPH.selRect;
       PPL_GRAPH.nodes.forEach(n=>{
@@ -1399,7 +1549,21 @@ function pplGraphSetupEvents(canvas){
       });
       PPL_GRAPH.selRect=null;
     }
+    // Click (not a drag) on a node → open its person card in the sidebar
+    if(clickCandidateId && !e.ctrlKey && !e.metaKey){
+      const {x,y}=xy(e);
+      const moved=Math.sqrt((x-clickStartPos.x)**2+(y-clickStartPos.y)**2);
+      if(moved<5){
+        const clicked=PPL_GRAPH.nodes.find(n=>n.id===clickCandidateId);
+        if(clicked && !clicked.isMe){
+          pplShowDetail(clicked.id);
+          document.getElementById('personDetail')?.scrollIntoView({behavior:'smooth',block:'start'});
+        }
+      }
+    }
+    clickCandidateId=null;
     if(PPL_GRAPH.dragging) PPL_GRAPH.selDragOffsets=null;
+    if(PPL_GRAPH.dragging || PPL_GRAPH.draggingCircle) PPL_GRAPH.tick=0; // fresh settle window from the dropped position
     PPL_GRAPH.dragging=null;
     PPL_GRAPH.draggingCircle=null;
     PPL_GRAPH._circleDragStart=null;
@@ -1424,9 +1588,23 @@ function pplGraphSetupEvents(canvas){
 
   canvas.addEventListener('wheel',e=>{e.preventDefault();PPL_GRAPH.zoom=Math.max(0.2,Math.min(4,PPL_GRAPH.zoom*(e.deltaY>0?0.9:1.1)));},{passive:false});
   canvas.addEventListener('dblclick',e=>{const {x,y}=xy(e),node=nodeAt(x,y);if(node&&node.isMe)pplTriggerMePhoto();});
-  canvas.addEventListener('touchstart',e=>{if(e.touches.length===1){const {x,y}=xy(e),node=nodeAt(x,y);if(node)PPL_GRAPH.dragging=node.id;else{isPanning=true;panStart={x,y};panOrigin={x:PPL_GRAPH.pan.x,y:PPL_GRAPH.pan.y};}}});
+  canvas.addEventListener('touchstart',e=>{if(e.touches.length===1){const {x,y}=xy(e),node=nodeAt(x,y);clickCandidateId=node?node.id:null;clickStartPos={x,y};if(node){PPL_GRAPH.dragging=node.id;PPL_GRAPH.tick=0;}else{isPanning=true;panStart={x,y};panOrigin={x:PPL_GRAPH.pan.x,y:PPL_GRAPH.pan.y};}}});
   canvas.addEventListener('touchmove',e=>{e.preventDefault();if(e.touches.length===1){const {x,y}=xy(e);if(PPL_GRAPH.dragging){const w=worldXY(x,y);const node=PPL_GRAPH.nodes.find(n=>n.id===PPL_GRAPH.dragging);if(node){node.x=w.x;node.y=w.y;node.vx=0;node.vy=0;}}else if(isPanning){PPL_GRAPH.pan.x=panOrigin.x+(x-panStart.x);PPL_GRAPH.pan.y=panOrigin.y+(y-panStart.y);}}},{passive:false});
-  canvas.addEventListener('touchend',()=>{PPL_GRAPH.dragging=null;isPanning=false;});
+  canvas.addEventListener('touchend',e=>{
+    if(clickCandidateId){
+      const {x,y}=xy(e.changedTouches?{touches:e.changedTouches}:e);
+      const moved=Math.sqrt((x-clickStartPos.x)**2+(y-clickStartPos.y)**2);
+      if(moved<5){
+        const tapped=PPL_GRAPH.nodes.find(n=>n.id===clickCandidateId);
+        if(tapped && !tapped.isMe){
+          pplShowDetail(tapped.id);
+          document.getElementById('personDetail')?.scrollIntoView({behavior:'smooth',block:'start'});
+        }
+      }
+    }
+    clickCandidateId=null;
+    if(PPL_GRAPH.dragging)PPL_GRAPH.tick=0;PPL_GRAPH.dragging=null;isPanning=false;
+  });
 }
 
 function pplGraphReset(){
@@ -1481,6 +1659,8 @@ function pplGraphRelax(){
   }
   const clusterKeys=Object.keys(clusters);
   const GAP=14; // minimum gap kept between adjacent node edges
+  const clusterOf={};
+  clusterKeys.forEach(key=>clusters[key].forEach(n=>{clusterOf[n.id]=key;}));
 
   // ---- 2. Pack each cluster's members on a sub-circle sized from real radii (no overlap) ----
   const clusterInfo=clusterKeys.map(key=>{
@@ -1548,14 +1728,21 @@ function pplGraphRelax(){
       }
     }
 
-    // edge springs — pull bonded pairs toward their natural resting length
+    // edge springs — pull bonded pairs toward their natural resting length.
+    // Bonds crossing a cluster boundary (or touching ME) get near-zero tension:
+    // the cluster-slot anchor (HOME_K, below) already governs their position,
+    // so a full-strength spring here would just fight that anchor and reintroduce
+    // the same "cramping" tug-of-war this whole rewrite is meant to kill.
     PPL_GRAPH.edges.forEach(e=>{
       const src=allNodes.find(n=>n.id===e.from), tgt=allNodes.find(n=>n.id===e.to);
       if(!src||!tgt) return;
       const dx=tgt.x-src.x, dy=tgt.y-src.y;
       const dist=Math.sqrt(dx*dx+dy*dy)||1;
       const targetLen=e.isMyRel?190:140;
-      const force=Math.max(-REP_CAP,Math.min(REP_CAP,(dist-targetLen)*EDGE_K));
+      const sameCluster=(src!==me && tgt!==me && clusterOf[src.id]!==undefined && clusterOf[src.id]===clusterOf[tgt.id]);
+      const k=EDGE_K*(sameCluster?1:0.06);
+      const force=pplSpringForce(dist, targetLen, k, REP_CAP);
+      if(force===0) return;
       const fx=(dx/dist)*force, fy=(dy/dist)*force;
       if(src!==me){src.vx+=fx; src.vy+=fy;}
       if(tgt!==me){tgt.vx-=fx; tgt.vy-=fy;}
@@ -1583,9 +1770,26 @@ function pplGraphRelax(){
   nodes.forEach(n=>{ n.vx=0; n.vy=0; delete n._relaxHomeX; delete n._relaxHomeY; });
   if(me){me.x=0;me.y=0;me.vx=0;me.vy=0;}
 
-  // Layout is already calm and overlap-free — physics only needs to maintain it now,
-  // not fight its way out of a pile-up, so no catapult can happen on hand-off.
-  PPL_GRAPH.tick=0;
+  // Final belt-and-braces overlap guarantee (same rule as the live loop's step 5)
+  for(let pass=0;pass<3;pass++){
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i], b=nodes[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.sqrt(dx*dx+dy*dy)||0.01;
+        const minD=(pplNodeRadius(a)+pplNodeRadius(b))+8;
+        if(dist>=minD) continue;
+        const push=(minD-dist)/2;
+        const ux=dx/dist, uy=dy/dist;
+        a.x-=ux*push; a.y-=uy*push;
+        b.x+=ux*push; b.y+=uy*push;
+      }
+    }
+  }
+
+  // Layout is already calm and overlap-free — physics only needs a brief top-up
+  // (not a full reheat) to blend it in, then it freezes. No catapult, no do-over.
+  PPL_GRAPH.tick=Math.max(0, PPL_SIM_SETTLE_TICKS-60);
   if(!PPL_GRAPH.physicsOn){PPL_GRAPH.physicsOn=true;pplUpdatePhysicsBtn();}
   pplGraphFitView();
 }
