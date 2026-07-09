@@ -1281,8 +1281,8 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
     <button class="hist-filter-chip active" onclick="filterHist('all',this)">All time</button>
     <button class="hist-filter-chip" onclick="filterHist('week',this)">This week</button>
     <button class="hist-filter-chip" onclick="filterHist('month',this)">This month</button>
-    <button class="hist-filter-chip" onclick="filterHist('good',this)">🔥 Good days (≥75%)</button>
-    <button class="hist-filter-chip" onclick="filterHist('bad',this)">💪 Low days (&lt;40%)</button>
+    <button class="hist-filter-chip" onclick="filterHist('good',this)">🔥 Good days (≥75 pts)</button>
+    <button class="hist-filter-chip" onclick="filterHist('bad',this)">💪 Low days (&lt;40 pts)</button>
     <button class="hist-filter-chip" onclick="filterHist('gym',this)">🏋️ Gym days</button>
     <button class="hist-filter-chip" onclick="filterHist('social',this)">🎉 Social days</button>
     <button class="hist-filter-chip" onclick="filterHist('spent',this)">💸 Spending days</button>
@@ -3615,7 +3615,10 @@ function updateMetrics(){
 function updateScore(s){
   document.getElementById('ringPct').textContent=s;
   const circ=2*Math.PI*52;
-  document.getElementById('ringFg').style.strokeDashoffset=circ-(s/100)*circ;
+  // Score is raw points now (uncapped, can go negative or past 100) — clamp only the
+  // ring's visual fill so the arc doesn't wrap or invert; the number itself stays exact.
+  const pct=Math.max(0,Math.min(100,s));
+  document.getElementById('ringFg').style.strokeDashoffset=circ-(pct/100)*circ;
   const e=s>=90?'🔥':s>=75?'⚡':s>=60?'✅':s>=40?'📈':'🌱';
   const m=s>=90?'Legendary!':s>=75?'Crushing it!':s>=60?'Solid day':s>=40?'Getting there':'Start logging!';
   document.getElementById('scoreEmoji').textContent=e;
@@ -3944,7 +3947,7 @@ function renderInsights(){
   if(!statsData.length) return;
   const avg=arr=>arr.filter(v=>v!=null&&v>0).reduce((a,b)=>a+b,0)/(arr.filter(v=>v!=null&&v>0).length||1);
   const scores=statsData.map(d=>d.score);
-  const avgScore=Math.round(avg(scores));
+  const avgScore=Math.round(scores.reduce((a,b)=>a+b,0)/(scores.length||1));
   const best=Math.max(...scores);
   const gymFull=statsData.filter(d=>d.gym==='full').length;
   const gymPct=Math.round(gymFull/statsData.length*100);
@@ -3956,8 +3959,8 @@ function renderInsights(){
   const fvFull=statsData.filter(d=>d.fruit_veg).length;
   const fvPct=Math.round(fvFull/statsData.length*100);
   const ins=[
-    {label:'Avg Score',val:avgScore+'%',sub:'Last '+statsData.length+' days',trend:avgScore>=60?'↑ On track':'↓ Room to grow',tcolor:avgScore>=60?'var(--sage)':'var(--coral)'},
-    {label:'Best Day',val:best+'%',sub:'Personal record',trend:'🏆 Keep chasing it',tcolor:'var(--amber)'},
+    {label:'Avg Score',val:avgScore,sub:'Last '+statsData.length+' days',trend:avgScore>=60?'↑ On track':'↓ Room to grow',tcolor:avgScore>=60?'var(--sage)':'var(--coral)'},
+    {label:'Best Day',val:best,sub:'Personal record',trend:'🏆 Keep chasing it',tcolor:'var(--amber)'},
     {label:'Gym Rate',val:gymPct+'%',sub:gymFull+' full sessions',trend:gymPct>=50?'🔥 Consistent':'Keep showing up',tcolor:gymPct>=50?'var(--sage)':'var(--text3)'},
     {label:'Avg Weight',val:avgWeight||'—',sub:'kg, trend tracked',trend:avgWeight>0?'📉 vs 88kg start':'No data yet',tcolor:'var(--sky)'},
     {label:'Avg Mood',val:avgMood||'—',sub:'out of 10',trend:avgMood>=6?'😄 Feeling good':'Work on wellbeing',tcolor:avgMood>=6?'var(--sage)':'var(--amber)'},
@@ -3976,21 +3979,24 @@ function renderInsights(){
 }
 
 // Chart builder
+// `interpolate:true` marks metrics where 0/null means "not logged" rather than a
+// real zero — gaps in these get filled with the average of the nearest logged
+// day before and after, so a missed day doesn't look like a cliff in the chart.
 const METRICS={
   // ── Core score ──
-  score:{label:'Score %',fn:d=>d.score,color:'#e85d3a',group:'General'},
+  score:{label:'Score (pts)',fn:d=>d.score,color:'#e85d3a',group:'General',interpolate:true},
   // ── Body & mood ──
-  mood:{label:'Mood',fn:d=>d.mood,color:'#3a7a5a',group:'Body & Mind'},
-  pain:{label:'Pain',fn:d=>d.pain,color:'#c44a6a',group:'Body & Mind'},
-  weight:{label:'Weight (kg)',fn:d=>d.weight,color:'#7a3a6a',group:'Body & Mind'},
+  mood:{label:'Mood',fn:d=>d.mood,color:'#3a7a5a',group:'Body & Mind',interpolate:true},
+  pain:{label:'Pain',fn:d=>d.pain,color:'#c44a6a',group:'Body & Mind',interpolate:true},
+  weight:{label:'Weight (kg)',fn:d=>d.weight,color:'#7a3a6a',group:'Body & Mind',interpolate:true},
   // ── Food & nutrition ──
-  calories:{label:'Calories',fn:d=>d.calories,color:'#d4821a',group:'Food'},
-  protein:{label:'Protein (g)',fn:d=>d.protein,color:'#2a6a9a',group:'Food'},
+  calories:{label:'Calories',fn:d=>d.calories,color:'#d4821a',group:'Food',interpolate:true},
+  protein:{label:'Protein (g)',fn:d=>d.protein,color:'#2a6a9a',group:'Food',interpolate:true},
   // ── Study ──
-  uni_study_mins:{label:'Uni Study (min)',fn:d=>d.uni_study_mins,color:'#7a3a6a',group:'Study'},
-  car_courses_mins:{label:'Car Courses (min)',fn:d=>d.car_courses_mins,color:'#d4821a',group:'Study'},
-  selfdev_mins:{label:'Self Dev (min)',fn:d=>d.selfdev_mins,color:'#2a6a9a',group:'Study'},
-  // ── Habits ──
+  uni_study_mins:{label:'Uni Study (min)',fn:d=>d.uni_study_mins,color:'#7a3a6a',group:'Study',interpolate:true},
+  car_courses_mins:{label:'Car Courses (min)',fn:d=>d.car_courses_mins,color:'#d4821a',group:'Study',interpolate:true},
+  selfdev_mins:{label:'Self Dev (min)',fn:d=>d.selfdev_mins,color:'#2a6a9a',group:'Study',interpolate:true},
+  // ── Habits (binary/categorical — 0 is a real answer, not "no data", so no interpolation) ──
   pills:{label:'Pills',fn:d=>d.pills,color:'#2a6a9a',group:'Habits'},
   soda:{label:'Soda',fn:d=>d.soda,color:'#e85d3a',group:'Habits'},
   meditated:{label:'Meditated',fn:d=>d.meditated?1:0,color:'#5a9a7a',group:'Habits'},
@@ -3999,13 +4005,40 @@ const METRICS={
   fruit_veg:{label:'Fruits/Veggies',fn:d=>d.fruit_veg?100:0,color:'#3a7a5a',group:'Food'},
   home_exercise:{label:'Home Exercise',fn:d=>({full:100,some:50,none:0}[d.home_exercise]??null),color:'#5a9a7a',group:'Habits'},
   // ── Sleep ──
-  sleep_score:{label:'Sleep Score',fn:d=>d.sleep_score!=null?d.sleep_score:null,color:'#7a3a6a',group:'Sleep'},
-  sleep_duration:{label:'Sleep Duration (min)',fn:d=>d.sleep_duration_mins||null,color:'#5a5a9a',group:'Sleep'},
-  sleep_quality:{label:'Sleep Quality',fn:d=>d.sleep_quality||null,color:'#9a5a7a',group:'Sleep'},
-  // ── Money ──
+  sleep_score:{label:'Sleep Score',fn:d=>d.sleep_score!=null?d.sleep_score:null,color:'#7a3a6a',group:'Sleep',interpolate:true},
+  sleep_duration:{label:'Sleep Duration (min)',fn:d=>d.sleep_duration_mins||null,color:'#5a5a9a',group:'Sleep',interpolate:true},
+  sleep_quality:{label:'Sleep Quality',fn:d=>d.sleep_quality||null,color:'#9a5a7a',group:'Sleep',interpolate:true},
+  // ── Money (0 spent is a real, meaningful day — no interpolation) ──
   money_spent:{label:'Money Spent (T)',fn:d=>d.money_spent!=null?d.money_spent:null,color:'#a07830',group:'Money'},
 };
 const COLORS=['#e85d3a','#3a7a5a','#d4821a','#2a6a9a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
+
+// Fills 0/null/undefined gaps in a numeric series with the average of the
+// nearest known value before and after the gap (or just that one neighbor if
+// the gap sits at the start/end of the range).
+function interpolateGaps(values){
+  const out=values.slice();
+  const n=out.length;
+  const isEmpty=v=>v===null||v===undefined||v===0;
+  let i=0;
+  while(i<n){
+    if(isEmpty(out[i])){
+      let prevVal=null;
+      for(let p=i-1;p>=0;p--){ if(!isEmpty(out[p])){prevVal=out[p];break;} }
+      let j=i;
+      while(j<n && isEmpty(out[j])) j++;
+      const nextVal=(j<n)?out[j]:null;
+      let fillVal;
+      if(prevVal!=null && nextVal!=null) fillVal=(prevVal+nextVal)/2;
+      else if(prevVal!=null) fillVal=prevVal;
+      else if(nextVal!=null) fillVal=nextVal;
+      else fillVal=null; // no logged data anywhere in the series
+      for(let k=i;k<j;k++) out[k]=fillVal;
+      i=j;
+    } else i++;
+  }
+  return out;
+}
 
 function renderMetricPicker(){
   const grid = document.getElementById('bYGrid');
@@ -4196,12 +4229,16 @@ function renderChartInner(cfg,skipGrid=false,isPreview=false){
       const j=gregToJalali(d.date);
       return j.d+' '+jMonthsShort[j.m-1];
     });
-    const datasets=cfg.yFields.map((y,i)=>({
-      label:METRICS[y]?.label||y, data:statsData.map(d=>METRICS[y]?.fn(d)),
-      borderColor:COLORS[i%COLORS.length],
-      backgroundColor:cfg.type==='bar'?COLORS[i%COLORS.length]+'cc':'transparent',
-      fill:false,tension:0.3,borderWidth:2,pointRadius:3,spanGaps:true,
-    }));
+    const datasets=cfg.yFields.map((y,i)=>{
+      const raw=statsData.map(d=>METRICS[y]?.fn(d));
+      const data=METRICS[y]?.interpolate?interpolateGaps(raw):raw;
+      return {
+        label:METRICS[y]?.label||y, data,
+        borderColor:COLORS[i%COLORS.length],
+        backgroundColor:cfg.type==='bar'?COLORS[i%COLORS.length]+'cc':'transparent',
+        fill:false,tension:0.3,borderWidth:2,pointRadius:3,spanGaps:true,
+      };
+    });
     return setInstance(new Chart(ctx,{type:cfg.type,data:{labels,datasets},options:baseOpts}));
   }
 
@@ -6890,13 +6927,25 @@ function renderSleepStats(data) {
     ]}, options: Object.assign({},baseOpts,{plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}})});
 
     // 3. Bedtime vs wake time
+    const decHourToClock = v => {
+      let h = Math.floor(v), m = Math.round((v - h) * 60);
+      if (m === 60) { h += 1; m = 0; }
+      h = ((h % 24) + 24) % 24;
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    };
     const bedMinsArr = recent.map(d=>{ const [h,m]=d.bedtime.split(':').map(Number); let v=h*60+m; if(v<12*60)v+=24*60; return Math.round((v-24*60)/60*100)/100; });
     const wakeMinsArr = recent.map(d=>{ const [h,m]=d.waketime.split(':').map(Number); return Math.round((h*60+m)/60*100)/100; });
     const c3 = document.getElementById('sleepTimesChart');
     if (c3) SLEEP.charts.times = new Chart(c3, { type:'line', data:{ labels, datasets:[
-      { label:'Bedtime (hrs past midnight)', data:bedMinsArr, borderColor:'#7a3a6a', backgroundColor:'transparent', tension:.3, pointRadius:3 },
-      { label:'Wake time (hrs)', data:wakeMinsArr, borderColor:'#2a6a9a', backgroundColor:'transparent', tension:.3, pointRadius:3 }
-    ]}, options: Object.assign({},baseOpts,{plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}})});
+      { label:'Bedtime', data:bedMinsArr, borderColor:'#7a3a6a', backgroundColor:'transparent', tension:.3, pointRadius:3, spanGaps:true },
+      { label:'Wake time', data:wakeMinsArr, borderColor:'#2a6a9a', backgroundColor:'transparent', tension:.3, pointRadius:3, spanGaps:true }
+    ]}, options: Object.assign({},baseOpts,{
+      plugins:{
+        legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${decHourToClock(ctx.parsed.y)}`}}
+      },
+      scales: Object.assign({},baseOpts.scales,{y:{grid:{color:gc},ticks:{color:tc,callback:v=>decHourToClock(v)}}})
+    })});
 
     // 4. Self-rated quality
     const qualData = recent.map(d=>d.quality||null);

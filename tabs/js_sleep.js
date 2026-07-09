@@ -272,13 +272,25 @@ function renderSleepStats(data) {
     ]}, options: Object.assign({},baseOpts,{plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}})});
 
     // 3. Bedtime vs wake time
+    const decHourToClock = v => {
+      let h = Math.floor(v), m = Math.round((v - h) * 60);
+      if (m === 60) { h += 1; m = 0; }
+      h = ((h % 24) + 24) % 24;
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    };
     const bedMinsArr = recent.map(d=>{ const [h,m]=d.bedtime.split(':').map(Number); let v=h*60+m; if(v<12*60)v+=24*60; return Math.round((v-24*60)/60*100)/100; });
     const wakeMinsArr = recent.map(d=>{ const [h,m]=d.waketime.split(':').map(Number); return Math.round((h*60+m)/60*100)/100; });
     const c3 = document.getElementById('sleepTimesChart');
     if (c3) SLEEP.charts.times = new Chart(c3, { type:'line', data:{ labels, datasets:[
-      { label:'Bedtime (hrs past midnight)', data:bedMinsArr, borderColor:'#7a3a6a', backgroundColor:'transparent', tension:.3, pointRadius:3 },
-      { label:'Wake time (hrs)', data:wakeMinsArr, borderColor:'#2a6a9a', backgroundColor:'transparent', tension:.3, pointRadius:3 }
-    ]}, options: Object.assign({},baseOpts,{plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}})});
+      { label:'Bedtime', data:bedMinsArr, borderColor:'#7a3a6a', backgroundColor:'transparent', tension:.3, pointRadius:3, spanGaps:true },
+      { label:'Wake time', data:wakeMinsArr, borderColor:'#2a6a9a', backgroundColor:'transparent', tension:.3, pointRadius:3, spanGaps:true }
+    ]}, options: Object.assign({},baseOpts,{
+      plugins:{
+        legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${decHourToClock(ctx.parsed.y)}`}}
+      },
+      scales: Object.assign({},baseOpts.scales,{y:{grid:{color:gc},ticks:{color:tc,callback:v=>decHourToClock(v)}}})
+    })});
 
     // 4. Self-rated quality
     const qualData = recent.map(d=>d.quality||null);

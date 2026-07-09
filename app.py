@@ -259,15 +259,17 @@ def compute_score(entry, cfg=None):
     elif sk=="half": score+=cfg["skincare_half"]
     # Pills
     if entry.get("pills"): score+=cfg["pills"]
-    # Mood, Pain (inverse)
-    score+=((entry.get("mood",5) or 5)/10)*cfg["mood_max"]
-    score+=(((10-(entry.get("pain",5) or 5))/10)*cfg["pain_max"])
+    # Mood, Pain (inverse) — only score if actually logged, no phantom mid-scale credit
+    mood=entry.get("mood",None)
+    if mood is not None: score+=(mood/10)*cfg["mood_max"]
+    pain=entry.get("pain",None)
+    if pain is not None: score+=((10-pain)/10)*cfg["pain_max"]
     # Social
     soc=entry.get("socialized","none")
     if soc=="irl": score+=cfg["social_irl"]
     elif soc=="chat": score+=cfg["social_chat"]
-    # No soda
-    if not entry.get("soda",False): score+=cfg["soda_free"]
+    # No soda — only credited if the day was actually logged (explicit false), not just untouched
+    if "soda" in entry and not entry.get("soda"): score+=cfg["soda_free"]
     # Fruit/veg
     if entry.get("fruit_veg",False): score+=cfg["fruit_veg"]
     # Teeth
@@ -1012,18 +1014,20 @@ def food_ingredients():
     action = data.get("action")
     if action == "add":
         db["ingredients"].append({
-            "id": str(int(datetime.now().timestamp()*1000)),
-            "name": data["name"],
-            "unit": data.get("unit", "g"),
-            "icon": data.get("icon", "🍽️"),
-            "category": data.get("category", "other")
-        })
+        "id": str(int(datetime.now().timestamp()*1000)),
+        "name": data["name"],
+        "unit": data.get("unit", "g"),
+        "icon": data.get("icon", "🍽️"),
+        "category": data.get("category", "other"),
+        "calories": data.get("calories", 0),
+        "protein": data.get("protein", 0)
+    })
     elif action == "delete":
         db["ingredients"] = [i for i in db["ingredients"] if i["id"] != data["id"]]
     elif action == "edit":
         for i in db["ingredients"]:
             if i["id"] == data["id"]:
-                i.update({k: data[k] for k in ["name","unit","icon","category"] if k in data})
+                i.update({k: data[k] for k in ["name","unit","icon","category","calories","protein"] if k in data})
     save_food(db)
     return jsonify({"ok": True, "ingredients": db["ingredients"]})
 
