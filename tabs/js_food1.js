@@ -14,53 +14,6 @@ const MEALS = [
 ];
 const UNITS = ['g','kg','ml','L','cup','tbsp','tsp','slice','piece','bowl','plate','portion','handful','count','custom'];
 
-// ── Extended nutrient tracking ─────────────────────
-// Calories + protein stay the primary, always-visible numbers everywhere.
-// Everything below is optional, per-ingredient, tucked away behind a
-// collapsed panel so the main UI stays uncluttered. Stored as a sparse
-// `nutrients` object on each ingredient (only fields the user filled in),
-// scaled by qty per logged item, and summed into F.entry.nutrients per day.
-const NUTRIENT_GROUPS = [
-  { label: 'Macros', items: [
-    { id:'carbs',  label:'Carbs',         unit:'g' },
-    { id:'fat',    label:'Fat',           unit:'g' },
-    { id:'satFat', label:'Saturated fat', unit:'g' },
-    { id:'fiber',  label:'Fiber',         unit:'g' },
-    { id:'sugar',  label:'Sugar',         unit:'g' },
-  ]},
-  { label: 'Vitamins', items: [
-    { id:'vitA',   label:'Vitamin A',       unit:'mcg' },
-    { id:'vitC',   label:'Vitamin C',       unit:'mg'  },
-    { id:'vitD',   label:'Vitamin D',       unit:'mcg' },
-    { id:'vitE',   label:'Vitamin E',       unit:'mg'  },
-    { id:'vitK',   label:'Vitamin K',       unit:'mcg' },
-    { id:'b1',     label:'B1 (Thiamin)',    unit:'mg'  },
-    { id:'b2',     label:'B2 (Riboflavin)', unit:'mg'  },
-    { id:'b3',     label:'B3 (Niacin)',     unit:'mg'  },
-    { id:'b6',     label:'B6',              unit:'mg'  },
-    { id:'b12',    label:'B12',             unit:'mcg' },
-    { id:'folate', label:'Folate',          unit:'mcg' },
-  ]},
-  { label: 'Minerals', items: [
-    { id:'calcium',    label:'Calcium',    unit:'mg' },
-    { id:'iron',       label:'Iron',       unit:'mg' },
-    { id:'magnesium',  label:'Magnesium',  unit:'mg' },
-    { id:'potassium',  label:'Potassium',  unit:'mg' },
-    { id:'sodium',     label:'Sodium',     unit:'mg' },
-    { id:'zinc',       label:'Zinc',       unit:'mg' },
-    { id:'phosphorus', label:'Phosphorus', unit:'mg' },
-  ]},
-  { label: 'Other', items: [
-    { id:'cholesterol', label:'Cholesterol', unit:'mg' },
-    { id:'omega3',      label:'Omega-3',     unit:'mg' },
-    { id:'collagen',    label:'Collagen',    unit:'mg' },
-    { id:'probiotic',   label:'Probiotics',  unit:'B CFU' },
-    { id:'caffeine',    label:'Caffeine',    unit:'mg' },
-    { id:'alcohol',     label:'Alcohol',     unit:'g' },
-  ]},
-];
-const ALL_NUTRIENT_IDS = NUTRIENT_GROUPS.flatMap(g => g.items.map(i => i.id));
-
 // Soft display targets — matches the values already used throughout this
 // module's stats/labels (kept identical, not a logic change).
 const CAL_TARGET = 1500;
@@ -68,8 +21,7 @@ const PROT_TARGET = 176;
 
 let F = {
   date: null, entry: null, ingredients: [], addingToMeal: null,
-  jalaliToday: null, foodCharts: {}, activeTab: 'log', ingrSearch: '', editingIngrId: null,
-  nutrientPanelOpen: false, dayNutrientsOpen: false
+  jalaliToday: null, foodCharts: {}, activeTab: 'log', ingrSearch: '', editingIngrId: null
 };
 
 // ── Jalali helpers ────────────────────────────────
@@ -245,38 +197,6 @@ function injectFoodStyles() {
     .meal-item-del-v2:hover{ background:var(--f-bad); color:#fff; }
     .meal-empty-v2{ text-align:center; padding:16px 8px; color:var(--text4,#a8967c); font-size:12.5px; font-style:italic; border:1.5px dashed var(--cream3,#e4d6bf); border-radius:12px; }
 
-    .nutrient-toggle-v2{ font-size:11.5px; color:var(--text3,#8a7a63); cursor:pointer; user-select:none; padding:2px 0; font-weight:600; }
-    .nutrient-toggle-v2:hover{ color:var(--text2,#3a2f22); }
-    .nutrient-panel-v2{ margin-top:6px; padding:10px 4px 2px; border-top:1px dashed var(--cream3,#e4d6bf); }
-    .nutrient-group-label-v2{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--text4,#a8967c); margin:8px 0 4px; font-weight:700; }
-    .nutrient-group-label-v2:first-child{ margin-top:0; }
-    .nutrient-grid-v2{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:6px; }
-    .nutrient-field-v2{ display:flex; flex-direction:column; gap:2px; font-size:10.5px; color:var(--text3,#8a7a63); }
-    .nutrient-field-v2 input{ padding:5px 7px; border-radius:7px; border:1.5px solid var(--cream3,#e4d6bf); background:var(--cream2,#efe6d8); font-size:12px; width:100%; }
-    .nutrient-readout-v2{ display:flex; justify-content:space-between; gap:6px; font-size:11.5px; color:var(--text3,#8a7a63); background:var(--cream2,#efe6d8); border-radius:7px; padding:4px 8px; }
-    .nutrient-readout-v2 b{ color:var(--text2,#3a2f22); font-weight:700; }
-    .meal-item-row-v2{ cursor:pointer; }
-    .ingr-info-overlay-v2{ display:none; position:fixed; inset:0; background:rgba(26,21,16,.45); z-index:200;
-      align-items:center; justify-content:center; padding:20px; }
-    .ingr-info-overlay-v2.open{ display:flex; }
-    .ingr-info-card-v2{ background:var(--f-card,#fffaf2); border-radius:18px; border:1.5px solid var(--warm,#e4d6bf);
-      padding:20px 22px; max-width:420px; width:100%; max-height:82vh; overflow-y:auto; box-shadow:0 12px 40px rgba(26,21,16,.25); }
-    .ingr-info-head-v2{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-    .ingr-info-title-v2{ font-family:'Fraunces',serif; font-weight:700; font-size:18px; color:var(--text2,#3a2f22); }
-    .ingr-info-close-v2{ border:none; background:var(--cream2,#efe6d8); width:28px; height:28px; border-radius:50%;
-      font-size:16px; line-height:1; cursor:pointer; color:var(--text3,#8a7a63); flex-shrink:0; }
-    .ingr-info-sub-v2{ font-size:12px; color:var(--text3,#8a7a63); margin-top:4px; }
-    .ingr-info-primary-v2{ display:flex; gap:10px; margin:14px 0 6px; }
-    .ingr-info-primary-cell-v2{ flex:1; background:var(--cream2,#efe6d8); border-radius:12px; padding:10px; text-align:center; }
-    .ingr-info-primary-cell-v2 b{ display:block; font-family:'Fraunces',serif; font-size:18px; color:var(--text2,#3a2f22); }
-    .ingr-info-primary-cell-v2 span{ font-size:10.5px; color:var(--text4,#a8967c); text-transform:uppercase; letter-spacing:.05em; }
-    .nutrient-bal-row-v2{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; align-items:center; padding:6px 2px; border-bottom:1px solid var(--cream2,#efe6d8); }
-    .nutrient-bal-label-v2{ font-size:12.5px; color:var(--text2,#3a2f22); font-weight:600; }
-    .nutrient-bal-val-v2{ font-size:11.5px; color:var(--text3,#8a7a63); text-align:right; }
-    .nutrient-bal-val-v2 span{ color:var(--text4,#a8967c); }
-    .nutrient-bal-bar-v2{ grid-column:1/2; height:5px; border-radius:4px; background:var(--cream2,#efe6d8); overflow:hidden; }
-    .nutrient-bal-fill-v2{ height:100%; border-radius:4px; }
-    .nutrient-bal-status-v2{ grid-column:2/3; font-size:11px; font-weight:700; text-align:right; }
     .ingr-search-v2{ width:100%; padding:9px 13px; border-radius:10px; border:1.5px solid var(--cream3,#e4d6bf); background:var(--cream2,#efe6d8);
       font-size:13px; margin-bottom:12px; box-sizing:border-box; }
     .ingr-grid-v2{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:14px; max-height:340px; overflow-y:auto; padding-right:2px; }
@@ -446,8 +366,6 @@ function renderFoodView() {
             <textarea class="food-notes" id="fNotes" placeholder="How did you feel? Anything notable...">${F.entry.notes||''}</textarea>
           </div>
           <button class="save-btn" onclick="saveMacros()" style="margin-top:12px;padding:12px;font-size:14px;">Save Nutrition Data</button>
-          <div class="nutrient-toggle-v2" style="margin-top:10px;" onclick="toggleDayNutrients()">${F.dayNutrientsOpen?'▾':'▸'} Full nutrient breakdown</div>
-          <div class="nutrient-panel-v2" id="dayNutrientsPanel" style="display:${F.dayNutrientsOpen?'block':'none'}">${renderDayNutrients()}</div>
         </div>
 
         <!-- Claude prompt -->
@@ -482,19 +400,6 @@ function renderFoodView() {
               <input type="number" class="m-input" id="newIngrProtein" placeholder="Protein g per unit" step="0.1" min="0" style="width:100%;" value="${editIngr?(editIngr.protein||''):''}"/>
             </div>
             <div style="font-size:11px;color:var(--text4);font-style:italic;">Calories get +10% bumped automatically on save, to keep estimates cautious</div>
-            <div class="nutrient-toggle-v2" onclick="toggleNutrientPanel()">${F.nutrientPanelOpen?'▾':'▸'} More nutrients (optional)</div>
-            <div class="nutrient-panel-v2" id="ingrNutrientsPanel" style="display:${F.nutrientPanelOpen?'block':'none'}">
-              ${NUTRIENT_GROUPS.map(g => `
-                <div class="nutrient-group-label-v2">${g.label}</div>
-                <div class="nutrient-grid-v2">
-                  ${g.items.map(n => `
-                    <label class="nutrient-field-v2">
-                      <span>${n.label}</span>
-                      <input type="number" step="0.01" min="0" id="nut_${n.id}" placeholder="${n.unit}"
-                        value="${editIngr && editIngr.nutrients && editIngr.nutrients[n.id] ? editIngr.nutrients[n.id] : ''}"/>
-                    </label>`).join('')}
-                </div>`).join('')}
-            </div>
           </div>
         </div>
       </div>
@@ -535,14 +440,14 @@ function renderMealBlock(mealDef) {
     </div>
     <div class="meal-items">
       ${items.length ? items.map((item,i) => `
-        <div class="meal-item-row-v2" onclick="openMealItemInfoCard('${mealDef.id}',${i})">
+        <div class="meal-item-row-v2">
           <div class="meal-item-icon-v2">${item.icon||'🍽️'}</div>
           <div class="meal-item-body-v2">
             <div class="meal-item-name-v2">${item.name}</div>
             ${item.note ? '<div class="meal-item-detail-v2">'+item.note+'</div>' : ''}
           </div>
           <div class="meal-item-macros-v2">${item.qty} ${item.unit}${item.calories?'<br>'+item.calories+' kcal':''}${item.protein?' · '+item.protein+'g P':''}</div>
-          <button class="meal-item-del-v2" onclick="event.stopPropagation();removeMealItem('${mealDef.id}',${i})">×</button>
+          <button class="meal-item-del-v2" onclick="removeMealItem('${mealDef.id}',${i})">×</button>
         </div>`).join('') : '<div class="meal-empty-v2">Nothing added yet</div>'}
     </div>
   </div>`;
@@ -554,7 +459,7 @@ function renderIngrGrid() {
   if (!F.ingredients.length) return '<div style="grid-column:1/-1;color:var(--text4);font-size:13px;padding:8px;font-style:italic;">No ingredients yet — add some below</div>';
   if (!list.length) return '<div style="grid-column:1/-1;color:var(--text4);font-size:13px;padding:8px;font-style:italic;">No matches for "'+term+'"</div>';
   return list.map(i => `
-    <div class="ingr-tile-v2" onclick="openIngrInfoCard('${i.id}')">
+    <div class="ingr-tile-v2" onclick="quickAddIngredient('${i.id}')">
       <button class="ingr-tile-del-v2" onclick="event.stopPropagation();deleteIngredient('${i.id}')" title="Delete">×</button>
       <button class="ingr-tile-edit-v2" onclick="event.stopPropagation();startEditIngredient('${i.id}')" title="Edit">✎</button>
       <div class="ingr-tile-icon-v2">${i.icon}</div>
@@ -623,87 +528,6 @@ function computeExtraFoodStats(data) {
   const mealCalTotal = Object.values(mealCals).reduce((a,b)=>a+b,0) || 1;
 
   return { streak, hitRate, avgWd, avgWe, avgLast7, avgPrev7, trendDelta, mealCals, mealCalTotal };
-}
-
-// Rough general reference values, used only to flag under/over patterns —
-// not medical guidance, just a "what am I missing / overgetting" nudge.
-// type 'min' = aim for at least this; 'max' = try to stay under this;
-// 'info' = no established target, just show the tracked average.
-const NUTRIENT_TARGETS = {
-  carbs:{target:250,type:'min'}, fat:{target:70,type:'min'}, satFat:{target:20,type:'max'},
-  fiber:{target:30,type:'min'}, sugar:{target:50,type:'max'},
-  vitA:{target:900,type:'min'}, vitC:{target:90,type:'min'}, vitD:{target:20,type:'min'},
-  vitE:{target:15,type:'min'}, vitK:{target:120,type:'min'}, b1:{target:1.2,type:'min'},
-  b2:{target:1.3,type:'min'}, b3:{target:16,type:'min'}, b6:{target:1.7,type:'min'},
-  b12:{target:2.4,type:'min'}, folate:{target:400,type:'min'},
-  calcium:{target:1000,type:'min'}, iron:{target:10,type:'min'}, magnesium:{target:400,type:'min'},
-  potassium:{target:3400,type:'min'}, sodium:{target:2300,type:'max'}, zinc:{target:11,type:'min'},
-  phosphorus:{target:700,type:'min'}, cholesterol:{target:300,type:'max'}, omega3:{target:1600,type:'min'},
-  caffeine:{target:400,type:'max'}, alcohol:{target:0,type:'max'},
-  collagen:{target:null,type:'info'}, probiotic:{target:null,type:'info'},
-};
-
-// Averages nutrient totals across days that actually have logged food —
-// only counts a nutrient's average over the days it was present at all,
-// so one unlogged field doesn't drag its own average toward zero.
-function computeNutrientAverages(fullLog) {
-  const loggedDays = (fullLog||[]).filter(e => (e.calories||0) > 0 || (e.nutrients && Object.keys(e.nutrients).length));
-  const sums = {}, dayCounts = {};
-  loggedDays.forEach(e => {
-    const n = e.nutrients || {};
-    ALL_NUTRIENT_IDS.forEach(id => {
-      if (n[id]) { sums[id] = (sums[id]||0) + n[id]; dayCounts[id] = (dayCounts[id]||0) + 1; }
-    });
-  });
-  const averages = {};
-  ALL_NUTRIENT_IDS.forEach(id => {
-    if (sums[id] && dayCounts[id]) averages[id] = { avg: Math.round((sums[id] / dayCounts[id]) * 100) / 100, daysTracked: dayCounts[id] };
-  });
-  return { averages, totalDays: loggedDays.length };
-}
-
-function renderNutrientBalanceCard(fullLog) {
-  const { averages, totalDays } = computeNutrientAverages(fullLog);
-  const trackedIds = Object.keys(averages);
-  if (!trackedIds.length) {
-    return `<div class="fm-card" style="margin-bottom:20px;">
-      <div class="fm-card-title">🧬 Nutrient Balance</div>
-      <div style="color:var(--text4);font-size:13px;font-style:italic;padding:8px 2px;">
-        No extended nutrient data logged yet — fill it in on ingredients (✎ edit in the Ingredient Library), then log some food and this fills in automatically.
-      </div>
-    </div>`;
-  }
-  const groupsHtml = NUTRIENT_GROUPS.map(g => {
-    const items = g.items.filter(n => averages[n.id]);
-    if (!items.length) return '';
-    const rows = items.map(n => {
-      const a = averages[n.id];
-      const t = NUTRIENT_TARGETS[n.id] || { target:null, type:'info' };
-      let barHtml = '', statusHtml;
-      if (t.target) {
-        const pct = Math.round((a.avg / t.target) * 100);
-        let status, color;
-        if (t.type === 'max') { status = pct > 100 ? 'High' : 'OK'; color = pct > 100 ? 'var(--f-bad)' : 'var(--f-ok)'; }
-        else { status = pct < 70 ? 'Low' : 'OK'; color = pct < 70 ? 'var(--f-warn)' : 'var(--f-ok)'; }
-        barHtml = `<div class="nutrient-bal-bar-v2"><div class="nutrient-bal-fill-v2" style="width:${Math.min(100,pct)}%;background:${color}"></div></div>`;
-        statusHtml = `<span class="nutrient-bal-status-v2" style="color:${color}">${status} · ${pct}%</span>`;
-      } else {
-        barHtml = '<div></div>';
-        statusHtml = `<span class="nutrient-bal-status-v2" style="color:var(--text4)">tracked</span>`;
-      }
-      return `<div class="nutrient-bal-row-v2">
-        <div class="nutrient-bal-label-v2">${n.label}</div>
-        <div class="nutrient-bal-val-v2">${a.avg} ${n.unit}<span> /day avg · ${a.daysTracked}d</span></div>
-        ${barHtml}${statusHtml}
-      </div>`;
-    }).join('');
-    return `<div class="nutrient-group-label-v2">${g.label}</div>${rows}`;
-  }).join('');
-  return `<div class="fm-card" style="margin-bottom:20px;">
-    <div class="fm-card-title">🧬 Nutrient Balance <span>avg over ${totalDays} logged day${totalDays!==1?'s':''}</span></div>
-    <div style="font-size:11px;color:var(--text4);font-style:italic;margin-bottom:10px;">Rough general reference ranges — flags what you're consistently under or over, not medical advice. Only nutrients you've logged data for are shown.</div>
-    ${groupsHtml}
-  </div>`;
 }
 
 function renderFoodStats(data) {
@@ -790,9 +614,6 @@ function renderFoodStats(data) {
       <div class="stat-tile-sub-v2">avg kcal, weekday / weekend</div>
     </div>
   </div>
-
-  <!-- Nutrient balance -->
-  ${renderNutrientBalanceCard(data.full_log || [])}
 
   <!-- Charts — full width, stacked -->
   <div class="fcharts-col-v2">
@@ -961,26 +782,6 @@ function toggleCustomUnit(sel) {
   if (ci) ci.style.display = sel.value === 'custom' ? 'block' : 'none';
 }
 
-function toggleNutrientPanel() {
-  F.nutrientPanelOpen = !F.nutrientPanelOpen;
-  const panel = document.getElementById('ingrNutrientsPanel');
-  const toggle = document.querySelector('.nutrient-toggle-v2');
-  if (panel) panel.style.display = F.nutrientPanelOpen ? 'block' : 'none';
-  if (toggle) toggle.textContent = (F.nutrientPanelOpen ? '▾' : '▸') + ' More nutrients (optional)';
-}
-
-// Reads the optional extended-nutrients fields — only nonzero values are
-// kept, so ingredients that skip this stay clean (no zero-clutter in data).
-function readNutrientForm() {
-  const nutrients = {};
-  ALL_NUTRIENT_IDS.forEach(id => {
-    const el = document.getElementById('nut_' + id);
-    const v = el ? parseFloat(el.value) : NaN;
-    if (!isNaN(v) && v > 0) nutrients[id] = v;
-  });
-  return nutrients;
-}
-
 // Reads the ingredient form fields (shared by add + edit)
 function readIngredientForm() {
   const name = document.getElementById('newIngrName').value.trim();
@@ -992,8 +793,7 @@ function readIngredientForm() {
   const rawCal = parseFloat(document.getElementById('newIngrCalories').value) || 0;
   const protein = parseFloat(document.getElementById('newIngrProtein').value) || 0;
   const calories = Math.round(rawCal * 1.1 * 10) / 10; // +10% caution buffer on calories only
-  const nutrients = readNutrientForm();
-  return { name, icon, unit, category, calories, protein, nutrients };
+  return { name, icon, unit, category, calories, protein };
 }
 
 function clearIngredientForm() {
@@ -1004,8 +804,6 @@ function clearIngredientForm() {
   const ci = document.getElementById('newIngrCustomUnit');
   if (ci) { ci.value = ''; ci.style.display = 'none'; }
   document.getElementById('newIngrUnit').value = 'g';
-  ALL_NUTRIENT_IDS.forEach(id => { const el = document.getElementById('nut_' + id); if (el) el.value = ''; });
-  F.nutrientPanelOpen = false;
 }
 
 // Entry point for the form's submit button — routes to add or edit
@@ -1016,8 +814,6 @@ async function submitIngredientForm() {
 
 function startEditIngredient(id) {
   F.editingIngrId = id;
-  const ingr = F.ingredients.find(i => i.id === id);
-  F.nutrientPanelOpen = !!(ingr && ingr.nutrients && Object.keys(ingr.nutrients).length);
   renderFoodView();
   const card = document.getElementById('ingrFormWrap');
   if (card) card.scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -1025,15 +821,14 @@ function startEditIngredient(id) {
 
 function cancelEditIngredient() {
   F.editingIngrId = null;
-  F.nutrientPanelOpen = false;
   renderFoodView();
 }
 
 async function addIngredient() {
-  const { name, icon, unit, category, calories, protein, nutrients } = readIngredientForm();
+  const { name, icon, unit, category, calories, protein } = readIngredientForm();
   if (!name) { showToast('Enter ingredient name',''); return; }
   const r = await fetch('/api/food/ingredients', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'add', name, icon, unit, category, calories, protein, nutrients }) });
+    body: JSON.stringify({ action:'add', name, icon, unit, category, calories, protein }) });
   const d = await r.json();
   F.ingredients = d.ingredients;
   clearIngredientForm();
@@ -1047,10 +842,10 @@ async function addIngredient() {
 // yet, this call will silently no-op or error depending on your route —
 // happy to wire up the Flask side if you share that route.
 async function updateIngredient(id) {
-  const { name, icon, unit, category, calories, protein, nutrients } = readIngredientForm();
+  const { name, icon, unit, category, calories, protein } = readIngredientForm();
   if (!name) { showToast('Enter ingredient name',''); return; }
   const r = await fetch('/api/food/ingredients', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'edit', id, name, icon, unit, category, calories, protein, nutrients }) });
+    body: JSON.stringify({ action:'edit', id, name, icon, unit, category, calories, protein }) });
   const d = await r.json();
   F.ingredients = d.ingredients;
   F.editingIngrId = null;
@@ -1066,61 +861,6 @@ async function deleteIngredient(id) {
   F.ingredients = d.ingredients;
   if (F.editingIngrId === id) F.editingIngrId = null;
   renderFoodView();
-}
-
-// ── Ingredient select: type-to-jump (Windows Explorer style) ──────
-// Native <select> type-ahead breaks here because every option's visible
-// text starts with an emoji icon, not a letter. This re-implements the
-// same behavior against the ingredient *name* instead: typing "s" jumps to
-// the first name starting with s, typing "sa" narrows further, and
-// repeating the same letter cycles through all matches — just like
-// Explorer/Finder file lists.
-function attachIngrTypeahead(sel) {
-  if (sel._typeaheadBound) return;
-  sel._typeaheadBound = true;
-  let buffer = '';
-  let bufferTimer = null;
-  sel.addEventListener('keydown', function(e) {
-    if (e.ctrlKey || e.altKey || e.metaKey) return;
-    if (!/^[a-zA-Z0-9\u0600-\u06FF]$/.test(e.key)) return; // letters/digits, incl. Persian
-    e.preventDefault();
-    e.stopPropagation();
-
-    const key = e.key.toLowerCase();
-    const repeatingSameChar = buffer.length > 0 && [...buffer].every(c => c === key);
-    clearTimeout(bufferTimer);
-    bufferTimer = setTimeout(() => { buffer = ''; }, 700);
-
-    const options = Array.from(sel.options).filter(o => o.value);
-    const nameFor = o => {
-      const ingr = F.ingredients.find(i => i.id === o.value);
-      return (ingr ? ingr.name : o.textContent).toLowerCase();
-    };
-
-    if (repeatingSameChar) {
-      // Cycle through everything starting with that single letter.
-      buffer += key;
-      const matches = options.filter(o => nameFor(o).startsWith(key));
-      if (matches.length) {
-        const curIdx = matches.findIndex(o => o.value === sel.value);
-        const next = matches[(curIdx + 1) % matches.length];
-        sel.value = next.value;
-        sel.dispatchEvent(new Event('change'));
-      }
-      return;
-    }
-
-    buffer += key;
-    const match = options.find(o => nameFor(o).startsWith(buffer));
-    if (match) {
-      sel.value = match.value;
-      sel.dispatchEvent(new Event('change'));
-    } else {
-      buffer = key; // no multi-char match — restart buffer from this keystroke
-      const singleMatch = options.find(o => nameFor(o).startsWith(buffer));
-      if (singleMatch) { sel.value = singleMatch.value; sel.dispatchEvent(new Event('change')); }
-    }
-  });
 }
 
 // ── Add item modal ────────────────────────────────
@@ -1156,76 +896,24 @@ function buildSortedOptions(mealId) {
   return html;
 }
 
-// ── Info card (ingredient library item, or a logged meal item) ────
-// Read-only detail view — shows every tracked number for that food.
-// Reuses one lazily-created overlay element rather than depending on
-// modal markup from the HTML template.
-function ensureInfoCardEl() {
-  let el = document.getElementById('ingrInfoOverlay');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'ingrInfoOverlay';
-    el.className = 'ingr-info-overlay-v2';
-    el.innerHTML = '<div class="ingr-info-card-v2" id="ingrInfoCard"></div>';
-    el.addEventListener('click', (e) => { if (e.target === el) closeIngrInfoCard(); });
-    document.body.appendChild(el);
-  }
-  return el;
-}
-
-function closeIngrInfoCard() {
-  const el = document.getElementById('ingrInfoOverlay');
-  if (el) el.classList.remove('open');
-}
-
-function buildInfoCardHTML(title, subtitle, calories, protein, nutrients) {
-  nutrients = nutrients || {};
-  const hasExtra = ALL_NUTRIENT_IDS.some(id => nutrients[id]);
-  const groupsHtml = NUTRIENT_GROUPS.map(g => {
-    const rows = g.items.filter(n => nutrients[n.id]);
-    if (!rows.length) return '';
-    return `<div class="nutrient-group-label-v2">${g.label}</div>
-      <div class="nutrient-grid-v2">${rows.map(n => `<div class="nutrient-readout-v2"><span>${n.label}</span><b>${nutrients[n.id]} ${n.unit}</b></div>`).join('')}</div>`;
-  }).join('');
-  return `
-    <div class="ingr-info-head-v2">
-      <div class="ingr-info-title-v2">${title}</div>
-      <button class="ingr-info-close-v2" onclick="closeIngrInfoCard()">×</button>
-    </div>
-    <div class="ingr-info-sub-v2">${subtitle}</div>
-    <div class="ingr-info-primary-v2">
-      <div class="ingr-info-primary-cell-v2"><b>${calories||0}</b><span>kcal</span></div>
-      <div class="ingr-info-primary-cell-v2"><b>${protein||0}g</b><span>protein</span></div>
-    </div>
-    ${hasExtra ? groupsHtml : '<div style="color:var(--text4);font-size:12px;font-style:italic;padding:8px 2px;">No extended nutrient data recorded for this yet — add it via the ✎ edit button in the Ingredient Library.</div>'}
-  `;
-}
-
-// Ingredient library item — shows per-unit values.
-function openIngrInfoCard(ingrId) {
-  const ingr = F.ingredients.find(i => i.id === ingrId);
-  if (!ingr) return;
-  const el = ensureInfoCardEl();
-  document.getElementById('ingrInfoCard').innerHTML = buildInfoCardHTML(
-    `${ingr.icon} ${ingr.name}`,
-    `Per 1 ${ingr.unit === 'custom' ? 'unit' : ingr.unit}`,
-    ingr.calories, ingr.protein, ingr.nutrients
-  );
-  el.classList.add('open');
-}
-
-// A specific logged meal item — shows totals for the exact amount logged.
-function openMealItemInfoCard(mealId, idx) {
-  const mealEntry = (F.entry.meals||[]).find(m => m.meal_id === mealId);
-  const item = mealEntry && mealEntry.items[idx];
-  if (!item) return;
-  const el = ensureInfoCardEl();
-  document.getElementById('ingrInfoCard').innerHTML = buildInfoCardHTML(
-    `${item.icon||'🍽️'} ${item.name}`,
-    `Your logged amount: ${item.qty} ${item.unit}${item.note ? ' · ' + item.note : ''}`,
-    item.calories, item.protein, item.nutrients
-  );
-  el.classList.add('open');
+function quickAddIngredient(ingrId) {
+  const titleEl = document.getElementById('foodItemTitle');
+  titleEl.innerHTML = 'Add to: <select id="quickMealSel" style="font-size:14px;border:1.5px solid var(--cream3);border-radius:8px;padding:4px 10px;background:var(--cream2);">' +
+    MEALS.map(m => '<option value="'+m.id+'">'+m.icon+' '+m.label+'</option>').join('') + '</select>';
+  F.addingToMeal = 'breakfast';
+  document.getElementById('quickMealSel').onchange = function(){ F.addingToMeal = this.value; };
+  const sel = document.getElementById('foodIngredientSelect');
+  sel.innerHTML = F.ingredients.map(i => '<option value="'+i.id+'"'+(i.id===ingrId?' selected':'')+'>'+i.icon+' '+i.name+' ('+i.unit+')</option>').join('');
+  sel.onchange = updateFoodModalUnit;
+  updateFoodModalUnit();
+  buildQtyPresets();
+  document.getElementById('foodQtyInput').value = '';
+  document.getElementById('foodItemNote').value = '';
+  const cr = document.getElementById('foodCustomUnitRow');
+  if (cr) cr.style.display = 'none';
+  const ci = document.getElementById('foodCustomUnitInput');
+  if (ci) ci.value = '';
+  document.getElementById('foodItemOverlay').classList.add('open');
 }
 
 function updateFoodModalUnit() {
@@ -1292,7 +980,6 @@ async function openFoodItemModal(mealId) {
   const sel = document.getElementById('foodIngredientSelect');
   sel.innerHTML = buildSortedOptions(mealId);
   sel.onchange = updateFoodModalUnit;
-  attachIngrTypeahead(sel);
   updateFoodModalUnit();
   buildQtyPresets();
 }
@@ -1309,14 +996,9 @@ async function confirmFoodItem() {
   const displayUnit = isCustom ? (customDesc || 'عدد') : ingr.unit;
   const itemCal = Math.round((ingr.calories||0) * qty);
   const itemProt = Math.round((ingr.protein||0) * qty * 10) / 10;
-  const itemNutrients = {};
-  if (ingr.nutrients) ALL_NUTRIENT_IDS.forEach(id => {
-    const v = ingr.nutrients[id];
-    if (v) itemNutrients[id] = Math.round(v * qty * 100) / 100;
-  });
   let mealEntry = F.entry.meals.find(m => m.meal_id === F.addingToMeal);
   if (!mealEntry) { mealEntry = { meal_id: F.addingToMeal, items: [] }; F.entry.meals.push(mealEntry); }
-  mealEntry.items.push({ ingredient_id: ingr.id, name: ingr.name, icon: ingr.icon, unit: displayUnit, qty, note, calories: itemCal, protein: itemProt, nutrients: itemNutrients });
+  mealEntry.items.push({ ingredient_id: ingr.id, name: ingr.name, icon: ingr.icon, unit: displayUnit, qty, note, calories: itemCal, protein: itemProt });
   recalcMacrosFromItems();
   closeFoodItemModal();
   await saveFoodEntry();
@@ -1335,39 +1017,12 @@ async function removeMealItem(mealId, idx) {
 // Sum calories/protein across all logged items for the day and set as the day's totals
 function recalcMacrosFromItems() {
   let cal = 0, prot = 0;
-  const nutrTotals = {};
   (F.entry.meals||[]).forEach(m => (m.items||[]).forEach(it => {
     cal += it.calories || 0;
     prot += it.protein || 0;
-    if (it.nutrients) Object.keys(it.nutrients).forEach(k => {
-      nutrTotals[k] = Math.round(((nutrTotals[k]||0) + it.nutrients[k]) * 100) / 100;
-    });
   }));
   F.entry.calories = Math.round(cal);
   F.entry.protein = Math.round(prot * 10) / 10;
-  F.entry.nutrients = nutrTotals;
-}
-
-function toggleDayNutrients() {
-  F.dayNutrientsOpen = !F.dayNutrientsOpen;
-  const panel = document.getElementById('dayNutrientsPanel');
-  if (panel) { panel.style.display = F.dayNutrientsOpen ? 'block' : 'none'; panel.innerHTML = renderDayNutrients(); }
-  const toggles = document.querySelectorAll('.nutrient-toggle-v2');
-  if (toggles[1]) toggles[1].textContent = (F.dayNutrientsOpen ? '▾' : '▸') + ' Full nutrient breakdown';
-}
-
-// Only ever shows nutrients that actually have logged values — no zero rows.
-function renderDayNutrients() {
-  const totals = F.entry.nutrients || {};
-  const hasAny = ALL_NUTRIENT_IDS.some(id => totals[id]);
-  if (!hasAny) return '<div style="color:var(--text4);font-size:12px;font-style:italic;padding:6px 2px;">No extra nutrient data logged yet — fill it in on ingredients as you add them.</div>';
-  return NUTRIENT_GROUPS.map(g => {
-    const rows = g.items.filter(n => totals[n.id]);
-    if (!rows.length) return '';
-    return `<div class="nutrient-group-label-v2">${g.label}</div>
-      <div class="nutrient-grid-v2">${rows.map(n => `
-        <div class="nutrient-readout-v2"><span>${n.label}</span><b>${totals[n.id]} ${n.unit}</b></div>`).join('')}</div>`;
-  }).join('');
 }
 
 // ── Macros ────────────────────────────────────────
