@@ -82,8 +82,8 @@ async function persistGoals() {
 }
 
 // ── Progress calculation ─────────────────────────────
-// Returns { pct, auto, moneyNote, timeNote }
-function goalsCalcProgress(g) {
+// Pure auto pct from spent/total resources only — no manual influence.
+function goalsAutoPct(g) {
   const moneyTotal = parseFloat(g.money_amount) || 0;
   const moneySpent = parseFloat(g.money_spent)  || 0;
   const timeTotal  = parseFloat(g.time_amount)  || 0;
@@ -103,17 +103,23 @@ function goalsCalcProgress(g) {
     notes.push(`${timeSpent} / ${timeTotal} hrs`);
   }
 
-  if (pcts.length === 0) {
-    // No trackable resource — use manual progress
-    return { pct: g.progress || 0, auto: false, notes: [] };
-  }
-
-  // Average of all tracked dimensions
+  if (!pcts.length) return { pct: 0, tracked: false, notes: [] };
   const pct = Math.round(pcts.reduce((a,b)=>a+b,0) / pcts.length);
-  return { pct, auto: true, notes };
+  return { pct, tracked: true, notes };
 }
 
-// Called from modal inputs to show live auto-progress preview
+// The % to display for a goal. Tracked goals (money and/or time totals set) always compute
+// live from actual spent/total — never from a stale stored number — so a daily tick or a spent
+// edit is reflected immediately. Untracked goals fall back to the last value the slider was set to.
+function goalsCalcProgress(g) {
+  const auto = goalsAutoPct(g);
+  if (auto.tracked) return { pct: auto.pct, tracked: true, notes: auto.notes };
+  const pct = Math.max(0, Math.min(100, Math.round(parseFloat(g.progress) || 0)));
+  return { pct, tracked: false, notes: [] };
+}
+
+// Called when Money/Time total or spent inputs change in the modal: recompute % from the
+// actual numbers and hard-sync the slider + note to match.
 function goalsUpdateProgressMode() {
   const moneyTotal = parseFloat(document.getElementById('gMoney')?.value) || 0;
   const moneySpent = parseFloat(document.getElementById('gMoneySpent')?.value) || 0;
@@ -121,47 +127,78 @@ function goalsUpdateProgressMode() {
   const timeSpent  = parseFloat(document.getElementById('gTimeSpent')?.value) || 0;
   const moneyUnit  = document.getElementById('gMoneyUnit')?.value || 'KT';
 
-  // Sync unit label next to spent
   const unitLbl = document.getElementById('gMoneySpentUnit');
   if (unitLbl) unitLbl.textContent = moneyUnit;
 
-  const hasTracking = (moneyTotal > 0) || (timeTotal > 0);
-  const autoWrap    = document.getElementById('gAutoProgressWrap');
-  const manualWrap  = document.getElementById('gManualProgressWrap');
-
-  // Daily task input only makes sense when a total hours target exists
   const dailyWrap = document.getElementById('gDailyTaskWrap');
   if (dailyWrap) dailyWrap.style.display = timeTotal > 0 ? 'block' : 'none';
 
-  if (!autoWrap || !manualWrap) return;
-
-  if (hasTracking) {
-    autoWrap.style.display  = 'block';
-    manualWrap.style.display= 'none';
-
-    let pcts = [], noteLines = [];
-    if (moneyTotal > 0) {
-      const p = Math.min(100, Math.round((moneySpent / moneyTotal) * 100));
-      pcts.push(p);
-      noteLines.push(`💰 ${moneySpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${p}%`);
-    }
-    if (timeTotal > 0) {
-      const p = Math.min(100, Math.round((timeSpent / timeTotal) * 100));
-      pcts.push(p);
-      noteLines.push(`⏱️ ${timeSpent} / ${timeTotal} hrs = ${p}%`);
-    }
-    const avg = pcts.length ? Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length) : 0;
-
-    const pctEl  = document.getElementById('gAutoProgressPct');
-    const barEl  = document.getElementById('gAutoProgressBar');
-    const noteEl = document.getElementById('gAutoProgressNote');
-    if (pctEl)  pctEl.textContent  = avg + '%';
-    if (barEl)  barEl.style.width  = avg + '%';
-    if (noteEl) noteEl.innerHTML   = noteLines.join('<br>');
-  } else {
-    autoWrap.style.display  = 'none';
-    manualWrap.style.display= 'block';
+  let pcts = [], noteLines = [];
+  if (moneyTotal > 0) {
+    const p = Math.min(100, Math.round((moneySpent / moneyTotal) * 100));
+    pcts.push(p);
+    noteLines.push(`💰 ${moneySpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${p}%`);
   }
+  if (timeTotal > 0) {
+    const p = Math.min(100, Math.round((timeSpent / timeTotal) * 100));
+    pcts.push(p);
+    noteLines.push(`⏱️ ${timeSpent} / ${timeTotal} hrs = ${p}%`);
+  }
+
+  if (pcts.length) {
+    const slider = document.getElementById('gProgress');
+    if (slider) slider.value = Math.round(pcts.reduce((a,b)=>a+b,0) / pcts.length);
+  }
+
+  const noteEl = document.getElementById('gProgressTrackedNote');
+  if (noteEl) noteEl.innerHTML = noteLines.join('<br>');
+
+  goalsRefreshProgressDisplay();
+}
+
+// Called when the % slider itself is dragged: backfills the actual spent hours/money to match
+// the new percentage, so the two stay locked together and future ticks build on the real number.
+function goalsOnProgressDrag() {
+  const slider = document.getElementById('gProgress');
+  if (!slider) return;
+  const pct = Math.max(0, Math.min(100, parseInt(slider.value) || 0));
+
+  const moneyTotal = parseFloat(document.getElementById('gMoney')?.value) || 0;
+  const timeTotal   = parseFloat(document.getElementById('gTime')?.value) || 0;
+  const moneyUnit   = document.getElementById('gMoneyUnit')?.value || 'KT';
+
+  let noteLines = [];
+  if (moneyTotal > 0) {
+    const newSpent = Math.round((pct / 100) * moneyTotal);
+    const spentEl = document.getElementById('gMoneySpent');
+    if (spentEl) spentEl.value = newSpent;
+    noteLines.push(`💰 ${newSpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${pct}%`);
+  }
+  if (timeTotal > 0) {
+    const newSpent = Math.round((pct / 100) * timeTotal * 100) / 100;
+    const spentEl = document.getElementById('gTimeSpent');
+    if (spentEl) spentEl.value = newSpent;
+    noteLines.push(`⏱️ ${newSpent} / ${timeTotal} hrs = ${pct}%`);
+  }
+
+  const noteEl = document.getElementById('gProgressTrackedNote');
+  if (noteEl) noteEl.innerHTML = noteLines.join('<br>');
+
+  goalsRefreshProgressDisplay();
+}
+
+// Repaints the bar/pct readouts to match wherever the slider currently sits —
+// called both after a manual drag and after an auto-pct nudge above.
+function goalsRefreshProgressDisplay() {
+  const slider = document.getElementById('gProgress');
+  if (!slider) return;
+  const val = parseInt(slider.value) || 0;
+  const pctEl = document.getElementById('gProgressPctDisplay');
+  const barEl = document.getElementById('gProgressBoxBar');
+  const valEl = document.getElementById('gProgressVal');
+  if (pctEl) pctEl.textContent = val + '%';
+  if (barEl) barEl.style.width = val + '%';
+  if (valEl) valEl.textContent = val + '%';
 }
 
 // ── Filter ────────────────────────────────────────────
@@ -246,27 +283,51 @@ function renderGoals() {
     const prog2 = goalsCalcProgress(g);
     const displayProg = prog2.pct;
 
-    const moneyTotal = g.money_amount ? Number(g.money_amount).toLocaleString() : null;
-    const moneySpent = g.money_spent  ? Number(g.money_spent).toLocaleString()  : null;
-    const moneyStr = moneyTotal
-      ? (moneySpent ? `${moneySpent} / ${moneyTotal} ${g.money_unit||'KT'}` : `${moneyTotal} ${g.money_unit||'KT'}`)
+    const moneyTotalNum = parseFloat(g.money_amount) || 0;
+    const moneySpentNum = parseFloat(g.money_spent)  || 0;
+    const moneyTracked  = moneyTotalNum > 0;
+    const moneyStr = moneyTracked
+      ? `${moneySpentNum.toLocaleString()} / ${moneyTotalNum.toLocaleString()} ${g.money_unit||'KT'}`
       : null;
-    const timeTotal = g.time_amount ? `${g.time_amount} hrs` : null;
-    const timeSpent = g.time_spent  ? `${g.time_spent} hrs`  : null;
-    const timeStr = timeTotal
-      ? (timeSpent ? `${timeSpent} / ${timeTotal}` : timeTotal)
+
+    const timeTotalNum = parseFloat(g.time_amount) || 0;
+    const timeSpentNum = parseFloat(g.time_spent)  || 0;
+    const timeTracked  = timeTotalNum > 0;
+    const timeStr = timeTracked
+      ? `${timeSpentNum} / ${timeTotalNum} hrs`
       : null;
 
     // Daily task tick (only for goals with a total-hours target + a daily hours amount)
     const todayIso = new Date().toISOString().slice(0,10);
     const dailyHours = parseFloat(g.daily_hours) || 0;
     const tickedToday = g.last_tick_date === todayIso;
+    // The amount defaults to the goal's configured daily hours, but is editable per-session
+    // (e.g. studied 2h instead of the usual 1h) — read from this input when the checkbox is ticked.
+    const loggedAmount = tickedToday ? (parseFloat(g.last_tick_amount) || dailyHours) : dailyHours;
+
+    // Quick-pick buttons: one step below the default, the default itself, then +1/+2/+3 steps —
+    // fast access to nearby amounts without hammering the spinner arrows. Step size is configurable
+    // per goal (set it in the goal's edit modal, under Daily task) — no hardcoded value.
+    const qStep = parseFloat(g.daily_step) || 0.25;
+    const fmtHrs = n => (Math.round(Math.max(0, n) * 100) / 100).toString();
+    const quickAmounts = [dailyHours - qStep, dailyHours, dailyHours + qStep, dailyHours + qStep*2, dailyHours + qStep*3]
+      .map(fmtHrs);
+    const quickBtnsHtml = quickAmounts.map((amt, qi) => `
+      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${!tickedToday && amt===loggedAmount.toString()?' active':''}"
+        onclick="event.stopPropagation(); goalsSetDailyAmount('${g.id}', ${amt})">${amt}</button>`).join('');
+
     const dailyTaskHtml = (parseFloat(g.time_amount) > 0 && dailyHours > 0) ? `
       <div class="goal-daily-task ${tickedToday ? 'done' : ''}">
         <button class="goal-daily-check" onclick="toggleGoalDailyTick('${g.id}')" title="${tickedToday ? "Undo today's log" : "Log today's session"}">${tickedToday ? GOAL_ICONS.check : ''}</button>
         <div class="goal-daily-task-text">
           <div class="goal-daily-task-label">${tickedToday ? "Today's session logged" : "Log today's session"}</div>
-          <div class="goal-daily-task-sub">${dailyHours}h/day toward this goal</div>
+          <div class="goal-daily-task-sub">hrs/day toward this goal</div>
+          <div class="goal-daily-amount-row">
+            ${!tickedToday ? quickBtnsHtml : ''}
+            <input type="number" class="goal-daily-amount-input" id="dailyAmt_${g.id}"
+              value="${loggedAmount}" step="${qStep}" min="0" ${tickedToday ? 'disabled' : ''}
+              onclick="event.stopPropagation()" oninput="event.stopPropagation(); goalsSyncDailyQuickButtons('${g.id}')"/>
+          </div>
         </div>
       </div>` : '';
 
@@ -307,31 +368,34 @@ function renderGoals() {
 
         <div class="goal-progress-wrap">
           <div class="goal-progress-header">
-            <span class="goal-progress-label">Progress${prog2.auto ? ' <span class="goal-progress-auto-badge">Auto</span>' : ''}</span>
+            <span class="goal-progress-label">Progress${prog2.tracked ? ' <span class="goal-progress-auto-badge">Tracked</span>' : ''}</span>
             <span class="goal-progress-pct" style="color:${accent};">${displayProg}%</span>
           </div>
           <div class="goal-progress-bar">
             <div class="goal-progress-fill" style="width:${displayProg}%;background:${accent};"></div>
           </div>
-          ${prog2.auto && prog2.notes.length ? `<div class="goal-progress-note">${prog2.notes.join(' · ')}</div>` : ''}
+          ${prog2.tracked && prog2.notes.length ? `<div class="goal-progress-note">${prog2.notes.join(' · ')}</div>` : ''}
         </div>
 
-        <div class="goal-meta-grid">
+        ${(moneyTracked || timeTracked) ? `
+        <div class="goal-meta-grid${(moneyTracked && timeTracked) ? '' : ' single'}">
+          ${moneyTracked ? `
           <div class="goal-meta-item">
             <div class="goal-meta-icon">${GOAL_ICONS.coin}</div>
             <div>
               <div class="goal-meta-label">Budget</div>
-              <div class="goal-meta-val${moneyStr?'':' empty'}">${moneyStr || 'Not tracked'}</div>
+              <div class="goal-meta-val">${moneyStr}</div>
             </div>
-          </div>
+          </div>` : ''}
+          ${timeTracked ? `
           <div class="goal-meta-item">
             <div class="goal-meta-icon">${GOAL_ICONS.clock}</div>
             <div>
               <div class="goal-meta-label">Time</div>
-              <div class="goal-meta-val${timeStr?'':' empty'}">${timeStr || 'Not tracked'}</div>
+              <div class="goal-meta-val">${timeStr}</div>
             </div>
-          </div>
-        </div>
+          </div>` : ''}
+        </div>` : ''}
 
         ${dailyTaskHtml}
         ${deadlineHtml}
@@ -377,18 +441,20 @@ function openGoalModal(id) {
     titleEl.textContent = '✏️ Edit Goal';
     document.getElementById('gTitle').value       = g.title || '';
     document.getElementById('gNotes').value       = g.notes || '';
-    document.getElementById('gProgress').value    = g.progress || 0;
-    document.getElementById('gProgressVal').textContent = (g.progress||0)+'%';
     document.getElementById('gMoney').value       = g.money_amount || '';
     document.getElementById('gMoneyUnit').value   = g.money_unit || 'KT';
     document.getElementById('gTime').value        = g.time_amount || '';
     document.getElementById('gDailyHours') && (document.getElementById('gDailyHours').value = g.daily_hours || '');
+    document.getElementById('gDailyStep')  && (document.getElementById('gDailyStep').value  = g.daily_step || 0.25);
 
     renderJalaliPicker('gTargetDatePicker', 'gTargetDateIso', g.target_date || null);
 
     document.getElementById('gMoneySpent') && (document.getElementById('gMoneySpent').value = g.money_spent || '');
     document.getElementById('gTimeSpent')  && (document.getElementById('gTimeSpent').value  = g.time_spent  || '');
-    // sync unit label and show correct mode
+
+    // Seed the single progress bar at the goal's stored value; goalsUpdateProgressMode()
+    // below will immediately re-derive it from spent/total anyway for tracked goals.
+    document.getElementById('gProgress').value = goalsCalcProgress(g).pct;
     goalsUpdateProgressMode();
 
     // Restore chip selections
@@ -401,13 +467,13 @@ function openGoalModal(id) {
     document.getElementById('gTitle').value = '';
     document.getElementById('gNotes').value = '';
     document.getElementById('gProgress').value = 0;
-    document.getElementById('gProgressVal').textContent = '0%';
     document.getElementById('gMoney').value = '';
     document.getElementById('gMoneyUnit').value = 'KT';
     document.getElementById('gMoneySpent') && (document.getElementById('gMoneySpent').value = '');
     document.getElementById('gTime').value = '';
     document.getElementById('gTimeSpent')  && (document.getElementById('gTimeSpent').value  = '');
     document.getElementById('gDailyHours') && (document.getElementById('gDailyHours').value = '');
+    document.getElementById('gDailyStep')  && (document.getElementById('gDailyStep').value  = 0.25);
     goalsUpdateProgressMode();
 
     renderJalaliPicker('gTargetDatePicker', 'gTargetDateIso', null);
@@ -456,18 +522,18 @@ async function saveGoal() {
     time_amount:  document.getElementById('gTime').value || null,
     time_unit:    'hrs total',
     daily_hours:  document.getElementById('gDailyHours')?.value || null,
+    daily_step:   document.getElementById('gDailyStep')?.value  || 0.25,
     money_spent:  document.getElementById('gMoneySpent')?.value || null,
     time_spent:   document.getElementById('gTimeSpent')?.value  || null,
     last_tick_date: existingGoal?.last_tick_date || null,
+    last_tick_amount: existingGoal?.last_tick_amount || null,
     pinned:       existingGoal?.pinned || false,
     created_at:   existingGoal?.created_at || new Date().toISOString(),
   };
 
-  // Compute final progress
-  const computedProg = goalsCalcProgress(goal);
-  goal.progress = computedProg.auto
-    ? computedProg.pct
-    : (parseInt(document.getElementById('gProgress').value) || 0);
+  // The slider IS the final progress. For tracked goals, its own oninput handler already
+  // backfilled gMoneySpent/gTimeSpent to match — so the two never drift apart.
+  goal.progress = Math.max(0, Math.min(100, parseInt(document.getElementById('gProgress').value) || 0));
 
   if (GOALS.editId) {
     const idx = GOALS.data.findIndex(x=>x.id===GOALS.editId);
@@ -487,12 +553,21 @@ async function saveGoal() {
 async function toggleGoalDone(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
+  const moneyTotal = parseFloat(g.money_amount) || 0;
+  const timeTotal  = parseFloat(g.time_amount)  || 0;
+
   if (g.status === 'done') {
     g.status = 'active';
-    if (g.progress === 100) g.progress = 90;
+    if (g.progress === 100) {
+      g.progress = 90;
+      if (moneyTotal > 0) g.money_spent = Math.round(moneyTotal * 0.9);
+      if (timeTotal  > 0) g.time_spent  = Math.round(timeTotal  * 0.9 * 100) / 100;
+    }
   } else {
     g.status = 'done';
     g.progress = 100;
+    if (moneyTotal > 0) g.money_spent = moneyTotal;
+    if (timeTotal  > 0) g.time_spent  = timeTotal;
   }
   await persistGoals();
   renderGoals();
@@ -510,35 +585,60 @@ async function deleteGoal(id) {
   goalsShowToast('Goal deleted');
 }
 
+// ── Daily amount quick-picker (default/±interval buttons next to the spinner) ──
+function goalsSetDailyAmount(id, val) {
+  const input = document.getElementById('dailyAmt_' + id);
+  if (!input) return;
+  input.value = Math.round(Math.max(0, val) * 100) / 100;
+  goalsSyncDailyQuickButtons(id);
+}
+
+function goalsSyncDailyQuickButtons(id) {
+  const input = document.getElementById('dailyAmt_' + id);
+  if (!input) return;
+  const row = input.closest('.goal-daily-amount-row');
+  if (!row) return;
+  const val = parseFloat(input.value);
+  row.querySelectorAll('.goal-daily-qbtn').forEach(b => {
+    b.classList.toggle('active', Math.abs(parseFloat(b.textContent) - val) < 0.001);
+  });
+}
+
 // ── Daily task tick (for goals tracking total hours) ──
 async function toggleGoalDailyTick(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
-  const daily = parseFloat(g.daily_hours) || 0;
-  if (!daily) return;
+  const defaultDaily = parseFloat(g.daily_hours) || 0;
+  if (!defaultDaily) return;
 
   const todayIso  = new Date().toISOString().slice(0,10);
   const timeTotal = parseFloat(g.time_amount) || 0;
   let timeSpent   = parseFloat(g.time_spent)  || 0;
 
   if (g.last_tick_date === todayIso) {
-    // Already ticked today — undo it
-    timeSpent = Math.max(0, timeSpent - daily);
+    // Already ticked today — undo using whatever amount was actually logged
+    const loggedAmt = parseFloat(g.last_tick_amount) || defaultDaily;
+    timeSpent = Math.max(0, timeSpent - loggedAmt);
     g.last_tick_date = null;
+    g.last_tick_amount = null;
   } else {
-    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + daily) : timeSpent + daily;
+    // Read the editable amount from the card (defaults to daily_hours, but can be changed
+    // per-session — e.g. studied 2h instead of the usual 1h)
+    const inputEl = document.getElementById('dailyAmt_' + id);
+    const amt = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
+    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amt) : timeSpent + amt;
     g.last_tick_date = todayIso;
+    g.last_tick_amount = amt;
   }
   g.time_spent = timeSpent;
 
-  // Time-based progress is auto-tracked, so recompute it
-  const prog = goalsCalcProgress(g);
-  if (prog.auto) g.progress = prog.pct;
+  // g.progress now recomputes live from the updated time_spent/total ratio.
+  g.progress = goalsCalcProgress(g).pct;
 
   await persistGoals();
   renderGoals();
   renderGoalsHero();
-  goalsShowToast(g.last_tick_date ? `+${daily}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
+  goalsShowToast(g.last_tick_date ? `+${g.last_tick_amount}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
 }
 
 // ── Pin to top ─────────────────────────────────────────

@@ -1,26 +1,34 @@
-<!-- TODAY -->
-<div id="today-view">
-  <div class="editing-banner" id="editingBanner">
-    ✏️ <span id="editingBannerText">Editing a past day</span> — changes save to that date only.
-  </div>
-
-  <!-- STICKY NOTES (compact, top of page) -->
-  <div id="stickyPanel" style="margin-bottom:20px;background:linear-gradient(135deg,#fef9c3,#fef3b0);border:1.5px solid #f0c040;border-radius:var(--r2);padding:12px 16px;box-shadow:var(--shadow);">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div style="font-size:12px;font-weight:700;color:#7a5c00;white-space:nowrap;flex-shrink:0;">📌 Sticky Notes</div>
-      <div id="stickyList" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;"></div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <input type="text" id="stickyInput" placeholder="Add note..." maxlength="40"
-          style="width:140px;padding:6px 10px;border:1.5px solid #e0c040;border-radius:50px;background:rgba(255,255,255,0.7);font-size:12px;font-weight:500;outline:none;"
-          onkeydown="if(event.key==='Enter')addStickyNote()"/>
-        <button onclick="addStickyNote()" style="padding:6px 12px;border-radius:50px;border:none;background:#f0c040;color:#5a4000;font-weight:700;font-size:12px;cursor:pointer;">+</button>
-      </div>
-    </div>
-  </div>
-  <!-- HERO -->
-  <div class="hero">
-    <!-- Score gauge (speedometer) -->
-    <style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Score Gauge — 20 Tiers Preview</title>
+<style>
+  :root {
+    --sky:#38bdf8; --plum:#a855f7; --coral:#f87171; --coral2:#ef4444; --amber:#f59e0b;
+    --sage:#4ade80; --sage2:#22c55e; --skyL:#e0f2fe; --sageL:#dcfce7; --plumL:#f3e8ff; --amberL:#fef3c7;
+    --cream:#faf7f2; --cream2:#f3ede2; --cream3:#e3d9c8; --ink:#2a2420; --text3:#8a7f6f;
+    --r2:16px; --shadow:0 4px 18px rgba(0,0,0,.08);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  body { margin:0; background:#161311; color:#eee; padding:24px; }
+  h1 { font-size:18px; font-weight:800; color:#fff; margin:0 0 4px; }
+  p.sub { color:#999; font-size:13px; margin:0 0 20px; }
+  .layout { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; }
+  .stage {
+    background:var(--cream); border-radius:24px; padding:32px 28px 24px; width:300px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5); flex-shrink:0;
+  }
+  .tierlist { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-width:520px; }
+  .tierlist button {
+    text-align:left; padding:9px 10px; border-radius:10px; border:1px solid #333;
+    background:#211d1a; color:#ddd; font-size:12px; cursor:pointer; font-weight:600;
+    display:flex; align-items:center; gap:6px; transition:.15s;
+  }
+  .tierlist button:hover { background:#2c2620; }
+  .tierlist button.active { background:#3a2f22; border-color:#f59e0b; color:#ffd28a; }
+  .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .tierlist .n { opacity:.55; font-weight:400; font-size:10px; }
       .score-card{--tc:var(--sky);--tc2:var(--plum);--glow-o:.18;position:relative;overflow:hidden;transition:box-shadow .6s ease;}
       .score-card-bg{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .6s ease;z-index:0;}
       .score-card>*:not(.score-card-bg){position:relative;z-index:1;}
@@ -211,7 +219,15 @@
       .tier-transcendent .gauge-track-fg{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--tc) 82%,transparent)) drop-shadow(0 0 4px var(--tc2));}
       .tier-transcendent .score-card-bg{opacity:.32;background:linear-gradient(120deg,#a855f7,#ec4899,#f59e0b,#22d3ee,#a855f7);background-size:400% 400%;animation:holoShift 4.5s ease infinite;}
       .tier-transcendent .score-card{animation:cardAura 1.6s ease-in-out infinite;}
-    </style>
+
+  .score-card { padding:24px 16px 18px; border-radius:20px; background:#fff; box-shadow:var(--shadow); text-align:center; }
+</style>
+</head>
+<body>
+<h1>Score Gauge — 20 Tier Preview</h1>
+<p class="sub">Click a tier to preview its unique background motion, particle fx, and glow. (Score number is illustrative.)</p>
+<div class="layout">
+  <div class="stage">
     <div class="score-card tier-hollow" id="scoreCard">
       <div class="score-card-bg" id="scoreCardBg"></div>
       <div class="gauge-wrap" id="gaugeWrap">
@@ -260,101 +276,78 @@
           <span class="particle p7"></span><span class="particle p8"></span>
         </div>
         <div class="ring-num">
-          <div class="ring-pct" id="ringPct">—</div>
+          <div class="ring-pct" id="ringPct">0</div>
           <div class="ring-lbl">score</div>
         </div>
       </div>
-      <div class="score-emoji" id="scoreEmoji">🎯</div>
-      <div class="score-msg" id="scoreMsg">Start logging your day</div>
-      <button onclick="toggleScoreBreakdown()" style="margin-top:10px;padding:5px 12px;border-radius:50px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;color:var(--text3);cursor:pointer;">📊 Scoring</button>
-    </div>
-
-    <!-- Quick metrics -->
-    <div class="metrics-bar" id="metricsBar">
-      <div class="metric-row">
-        <div class="metric-icon" style="background:var(--amberL)">🔥</div>
-        <div class="metric-info">
-          <div class="metric-name">Calories</div>
-          <div class="metric-val" id="mCal">—</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="mCalBar" style="background:var(--amber);width:0%"></div></div>
-          <div id="mDeficit" style="font-size:11px;margin-top:4px;font-weight:600;color:var(--text3);"></div>
-        </div>
-      </div>
-      <div class="metric-row">
-        <div class="metric-icon" style="background:var(--sageL)">💪</div>
-        <div class="metric-info">
-          <div class="metric-name">Protein</div>
-          <div class="metric-val" id="mProt">—</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="mProtBar" style="background:var(--sage2);width:0%"></div></div>
-        </div>
-      </div>
-      <div class="metric-row">
-        <div class="metric-icon" style="background:var(--skyL)">⚖️</div>
-        <div class="metric-info">
-          <div class="metric-name">Weight</div>
-          <div class="metric-val" id="mWeight">—</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="mWeightBar" style="background:var(--sky);width:0%"></div></div>
-        </div>
-      </div>
-      <div class="metric-row">
-        <div class="metric-icon" style="background:var(--plumL)">📚</div>
-        <div class="metric-info">
-          <div class="metric-name">Study Total</div>
-          <div class="metric-val" id="mStudy">—</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="mStudyBar" style="background:var(--plum);width:0%"></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Adalimumab -->
-    <div class="adal-card" onclick="openAdal()">
-      <div class="adal-top">
-        <div class="adal-badge ok" id="adalBadge">💉</div>
-        <div>
-          <div class="adal-title" id="adalTitle">Adalimumab</div>
-          <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace" id="adalNextDate">Click to set up</div>
-        </div>
-      </div>
-      <div class="adal-msg" id="adalMsg">Injection reminder</div>
-      <div class="adal-progress"><div class="adal-progress-fill" id="adalBar" style="width:50%"></div></div>
-      <div class="adal-dates"><span id="adalFrom">—</span><span id="adalTo">—</span></div>
+      <div class="score-emoji" id="scoreEmoji" style="font-size:22px;">🌫️</div>
+      <div class="score-msg" id="scoreMsg">Waking up.</div>
     </div>
   </div>
+  <div class="tierlist" id="tierList"></div>
+</div>
 
-  <!-- FORM SECTIONS -->
-  <div class="sections">
+<script>
+const SCORE_TIERS=[
+  {min:144,key:'transcendent',c:'#a855f7',c2:'#ec4899',c3:'#22d3ee',fx:'holo',name:'Transcendent',emojis:['✨','🌌','🌠','💫'],msgs:['Transcendent.','Beyond the scale.','You broke the gauge.']},
+  {min:136,key:'celestial',c:'#6366f1',c2:'#facc15',c3:'#818cf8',fx:'star',name:'Celestial',emojis:['🌟','🪐','🌌'],msgs:['Celestial.','Among the stars.']},
+  {min:128,key:'royal',c:'#eab308',c2:'#7c3aed',c3:'#facc15',fx:'shimmer',name:'Royal',emojis:['👑','🏆','🔮'],msgs:['Royalty today.','Crowned.']},
+  {min:120,key:'electric',c:'#8b5cf6',c2:'#3b82f6',c3:'#a78bfa',fx:'bolt',name:'Electric',emojis:['⚡','🌩️','🔮'],msgs:['Electric.','Storm mode.']},
+  {min:112,key:'inferno',c:'#dc2626',c2:'#7c2d12',c3:'#f97316',fx:'ember',name:'Inferno',emojis:['🌋','🔥','💀'],msgs:['Inferno.','Molten.']},
+  {min:104,key:'blazing',c:'#ef4444',c2:'#f59e0b',c3:'#fca5a5',fx:'flame',name:'Blazing',emojis:['🔥','🚀','💯'],msgs:['Blazing!','On fire.']},
+  {min:96, key:'crushing',c:'#ea580c',c2:'#dc2626',c3:'#fb923c',fx:'spark',name:'Crushing',emojis:['💥','⚡','🌟'],msgs:['Crushing it!']},
+  {min:88, key:'driven',c:'#f97316',c2:'#c2410c',c3:'#fdba74',fx:'spark',name:'Driven',emojis:['🏁','⚙️','🔥'],msgs:['Driven.','Full send.']},
+  {min:80, key:'charged',c:'#eab308',c2:'#a16207',c3:'#facc15',fx:'spark',name:'Charged',emojis:['⚡','🔋','💛'],msgs:['Charged up.']},
+  {min:72, key:'solid',c:'#65a30d',c2:'#3f6212',c3:'#a3e635',fx:'',name:'Solid',emojis:['✅','💪','🎯'],msgs:['Solid day.']},
+  {min:64, key:'steady',c:'#22c55e',c2:'#15803d',c3:'#4ade80',fx:'',name:'Steady',emojis:['🟢','🧭','⚖️'],msgs:['Steady state.']},
+  {min:56, key:'momentum',c:'#14b8a6',c2:'#0f766e',c3:'#2dd4bf',fx:'bubble',name:'Momentum',emojis:['🌊','🌀'],msgs:['Building momentum.']},
+  {min:48, key:'current',c:'#06b6d4',c2:'#0e7490',c3:'#22d3ee',fx:'wisp',name:'Current',emojis:['🌊','💧'],msgs:['In the current.']},
+  {min:40, key:'rising',c:'#0ea5e9',c2:'#0369a1',c3:'#38bdf8',fx:'bubble',name:'Rising',emojis:['📈','🌤️'],msgs:['Rising.']},
+  {min:32, key:'breeze',c:'#38bdf8',c2:'#0284c7',c3:'#7dd3fc',fx:'wisp',name:'Breeze',emojis:['🍃','🌬️'],msgs:['Catching a breeze.']},
+  {min:24, key:'sprout',c:'#4ade80',c2:'#166534',c3:'#86efac',fx:'leaf',name:'Sprout',emojis:['🌱','🍃'],msgs:['Sprouting.']},
+  {min:16, key:'kindling',c:'#f59e0b',c2:'#b45309',c3:'#fbbf24',fx:'flame',name:'Kindling',emojis:['🔥','🕯️'],msgs:['Kindling caught.']},
+  {min:8,  key:'ember',c:'#b45309',c2:'#78350f',c3:'#d97706',fx:'ember',name:'Ember',emojis:['🔥','♨️'],msgs:['Faint ember.']},
+  {min:0,  key:'hollow',c:'#78909c',c2:'#37474f',c3:'#90a4ae',fx:'',name:'Hollow',emojis:['🌫️','☁️'],msgs:['Waking up.']},
+  {min:-999,key:'rockbottom',c:'#4b5563',c2:'#1f2937',c3:'#6b7280',fx:'ash',name:'Rock Bottom',emojis:['🌑','🔧'],msgs:['Reset day.']}
+];
 
-    <!-- GYM -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-icon" style="background:var(--sageL)">🏋️</div>
-        <div><div class="card-title">Gym Session</div><div class="card-sub">How was the workout?</div></div>
-      </div>
-      <div class="fgroup">
-        <div class="flabel">Session type</div>
-        <div class="chips" id="gym-chips">
-          <button class="chip" data-v="none" onclick="pick('gym','none',this,'ink')">😴 Rest day</button>
-          <button class="chip" data-v="skipped" onclick="pick('gym','skipped',this,'rose')">❌ Skipped</button>
-          <button class="chip" data-v="half" onclick="pick('gym','half',this,'amber')">⚡ Half session</button>
-          <button class="chip" data-v="full" onclick="pick('gym','full',this,'sage')">🔥 Full session</button>
-        </div>
-      </div>
-    </div>
+const listEl = document.getElementById('tierList');
+SCORE_TIERS.slice().reverse().forEach((t,i)=>{
+  const b=document.createElement('button');
+  b.innerHTML = `<span class="dot" style="background:${t.c}"></span> ${t.emojis[0]} ${t.name} <span class="n">${t.min<=-999?'<0':t.min+'+'}</span>`;
+  b.onclick=()=>applyTier(t,b);
+  b.dataset.key=t.key;
+  listEl.appendChild(b);
+});
 
-    <!-- HOME EXERCISE -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-icon" style="background:var(--skyL)">🏠</div>
-        <div><div class="card-title">Home Exercise</div><div class="card-sub">Stretching, calisthenics, yoga, walks…</div></div>
-      </div>
-      <div class="fgroup">
-        <div class="flabel">Did you exercise at home?</div>
-        <div class="chips" id="home-exercise-chips">
-          <button class="chip" data-v="none" onclick="pick('home_exercise','none',this,'ink')">😐 None</button>
-          <button class="chip" data-v="half" onclick="pick('home_exercise','half',this,'sky')">🌿 Light / Short</button>
-          <button class="chip" data-v="full" onclick="pick('home_exercise','full',this,'sage')">💪 Full session</button>
-        </div>
-      </div>
-    </div>
+function applyTier(tier, btn){
+  document.querySelectorAll('.tierlist button').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const card=document.getElementById('scoreCard');
+  card.className='score-card tier-'+tier.key;
+  card.style.setProperty('--tc',tier.c);
+  card.style.setProperty('--tc2',tier.c2);
+  card.style.setProperty('--tc3',tier.c3||tier.c2);
+  card.style.setProperty('--glow-o',.18);
+  if(tier.fx) card.dataset.fx=tier.fx; else delete card.dataset.fx;
+  document.getElementById('ringPct').textContent = Math.max(0,tier.min);
+  document.getElementById('scoreEmoji').textContent = tier.emojis[0];
+  document.getElementById('scoreMsg').textContent = tier.msgs[0];
+  document.getElementById('scoreMsg').style.color = tier.c;
 
-    
+  const track=document.getElementById('gaugeTrack');
+  const len=track.getTotalLength();
+  const max=Math.max(120, Math.ceil((Math.max(tier.min,0)+15)/10)*10);
+  const pct=Math.max(0,Math.min(1,Math.max(tier.min,0)/max));
+  track.style.strokeDasharray=len;
+  track.style.strokeDashoffset=len*(1-pct);
+  const angle=-125+pct*250;
+  document.getElementById('needleGrp').setAttribute('transform','rotate('+angle+' 110 115)');
+  document.getElementById('gaugeMaxLabel').textContent=max;
+}
+
+applyTier(SCORE_TIERS[SCORE_TIERS.length-1], null);
+document.querySelectorAll('.tierlist button')[19].classList.add('active');
+</script>
+</body>
+</html>

@@ -671,19 +671,246 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
   </div>
   <!-- HERO -->
   <div class="hero">
-    <!-- Score ring -->
-    <div class="score-card">
-      <div class="ring-wrap">
-        <svg viewBox="0 0 130 130" width="130" height="130">
+    <!-- Score gauge (speedometer) -->
+    <style>
+      .score-card{--tc:var(--sky);--tc2:var(--plum);--glow-o:.18;position:relative;overflow:hidden;transition:box-shadow .6s ease;}
+      .score-card-bg{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .6s ease;z-index:0;}
+      .score-card>*:not(.score-card-bg){position:relative;z-index:1;}
+
+      .gauge-wrap{position:relative;width:220px;height:170px;margin:0 auto;}
+      .gauge-glow{position:absolute;inset:-20px;border-radius:50%;pointer-events:none;
+        background:radial-gradient(circle at 50% 62%,color-mix(in srgb,var(--tc) 65%,transparent) 0%,transparent 68%);
+        opacity:var(--glow-o);transition:opacity .6s ease,background .6s ease;filter:blur(6px);}
+      .gauge-svg{position:relative;width:100%;height:100%;overflow:visible;}
+      .gauge-track-bg{fill:none;stroke:var(--cream3);stroke-width:16;stroke-linecap:round;}
+      .gauge-track-fg{fill:none;stroke:url(#gaugeGrad);stroke-width:16;stroke-linecap:round;
+        transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1),filter .6s ease;
+        filter:drop-shadow(0 0 4px color-mix(in srgb,var(--tc) 55%,transparent));}
+      .gauge-tick{stroke:var(--cream3);stroke-width:2.5;}
+      .gauge-tick-minor{stroke:var(--cream3);stroke-width:1.5;opacity:.7;}
+      .gauge-needle-grp{transition:transform .9s cubic-bezier(.22,1.4,.36,1);}
+      .gauge-needle{fill:var(--tc);transition:fill .6s ease;}
+      .gauge-needle-tail{fill:color-mix(in srgb,var(--tc) 55%,var(--text3));opacity:.85;transition:fill .6s ease;}
+      .gauge-hub{fill:var(--tc);transition:fill .6s ease;}
+      .gauge-hub-dot{fill:var(--cream2);}
+      .gauge-endlabel{font-size:10px;font-weight:700;fill:var(--text3);font-family:'JetBrains Mono',monospace;}
+      .shine{opacity:0;transition:opacity .6s ease;mix-blend-mode:screen;}
+      .ring-num{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;}
+      .ring-num .ring-pct{font-size:36px;font-weight:800;color:var(--tc);line-height:1;transition:color .6s ease;}
+      .ring-num .ring-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+      .gauge-wrap.pop{animation:gaugePop .5s cubic-bezier(.34,1.56,.64,1);}
+      @keyframes gaugePop{0%{transform:scale(1);}35%{transform:scale(1.05);}65%{transform:scale(.985);}100%{transform:scale(1);}}
+      .score-emoji{transition:opacity .18s ease,transform .18s ease;display:inline-block;}
+      .score-msg{transition:opacity .2s ease,transform .2s ease;color:var(--tc);font-weight:700;}
+
+      /* ══════════════════════════════════════════════════════════════
+         20-TIER IDENTITY SYSTEM — each tier = unique bg motion + fx
+         Colors come from JS via --tc/--tc2/--tc3. Particle look driven
+         by data-fx on .score-card. Card-level aura on top tiers.
+         ══════════════════════════════════════════════════════════════ */
+      @keyframes glowPulse{0%,100%{opacity:var(--glow-o);transform:scale(1);}50%{opacity:calc(var(--glow-o) + .22);transform:scale(1.06);}}
+      @keyframes staticFlicker{0%,100%{opacity:.08;}45%{opacity:.05;}50%{opacity:.24;}72%{opacity:.09;}100%{opacity:.14;}}
+      @keyframes fogDrift{0%,100%{transform:translate(0,0);}50%{transform:translate(6px,-5px);}}
+      @keyframes emberGlow{0%,100%{opacity:.16;transform:scale(1);}50%{opacity:.3;transform:scale(1.04);}}
+      @keyframes windDrift{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}
+      @keyframes sproutSway{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.035) rotate(1deg);}}
+      @keyframes riseFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+      @keyframes waveShift{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}
+      @keyframes electricJitter{0%,100%{opacity:.22;transform:translate(0,0);}20%{opacity:.36;transform:translate(-1px,1px);}40%{opacity:.18;transform:translate(1px,-1px);}60%{opacity:.32;transform:translate(-1px,0);}80%{opacity:.2;transform:translate(1px,1px);}}
+      @keyframes flameFlicker{0%,100%{opacity:.28;transform:scaleY(1);}50%{opacity:.42;transform:scaleY(1.08);}}
+      @keyframes lavaBubble{0%,100%{opacity:.3;transform:scale(1);filter:hue-rotate(0deg);}50%{opacity:.42;transform:scale(1.1);filter:hue-rotate(-8deg);}}
+      @keyframes boltStrobe{0%,89%,100%{opacity:.2;}90%{opacity:.55;}92%{opacity:.15;}94%{opacity:.5;}}
+      @keyframes royalDrift{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.09) rotate(3deg);}}
+      @keyframes starFieldTwinkle{0%,100%{opacity:.28;}50%{opacity:.44;}}
+      @keyframes holoShift{0%{background-position:0% 50%;filter:hue-rotate(0deg) saturate(1.3);}50%{background-position:100% 50%;filter:hue-rotate(25deg) saturate(1.5);}100%{background-position:0% 50%;filter:hue-rotate(0deg) saturate(1.3);}}
+      @keyframes cardAura{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--tc) 0%,transparent);}50%{box-shadow:0 0 26px 2px color-mix(in srgb,var(--tc) 40%,transparent);}}
+      @keyframes hubPulse{0%,100%{r:9;}50%{r:10.8;}}
+
+      /* particle shapes — driven by data-fx on .score-card */
+      .score-card[data-fx]:not([data-fx=""]) .gauge-particles{display:block;}
+      .particle{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--tc);opacity:0;}
+      .particle.p1{left:14%;bottom:26%;animation-delay:.1s;}
+      .particle.p2{left:27%;bottom:10%;animation-delay:.85s;}
+      .particle.p3{left:41%;bottom:20%;animation-delay:1.5s;}
+      .particle.p4{left:55%;bottom:6%;animation-delay:.4s;}
+      .particle.p5{left:68%;bottom:16%;animation-delay:1.15s;}
+      .particle.p6{left:80%;bottom:28%;animation-delay:.65s;}
+      .particle.p7{left:47%;bottom:32%;animation-delay:1.85s;}
+      .particle.p8{left:60%;bottom:8%;animation-delay:2.1s;}
+
+      @keyframes ashFall{0%{transform:translateY(-6px) rotate(0deg);opacity:0;}15%{opacity:.5;}100%{transform:translateY(40px) rotate(60deg);opacity:0;}}
+      [data-fx="ash"] .particle{background:#94a3b8;border-radius:2px;width:3px;height:3px;animation:ashFall 3.6s linear infinite;}
+
+      @keyframes emberRise{0%{transform:translateY(0) scale(.6);opacity:0;}30%{opacity:.85;}100%{transform:translateY(-42px) scale(1);opacity:0;}}
+      [data-fx="ember"] .particle{background:var(--tc);box-shadow:0 0 5px var(--tc);animation:emberRise 3.2s ease-in infinite;}
+
+      @keyframes flameRise{0%{transform:translateY(4px) scale(.5);opacity:0;}25%{opacity:.9;}100%{transform:translateY(-30px) scale(1.15);opacity:0;}}
+      [data-fx="flame"] .particle{background:linear-gradient(var(--tc),var(--tc2));border-radius:50% 50% 50% 4px;width:6px;height:8px;animation:flameRise 1.5s ease-in infinite;}
+
+      @keyframes leafSway{0%,100%{transform:translate(0,0) rotate(0deg);opacity:.7;}50%{transform:translate(4px,-8px) rotate(25deg);opacity:.95;}}
+      [data-fx="leaf"] .particle{background:var(--tc);border-radius:0 70% 0 70%;width:6px;height:6px;animation:leafSway 3s ease-in-out infinite;}
+
+      @keyframes wispDrift{0%{transform:translateX(-10px);opacity:0;}30%{opacity:.7;}100%{transform:translateX(24px);opacity:0;}}
+      [data-fx="wisp"] .particle{width:16px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--tc),transparent);animation:wispDrift 3.1s ease-in-out infinite;}
+
+      @keyframes bubbleRise{0%{transform:translateY(6px) scale(.7);opacity:0;}25%{opacity:.85;}100%{transform:translateY(-44px) scale(1.05) translateX(4px);opacity:0;}}
+      [data-fx="bubble"] .particle{background:radial-gradient(circle at 30% 30%,#fff,var(--tc));animation:bubbleRise 2.7s ease-in infinite;}
+
+      @keyframes sparkFloat{0%{transform:translateY(0) scale(.5);opacity:0;}25%{opacity:1;}100%{transform:translateY(-46px) scale(1.1);opacity:0;}}
+      [data-fx="spark"] .particle{background:var(--tc);box-shadow:0 0 5px var(--tc);animation:sparkFloat 1.7s ease-in infinite;}
+
+      @keyframes boltFlash{0%,100%{opacity:0;}48%{opacity:0;}50%{opacity:1;}54%{opacity:.2;}58%{opacity:.9;}64%{opacity:0;}}
+      [data-fx="bolt"] .particle{width:2px;height:18px;border-radius:1px;background:linear-gradient(var(--tc),var(--tc2));box-shadow:0 0 6px var(--tc);animation:boltFlash 1.6s steps(1) infinite;}
+
+      @keyframes shimmerTwinkle{0%,100%{opacity:.3;transform:rotate(45deg) scale(.8);}50%{opacity:1;transform:rotate(45deg) scale(1.25);}}
+      [data-fx="shimmer"] .particle{background:linear-gradient(135deg,var(--tc),var(--tc2));transform:rotate(45deg);border-radius:2px;animation:shimmerTwinkle 2.3s ease-in-out infinite;}
+
+      @keyframes starTwinkle{0%,100%{opacity:.25;transform:scale(.7);}50%{opacity:1;transform:scale(1.3);}}
+      [data-fx="star"] .particle{background:#fff;box-shadow:0 0 5px var(--tc2);animation:starTwinkle 2.1s ease-in-out infinite;}
+
+      @keyframes holoSpin{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
+      [data-fx="holo"] .particle{background:conic-gradient(from 0deg,#f472b6,#facc15,#4ade80,#38bdf8,#a855f7,#f472b6);box-shadow:0 0 7px var(--tc);animation:holoSpin 2.6s linear infinite,starTwinkle 1.7s ease-in-out infinite;}
+
+      /* ── 1. rockbottom — cracked ash, dying static ── */
+      .tier-rockbottom .score-card-bg{opacity:.16;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--tc) 16%,transparent) 0 2px,transparent 2px 7px);animation:staticFlicker 3.4s steps(4) infinite;}
+
+      /* ── 2. hollow — pale drifting fog ── */
+      .tier-hollow .score-card-bg{opacity:.18;background:radial-gradient(circle at 38% 35%,color-mix(in srgb,var(--tc) 22%,transparent),transparent 70%),radial-gradient(circle at 66% 68%,color-mix(in srgb,var(--tc) 16%,transparent),transparent 70%);animation:fogDrift 6.5s ease-in-out infinite;}
+
+      /* ── 3. ember — dim glow, faint pulse ── */
+      .tier-ember .score-card-bg{opacity:.18;background:radial-gradient(circle at 50% 95%,color-mix(in srgb,var(--tc) 30%,transparent),transparent 65%);animation:emberGlow 3.6s ease-in-out infinite;}
+
+      /* ── 4. kindling — small warm flicker ── */
+      .tier-kindling .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 98%,color-mix(in srgb,var(--tc) 34%,transparent),transparent 66%);animation:flameFlicker 2s ease-in-out infinite;}
+
+      /* ── 5. sprout — green growth sway ── */
+      .tier-sprout .score-card-bg{opacity:.18;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 68%);animation:sproutSway 3.4s ease-in-out infinite;}
+
+      /* ── 6. breeze — diagonal wind wash ── */
+      .tier-breeze .score-card-bg{opacity:.2;background:linear-gradient(100deg,color-mix(in srgb,var(--tc) 10%,transparent),color-mix(in srgb,var(--tc) 28%,transparent) 30%,transparent 60%);background-size:250% 100%;animation:windDrift 4.2s linear infinite;}
+
+      /* ── 7. rising — ascending bloom ── */
+      .tier-rising .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 28%,transparent),transparent 70%);animation:riseFloat 2.8s ease-in-out infinite;}
+
+      /* ── 8. current — flowing wave, cool teal ── */
+      .tier-current .score-card-bg{opacity:.22;background:linear-gradient(120deg,color-mix(in srgb,var(--tc) 26%,transparent),color-mix(in srgb,var(--tc2) 20%,transparent));background-size:220% 220%;animation:waveShift 3.8s ease-in-out infinite;}
+
+      /* ── 9. momentum — faster wave, more contrast ── */
+      .tier-momentum .score-card-bg{opacity:.24;background:linear-gradient(120deg,color-mix(in srgb,var(--tc) 32%,transparent),color-mix(in srgb,var(--tc2) 28%,transparent));background-size:220% 220%;animation:waveShift 2.6s ease-in-out infinite;}
+
+      /* ── 10. steady — calm balanced pulse ── */
+      .tier-steady .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 66%);animation:glowPulse 3s ease-in-out infinite;}
+
+      /* ── 11. solid — stable earthy glow, minimal motion ── */
+      .tier-solid .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 58%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 66%);}
+
+      /* ── 12. charged — electric jitter ── */
+      .tier-charged .gauge-glow{animation:glowPulse 2s ease-in-out infinite;}
+      .tier-charged .score-card-bg{opacity:.24;background:linear-gradient(135deg,color-mix(in srgb,var(--tc) 34%,transparent),color-mix(in srgb,var(--tc2) 22%,transparent));animation:electricJitter 1.4s steps(6) infinite;}
+
+      /* ── 13. driven — orange engine pulse + sparks ── */
+      .tier-driven .gauge-glow{animation:glowPulse 1.9s ease-in-out infinite;}
+      .tier-driven .score-card-bg{opacity:.26;background:radial-gradient(circle at 50% 96%,color-mix(in srgb,var(--tc) 36%,transparent),transparent 68%);animation:glowPulse 1.9s ease-in-out infinite;}
+
+      /* ── 14. crushing — coral surge, sparks on ── */
+      .tier-crushing .gauge-glow{animation:glowPulse 1.7s ease-in-out infinite;}
+      .tier-crushing .score-card-bg{opacity:.27;background:radial-gradient(circle at 50% 92%,color-mix(in srgb,var(--tc) 36%,transparent),transparent 66%);animation:glowPulse 1.7s ease-in-out infinite;}
+      .tier-crushing .gauge-track-fg{filter:drop-shadow(0 0 7px color-mix(in srgb,var(--tc) 65%,transparent));}
+
+      /* ── 15. blazing — flame flicker, shine, hot track ── */
+      .tier-blazing .gauge-glow{animation:glowPulse 1.4s ease-in-out infinite;}
+      .tier-blazing .shine{opacity:.4;}
+      .tier-blazing .gauge-track-fg{filter:drop-shadow(0 0 8px color-mix(in srgb,var(--tc) 70%,transparent));}
+      .tier-blazing .score-card-bg{opacity:.3;background:radial-gradient(circle at 50% 100%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 72%);animation:flameFlicker 1.3s ease-in-out infinite;}
+
+      /* ── 16. inferno — deep lava bubble, heavy embers ── */
+      .tier-inferno .gauge-glow{animation:glowPulse 1.3s ease-in-out infinite;}
+      .tier-inferno .shine{opacity:.35;}
+      .tier-inferno .gauge-track-fg{filter:drop-shadow(0 0 9px color-mix(in srgb,var(--tc) 75%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-inferno .score-card-bg{opacity:.34;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 50%,transparent),color-mix(in srgb,var(--tc2) 30%,transparent) 55%,transparent 78%);animation:lavaBubble 2.1s ease-in-out infinite;}
+
+      /* ── 17. electric — strobing bolts, purple-blue storm ── */
+      .tier-electric .gauge-glow{animation:glowPulse 1.2s ease-in-out infinite;}
+      .tier-electric .shine{opacity:.5;}
+      .tier-electric .gauge-hub{animation:hubPulse 1.3s ease-in-out infinite;}
+      .tier-electric .gauge-needle,.tier-electric .gauge-hub{filter:drop-shadow(0 0 5px var(--tc));}
+      .tier-electric .gauge-track-fg{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--tc) 78%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-electric .score-card-bg{opacity:.3;background:linear-gradient(140deg,color-mix(in srgb,var(--tc) 40%,transparent),color-mix(in srgb,var(--tc2) 34%,transparent));animation:boltStrobe 1.9s steps(1) infinite;}
+      .tier-electric .score-card{animation:cardAura 1.8s ease-in-out infinite;}
+
+      /* ── 18. royal — gold+violet shimmer rays ── */
+      .tier-royal .gauge-glow{animation:glowPulse 1.5s ease-in-out infinite;}
+      .tier-royal .shine{opacity:.6;}
+      .tier-royal .gauge-hub{animation:hubPulse 1.4s ease-in-out infinite;}
+      .tier-royal .gauge-track-fg{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--tc) 78%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-royal .score-card-bg{opacity:.34;background:radial-gradient(circle at 28% 22%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 60%),radial-gradient(circle at 78% 82%,color-mix(in srgb,var(--tc2) 42%,transparent),transparent 60%);animation:royalDrift 4.6s ease-in-out infinite;}
+      .tier-royal .score-card{animation:cardAura 2.2s ease-in-out infinite;}
+
+      /* ── 19. celestial — deep indigo starfield ── */
+      .tier-celestial .gauge-glow{animation:glowPulse 1.3s ease-in-out infinite;}
+      .tier-celestial .shine{opacity:.62;}
+      .tier-celestial .gauge-hub{animation:hubPulse 1.2s ease-in-out infinite;}
+      .tier-celestial .gauge-needle,.tier-celestial .gauge-hub{filter:drop-shadow(0 0 5px var(--tc));}
+      .tier-celestial .gauge-track-fg{filter:drop-shadow(0 0 11px color-mix(in srgb,var(--tc) 80%,transparent)) drop-shadow(0 0 4px var(--tc2));}
+      .tier-celestial .score-card-bg{opacity:.36;background:radial-gradient(circle at 20% 20%,#fff 0.5px,transparent 1.5px) 0 0/22px 22px,radial-gradient(circle at 60% 40%,#fff 0.5px,transparent 1.5px) 0 0/30px 30px,radial-gradient(circle at 80% 75%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 60%),radial-gradient(circle at 25% 80%,color-mix(in srgb,var(--tc2) 40%,transparent),transparent 60%);animation:starFieldTwinkle 2.4s ease-in-out infinite;}
+      .tier-celestial .score-card{animation:cardAura 2s ease-in-out infinite;}
+
+      /* ── 20. transcendent — full holographic supremacy ── */
+      .tier-transcendent .gauge-glow{animation:glowPulse 1.1s ease-in-out infinite;}
+      .tier-transcendent .shine{opacity:.75;}
+      .tier-transcendent .gauge-hub{animation:hubPulse .95s ease-in-out infinite;}
+      .tier-transcendent .gauge-needle,.tier-transcendent .gauge-hub{filter:drop-shadow(0 0 6px var(--tc));}
+      .tier-transcendent .gauge-track-fg{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--tc) 82%,transparent)) drop-shadow(0 0 4px var(--tc2));}
+      .tier-transcendent .score-card-bg{opacity:.32;background:linear-gradient(120deg,#a855f7,#ec4899,#f59e0b,#22d3ee,#a855f7);background-size:400% 400%;animation:holoShift 4.5s ease infinite;}
+      .tier-transcendent .score-card{animation:cardAura 1.6s ease-in-out infinite;}
+    </style>
+    <div class="score-card tier-hollow" id="scoreCard">
+      <div class="score-card-bg" id="scoreCardBg"></div>
+      <div class="gauge-wrap" id="gaugeWrap">
+        <div class="gauge-glow" id="gaugeGlow"></div>
+        <svg class="gauge-svg" viewBox="0 0 220 170">
           <defs>
-            <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#e85d3a"/>
-              <stop offset="100%" stop-color="#3a7a5a"/>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--coral)"/>
+              <stop offset="50%" stop-color="var(--amber)"/>
+              <stop offset="100%" stop-color="var(--sage)"/>
             </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
           </defs>
-          <circle class="ring-bg" cx="65" cy="65" r="52"/>
-          <circle class="ring-fg" id="ringFg" cx="65" cy="65" r="52" stroke-dasharray="326.726" stroke-dashoffset="326.726"/>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/>
+            <polygon class="gauge-needle" points="110,30 113,113 107,113"/>
+          </g>
+          <circle class="gauge-hub" cx="110" cy="115" r="9"/>
+          <circle class="gauge-hub-dot" cx="110" cy="115" r="3.5"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
         </svg>
+        <div class="gauge-particles">
+          <span class="particle p1"></span><span class="particle p2"></span><span class="particle p3"></span>
+          <span class="particle p4"></span><span class="particle p5"></span><span class="particle p6"></span>
+          <span class="particle p7"></span><span class="particle p8"></span>
+        </div>
         <div class="ring-num">
           <div class="ring-pct" id="ringPct">—</div>
           <div class="ring-lbl">score</div>
@@ -1597,7 +1824,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 
 <style>
 /* ── Goal tab specific styles ──────────────────────── */
-#goals-view { display:none; }
+#goals-view { display:none; padding: 4px 32px 48px; }
 
 .goals-hero {
   display:grid;
@@ -1811,12 +2038,12 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 
 /* Meta grid */
 .goal-meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.goal-meta-grid.single { grid-template-columns:1fr; }
 .goal-meta-item { display:flex; align-items:center; gap:10px; background:var(--cream2); border-radius:var(--r2); padding:10px 12px; }
 .goal-meta-icon { width:26px; height:26px; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--text3); }
 .goal-meta-icon svg { width:13px; height:13px; display:block; }
 .goal-meta-label { font-size:9.5px; color:var(--text3); text-transform:uppercase; letter-spacing:.07em; font-weight:700; }
 .goal-meta-val { font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink); margin-top:1px; }
-.goal-meta-val.empty { color:var(--text3); font-weight:500; font-family:inherit; font-size:12.5px; }
 
 /* Daily task CTA */
 .goal-daily-task {
@@ -1842,10 +2069,57 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 .goal-daily-check:hover { border-color:var(--sage); }
 .goal-daily-check svg { width:15px; height:15px; display:block; }
 .goal-daily-task.done .goal-daily-check { background:var(--sage); border-color:var(--sage); color:#fff; }
-.goal-daily-task-text { flex:1; }
+.goal-daily-task-text { flex:1; min-width:0; }
 .goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
 .goal-daily-task.done .goal-daily-task-label { color:var(--sage); }
 .goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+
+/* Quick amount picker: default/±interval buttons + native number input (spinner kept on purpose) */
+.goal-daily-amount-row {
+  display:flex; align-items:center; gap:6px; margin-top:7px; flex-wrap:wrap;
+}
+.goal-daily-qbtn {
+  font-size:10.5px; font-weight:700; color:var(--text3);
+  background:#fff; border:1.5px solid var(--cream3); border-radius:6px;
+  padding:3px 7px; cursor:pointer; font-family:inherit; line-height:1.3;
+  transition:all .12s;
+}
+.goal-daily-qbtn:hover { border-color:var(--sage); color:var(--sage); }
+.goal-daily-qbtn.default { border-color:var(--sage); color:var(--sage); background:var(--sageL); }
+.goal-daily-qbtn.active { background:var(--sage); border-color:var(--sage); color:#fff; }
+.goal-daily-amount-input {
+  width:52px; font-size:12px; font-weight:700; color:var(--ink);
+  background:#fff; border:1.5px solid var(--cream3); border-radius:6px;
+  padding:3px 5px; text-align:center; font-family:inherit; margin-left:2px;
+}
+.goal-daily-amount-input:focus { outline:none; border-color:var(--sage); }
+.goal-daily-amount-input:disabled { background:transparent; border-color:transparent; color:var(--sage); font-weight:700; }
+
+/* Self-contained slider — deliberately NOT relying on a shared/global slider class,
+   so it can't inherit stray negative margins meant for a different container width. */
+.goal-progress-slider {
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:6px; margin:0; padding:0;
+  background:transparent; cursor:pointer; outline:none;
+  box-sizing:border-box;
+}
+.goal-progress-slider::-webkit-slider-runnable-track {
+  height:6px; border-radius:3px; background:var(--cream3);
+}
+.goal-progress-slider::-moz-range-track {
+  height:6px; border-radius:3px; background:var(--cream3);
+}
+.goal-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none;
+  width:18px; height:18px; border-radius:50%;
+  background:#fff; border:3px solid var(--coral);
+  margin-top:-6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.goal-progress-slider::-moz-range-thumb {
+  width:18px; height:18px; border-radius:50%;
+  background:#fff; border:3px solid var(--coral);
+  cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
 
 .goal-notes {
   font-size:12px;
@@ -2108,29 +2382,30 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
             <input type="number" class="modal-input" id="gDailyHours" placeholder="e.g. 1" min="0" step="0.25" style="margin:0;flex:1;"/>
             <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs/day</span>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+            <input type="number" class="modal-input" id="gDailyStep" placeholder="0.25" min="0.05" step="0.05" style="margin:0;width:100px;flex:none;"/>
+            <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs step for the quick +/- buttons on the card</span>
+          </div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px;">Adds a checkbox to the goal card — tick it once a day to log these hours automatically.</div>
         </div>
       </div>
 
-      <!-- Auto-derived progress indicator (shown when resource tracking active) -->
-      <div id="gAutoProgressWrap" style="display:none;margin-top:6px;padding:10px 12px;background:var(--cream2);border-radius:8px;">
+      <!-- Single progress bar — always live, always draggable. Dragging it backfills the
+           actual spent hours/money to match (so the numbers below never disagree with the %),
+           and ticking off hours later keeps updating both together. -->
+      <div id="gProgressBox" style="margin-top:6px;padding:10px 12px;background:var(--cream2);border-radius:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Auto progress</span>
-          <span id="gAutoProgressPct" style="font-size:15px;font-weight:700;color:var(--ink);">0%</span>
+          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Progress</span>
+          <span id="gProgressPctDisplay" style="font-size:15px;font-weight:700;color:var(--ink);">0%</span>
         </div>
         <div style="height:6px;background:var(--cream3);border-radius:3px;overflow:hidden;">
-          <div id="gAutoProgressBar" style="height:100%;width:0%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
+          <div id="gProgressBoxBar" style="height:100%;width:0%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
         </div>
-        <div id="gAutoProgressNote" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
-      </div>
-
-      <!-- Manual progress (shown only when no trackable resource) -->
-      <div id="gManualProgressWrap" style="margin-top:10px;">
-        <div class="builder-label" style="margin-bottom:8px;">Progress (manual, 0 – 100%)</div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <input type="range" class="smart-slider" id="gProgress" min="0" max="100" value="0"
-            oninput="document.getElementById('gProgressVal').textContent=this.value+'%'" style="flex:1;"/>
-          <span class="smart-num" id="gProgressVal" style="min-width:44px;text-align:right;">0%</span>
+        <div id="gProgressTrackedNote" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+          <input type="range" class="goal-progress-slider" id="gProgress" min="0" max="100" value="0"
+            oninput="goalsOnProgressDrag()" style="flex:1;"/>
+          <span id="gProgressVal" style="min-width:44px;text-align:right;font-weight:700;color:var(--ink);">0%</span>
         </div>
       </div>
     </div>
@@ -3611,18 +3886,103 @@ function updateMetrics(){
   document.getElementById('mStudyBar').style.width=Math.min(100,study/360*100)+'%';
 }
 
-// ─── SCORE ─────────────────────────────────────────
+// ─── SCORE (speedometer gauge) ─────────────────────
+let _gaugePathLen=null;
+let _lastShownScore=null;
+const SCORE_TIERS=[
+  {min:144,key:'transcendent',c:'#a855f7',c2:'#ec4899',c3:'#22d3ee',fx:'holo',
+    emojis:['✨','🌌','🌠','💫'],msgs:['Transcendent.','Beyond the scale.','You broke the gauge.','Otherworldly.','No ceiling. Never was.']},
+  {min:136,key:'celestial',c:'#6366f1',c2:'#facc15',c3:'#818cf8',fx:'star',
+    emojis:['🌟','🪐','🌌'],msgs:['Celestial.','Among the stars.','Operating on another plane.']},
+  {min:128,key:'royal',c:'#eab308',c2:'#7c3aed',c3:'#facc15',fx:'shimmer',
+    emojis:['👑','🏆','🔮'],msgs:['Royalty today.','Crowned.','Untouchable.']},
+  {min:120,key:'electric',c:'#8b5cf6',c2:'#3b82f6',c3:'#a78bfa',fx:'bolt',
+    emojis:['⚡','🌩️','🔮'],msgs:['Electric.','Storm mode.','Lightning in a bottle.']},
+  {min:112,key:'inferno',c:'#dc2626',c2:'#7c2d12',c3:'#f97316',fx:'ember',
+    emojis:['🌋','🔥','💀'],msgs:['Inferno.','Molten. Unstoppable.','Nothing left standing.']},
+  {min:104,key:'blazing',c:'#ef4444',c2:'#f59e0b',c3:'#fca5a5',fx:'flame',
+    emojis:['🔥','🚀','💯'],msgs:['Blazing!','On fire.','Unstoppable.']},
+  {min:96, key:'crushing',c:'#ea580c',c2:'#dc2626',c3:'#fb923c',fx:'spark',
+    emojis:['💥','⚡','🌟'],msgs:['Crushing it!','Big momentum.','On a roll.']},
+  {min:88, key:'driven',c:'#f97316',c2:'#c2410c',c3:'#fdba74',fx:'spark',
+    emojis:['🏁','⚙️','🔥'],msgs:['Driven.','Foot on the gas.','Full send.']},
+  {min:80, key:'charged',c:'#eab308',c2:'#a16207',c3:'#facc15',fx:'spark',
+    emojis:['⚡','🔋','💛'],msgs:['Charged up.','Power surging.','Wired and locked in.']},
+  {min:72, key:'solid',c:'#65a30d',c2:'#3f6212',c3:'#a3e635',fx:'',
+    emojis:['✅','💪','🎯'],msgs:['Solid day.','Steady progress.','Locked in.']},
+  {min:64, key:'steady',c:'#22c55e',c2:'#15803d',c3:'#4ade80',fx:'',
+    emojis:['🟢','🧭','⚖️'],msgs:['Steady state.','Balanced and building.','Consistent.']},
+  {min:56, key:'momentum',c:'#14b8a6',c2:'#0f766e',c3:'#2dd4bf',fx:'bubble',
+    emojis:['🌊','🌀'],msgs:['Building momentum.','Finding your flow.','Picking up speed.']},
+  {min:48, key:'current',c:'#06b6d4',c2:'#0e7490',c3:'#22d3ee',fx:'wisp',
+    emojis:['🌊','💧'],msgs:['In the current.','Flowing.','Carried forward.']},
+  {min:40, key:'rising',c:'#0ea5e9',c2:'#0369a1',c3:'#38bdf8',fx:'bubble',
+    emojis:['📈','🌤️'],msgs:['Rising.','Getting there.','Keep stacking.']},
+  {min:32, key:'breeze',c:'#38bdf8',c2:'#0284c7',c3:'#7dd3fc',fx:'wisp',
+    emojis:['🍃','🌬️'],msgs:['Catching a breeze.','Light and easy progress.','Moving forward.']},
+  {min:24, key:'sprout',c:'#4ade80',c2:'#166534',c3:'#86efac',fx:'leaf',
+    emojis:['🌱','🍃'],msgs:['Sprouting.','Early growth.','Small wins add up.']},
+  {min:16, key:'kindling',c:'#f59e0b',c2:'#b45309',c3:'#fbbf24',fx:'flame',
+    emojis:['🔥','🕯️'],msgs:['Kindling caught.','A spark took hold.','Warming up.']},
+  {min:8,  key:'ember',c:'#b45309',c2:'#78350f',c3:'#d97706',fx:'ember',
+    emojis:['🔥','♨️'],msgs:['Faint ember.','Something\'s glowing.','A start.']},
+  {min:0,  key:'hollow',c:'#78909c',c2:'#37474f',c3:'#90a4ae',fx:'',
+    emojis:['🌫️','☁️'],msgs:['Waking up.','Just getting started.','Log something.']},
+  {min:-Infinity,key:'rockbottom',c:'#4b5563',c2:'#1f2937',c3:'#6b7280',fx:'ash',
+    emojis:['🌑','🔧'],msgs:['Reset day.',"Tomorrow's fresh.",'Every day is new.']}
+];
+function computeGaugeMax(s){
+  return Math.max(120, Math.ceil((Math.max(s,0)+15)/10)*10);
+}
+function pickFrom(arr,seed){ return arr[Math.abs(seed)%arr.length]; }
+function swapText(el,text){
+  el.style.opacity=0; el.style.transform='translateY(4px)';
+  setTimeout(()=>{ el.textContent=text; el.style.opacity=1; el.style.transform='translateY(0)'; },160);
+}
+function animateNumber(el,from,to){
+  const dur=700, start=performance.now();
+  function step(now){
+    const t=Math.min(1,(now-start)/dur);
+    const eased=1-Math.pow(1-t,3);
+    el.textContent=Math.round(from+(to-from)*eased);
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
 function updateScore(s){
-  document.getElementById('ringPct').textContent=s;
-  const circ=2*Math.PI*52;
-  // Score is raw points now (uncapped, can go negative or past 100) — clamp only the
-  // ring's visual fill so the arc doesn't wrap or invert; the number itself stays exact.
-  const pct=Math.max(0,Math.min(100,s));
-  document.getElementById('ringFg').style.strokeDashoffset=circ-(pct/100)*circ;
-  const e=s>=90?'🔥':s>=75?'⚡':s>=60?'✅':s>=40?'📈':'🌱';
-  const m=s>=90?'Legendary!':s>=75?'Crushing it!':s>=60?'Solid day':s>=40?'Getting there':'Start logging!';
-  document.getElementById('scoreEmoji').textContent=e;
-  document.getElementById('scoreMsg').textContent=m;
+  const track=document.getElementById('gaugeTrack');
+  if(_gaugePathLen===null) _gaugePathLen=track.getTotalLength();
+  const max=computeGaugeMax(s);
+  const pct=Math.max(0,Math.min(1,s/max));
+  track.style.strokeDasharray=_gaugePathLen;
+  track.style.strokeDashoffset=_gaugePathLen*(1-pct);
+  const angle=-125+pct*250;
+  document.getElementById('needleGrp').setAttribute('transform','rotate('+angle+' 110 115)');
+  document.getElementById('gaugeMaxLabel').textContent=max;
+
+  const tier=SCORE_TIERS.find(t=>s>=t.min);
+  const card=document.getElementById('scoreCard');
+  card.className='score-card tier-'+tier.key;
+  card.style.setProperty('--tc',tier.c);
+  card.style.setProperty('--tc2',tier.c2);
+  card.style.setProperty('--tc3',tier.c3||tier.c2);
+  card.style.setProperty('--glow-o',.18);
+  if(tier.fx) card.dataset.fx=tier.fx; else delete card.dataset.fx;
+
+  const ringPctEl=document.getElementById('ringPct');
+  const prev=_lastShownScore===null?s:_lastShownScore;
+  animateNumber(ringPctEl,prev,s);
+
+  swapText(document.getElementById('scoreMsg'),pickFrom(tier.msgs,s));
+  const emojiEl=document.getElementById('scoreEmoji');
+  emojiEl.style.transform='scale(0.6)';
+  setTimeout(()=>{ emojiEl.textContent=pickFrom(tier.emojis,s+1); emojiEl.style.transform='scale(1)'; },160);
+
+  if(_lastShownScore!==null && s>_lastShownScore){
+    const wrap=document.getElementById('gaugeWrap');
+    wrap.classList.remove('pop'); void wrap.offsetWidth; wrap.classList.add('pop');
+  }
+  _lastShownScore=s;
 }
 
 // ─── ADALIMUMAB ────────────────────────────────────
@@ -10050,8 +10410,8 @@ async function persistGoals() {
 }
 
 // ── Progress calculation ─────────────────────────────
-// Returns { pct, auto, moneyNote, timeNote }
-function goalsCalcProgress(g) {
+// Pure auto pct from spent/total resources only — no manual influence.
+function goalsAutoPct(g) {
   const moneyTotal = parseFloat(g.money_amount) || 0;
   const moneySpent = parseFloat(g.money_spent)  || 0;
   const timeTotal  = parseFloat(g.time_amount)  || 0;
@@ -10071,17 +10431,23 @@ function goalsCalcProgress(g) {
     notes.push(`${timeSpent} / ${timeTotal} hrs`);
   }
 
-  if (pcts.length === 0) {
-    // No trackable resource — use manual progress
-    return { pct: g.progress || 0, auto: false, notes: [] };
-  }
-
-  // Average of all tracked dimensions
+  if (!pcts.length) return { pct: 0, tracked: false, notes: [] };
   const pct = Math.round(pcts.reduce((a,b)=>a+b,0) / pcts.length);
-  return { pct, auto: true, notes };
+  return { pct, tracked: true, notes };
 }
 
-// Called from modal inputs to show live auto-progress preview
+// The % to display for a goal. Tracked goals (money and/or time totals set) always compute
+// live from actual spent/total — never from a stale stored number — so a daily tick or a spent
+// edit is reflected immediately. Untracked goals fall back to the last value the slider was set to.
+function goalsCalcProgress(g) {
+  const auto = goalsAutoPct(g);
+  if (auto.tracked) return { pct: auto.pct, tracked: true, notes: auto.notes };
+  const pct = Math.max(0, Math.min(100, Math.round(parseFloat(g.progress) || 0)));
+  return { pct, tracked: false, notes: [] };
+}
+
+// Called when Money/Time total or spent inputs change in the modal: recompute % from the
+// actual numbers and hard-sync the slider + note to match.
 function goalsUpdateProgressMode() {
   const moneyTotal = parseFloat(document.getElementById('gMoney')?.value) || 0;
   const moneySpent = parseFloat(document.getElementById('gMoneySpent')?.value) || 0;
@@ -10089,47 +10455,78 @@ function goalsUpdateProgressMode() {
   const timeSpent  = parseFloat(document.getElementById('gTimeSpent')?.value) || 0;
   const moneyUnit  = document.getElementById('gMoneyUnit')?.value || 'KT';
 
-  // Sync unit label next to spent
   const unitLbl = document.getElementById('gMoneySpentUnit');
   if (unitLbl) unitLbl.textContent = moneyUnit;
 
-  const hasTracking = (moneyTotal > 0) || (timeTotal > 0);
-  const autoWrap    = document.getElementById('gAutoProgressWrap');
-  const manualWrap  = document.getElementById('gManualProgressWrap');
-
-  // Daily task input only makes sense when a total hours target exists
   const dailyWrap = document.getElementById('gDailyTaskWrap');
   if (dailyWrap) dailyWrap.style.display = timeTotal > 0 ? 'block' : 'none';
 
-  if (!autoWrap || !manualWrap) return;
-
-  if (hasTracking) {
-    autoWrap.style.display  = 'block';
-    manualWrap.style.display= 'none';
-
-    let pcts = [], noteLines = [];
-    if (moneyTotal > 0) {
-      const p = Math.min(100, Math.round((moneySpent / moneyTotal) * 100));
-      pcts.push(p);
-      noteLines.push(`💰 ${moneySpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${p}%`);
-    }
-    if (timeTotal > 0) {
-      const p = Math.min(100, Math.round((timeSpent / timeTotal) * 100));
-      pcts.push(p);
-      noteLines.push(`⏱️ ${timeSpent} / ${timeTotal} hrs = ${p}%`);
-    }
-    const avg = pcts.length ? Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length) : 0;
-
-    const pctEl  = document.getElementById('gAutoProgressPct');
-    const barEl  = document.getElementById('gAutoProgressBar');
-    const noteEl = document.getElementById('gAutoProgressNote');
-    if (pctEl)  pctEl.textContent  = avg + '%';
-    if (barEl)  barEl.style.width  = avg + '%';
-    if (noteEl) noteEl.innerHTML   = noteLines.join('<br>');
-  } else {
-    autoWrap.style.display  = 'none';
-    manualWrap.style.display= 'block';
+  let pcts = [], noteLines = [];
+  if (moneyTotal > 0) {
+    const p = Math.min(100, Math.round((moneySpent / moneyTotal) * 100));
+    pcts.push(p);
+    noteLines.push(`💰 ${moneySpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${p}%`);
   }
+  if (timeTotal > 0) {
+    const p = Math.min(100, Math.round((timeSpent / timeTotal) * 100));
+    pcts.push(p);
+    noteLines.push(`⏱️ ${timeSpent} / ${timeTotal} hrs = ${p}%`);
+  }
+
+  if (pcts.length) {
+    const slider = document.getElementById('gProgress');
+    if (slider) slider.value = Math.round(pcts.reduce((a,b)=>a+b,0) / pcts.length);
+  }
+
+  const noteEl = document.getElementById('gProgressTrackedNote');
+  if (noteEl) noteEl.innerHTML = noteLines.join('<br>');
+
+  goalsRefreshProgressDisplay();
+}
+
+// Called when the % slider itself is dragged: backfills the actual spent hours/money to match
+// the new percentage, so the two stay locked together and future ticks build on the real number.
+function goalsOnProgressDrag() {
+  const slider = document.getElementById('gProgress');
+  if (!slider) return;
+  const pct = Math.max(0, Math.min(100, parseInt(slider.value) || 0));
+
+  const moneyTotal = parseFloat(document.getElementById('gMoney')?.value) || 0;
+  const timeTotal   = parseFloat(document.getElementById('gTime')?.value) || 0;
+  const moneyUnit   = document.getElementById('gMoneyUnit')?.value || 'KT';
+
+  let noteLines = [];
+  if (moneyTotal > 0) {
+    const newSpent = Math.round((pct / 100) * moneyTotal);
+    const spentEl = document.getElementById('gMoneySpent');
+    if (spentEl) spentEl.value = newSpent;
+    noteLines.push(`💰 ${newSpent.toLocaleString()} / ${moneyTotal.toLocaleString()} ${moneyUnit} = ${pct}%`);
+  }
+  if (timeTotal > 0) {
+    const newSpent = Math.round((pct / 100) * timeTotal * 100) / 100;
+    const spentEl = document.getElementById('gTimeSpent');
+    if (spentEl) spentEl.value = newSpent;
+    noteLines.push(`⏱️ ${newSpent} / ${timeTotal} hrs = ${pct}%`);
+  }
+
+  const noteEl = document.getElementById('gProgressTrackedNote');
+  if (noteEl) noteEl.innerHTML = noteLines.join('<br>');
+
+  goalsRefreshProgressDisplay();
+}
+
+// Repaints the bar/pct readouts to match wherever the slider currently sits —
+// called both after a manual drag and after an auto-pct nudge above.
+function goalsRefreshProgressDisplay() {
+  const slider = document.getElementById('gProgress');
+  if (!slider) return;
+  const val = parseInt(slider.value) || 0;
+  const pctEl = document.getElementById('gProgressPctDisplay');
+  const barEl = document.getElementById('gProgressBoxBar');
+  const valEl = document.getElementById('gProgressVal');
+  if (pctEl) pctEl.textContent = val + '%';
+  if (barEl) barEl.style.width = val + '%';
+  if (valEl) valEl.textContent = val + '%';
 }
 
 // ── Filter ────────────────────────────────────────────
@@ -10214,27 +10611,51 @@ function renderGoals() {
     const prog2 = goalsCalcProgress(g);
     const displayProg = prog2.pct;
 
-    const moneyTotal = g.money_amount ? Number(g.money_amount).toLocaleString() : null;
-    const moneySpent = g.money_spent  ? Number(g.money_spent).toLocaleString()  : null;
-    const moneyStr = moneyTotal
-      ? (moneySpent ? `${moneySpent} / ${moneyTotal} ${g.money_unit||'KT'}` : `${moneyTotal} ${g.money_unit||'KT'}`)
+    const moneyTotalNum = parseFloat(g.money_amount) || 0;
+    const moneySpentNum = parseFloat(g.money_spent)  || 0;
+    const moneyTracked  = moneyTotalNum > 0;
+    const moneyStr = moneyTracked
+      ? `${moneySpentNum.toLocaleString()} / ${moneyTotalNum.toLocaleString()} ${g.money_unit||'KT'}`
       : null;
-    const timeTotal = g.time_amount ? `${g.time_amount} hrs` : null;
-    const timeSpent = g.time_spent  ? `${g.time_spent} hrs`  : null;
-    const timeStr = timeTotal
-      ? (timeSpent ? `${timeSpent} / ${timeTotal}` : timeTotal)
+
+    const timeTotalNum = parseFloat(g.time_amount) || 0;
+    const timeSpentNum = parseFloat(g.time_spent)  || 0;
+    const timeTracked  = timeTotalNum > 0;
+    const timeStr = timeTracked
+      ? `${timeSpentNum} / ${timeTotalNum} hrs`
       : null;
 
     // Daily task tick (only for goals with a total-hours target + a daily hours amount)
     const todayIso = new Date().toISOString().slice(0,10);
     const dailyHours = parseFloat(g.daily_hours) || 0;
     const tickedToday = g.last_tick_date === todayIso;
+    // The amount defaults to the goal's configured daily hours, but is editable per-session
+    // (e.g. studied 2h instead of the usual 1h) — read from this input when the checkbox is ticked.
+    const loggedAmount = tickedToday ? (parseFloat(g.last_tick_amount) || dailyHours) : dailyHours;
+
+    // Quick-pick buttons: one step below the default, the default itself, then +1/+2/+3 steps —
+    // fast access to nearby amounts without hammering the spinner arrows. Step size is configurable
+    // per goal (set it in the goal's edit modal, under Daily task) — no hardcoded value.
+    const qStep = parseFloat(g.daily_step) || 0.25;
+    const fmtHrs = n => (Math.round(Math.max(0, n) * 100) / 100).toString();
+    const quickAmounts = [dailyHours - qStep, dailyHours, dailyHours + qStep, dailyHours + qStep*2, dailyHours + qStep*3]
+      .map(fmtHrs);
+    const quickBtnsHtml = quickAmounts.map((amt, qi) => `
+      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${!tickedToday && amt===loggedAmount.toString()?' active':''}"
+        onclick="event.stopPropagation(); goalsSetDailyAmount('${g.id}', ${amt})">${amt}</button>`).join('');
+
     const dailyTaskHtml = (parseFloat(g.time_amount) > 0 && dailyHours > 0) ? `
       <div class="goal-daily-task ${tickedToday ? 'done' : ''}">
         <button class="goal-daily-check" onclick="toggleGoalDailyTick('${g.id}')" title="${tickedToday ? "Undo today's log" : "Log today's session"}">${tickedToday ? GOAL_ICONS.check : ''}</button>
         <div class="goal-daily-task-text">
           <div class="goal-daily-task-label">${tickedToday ? "Today's session logged" : "Log today's session"}</div>
-          <div class="goal-daily-task-sub">${dailyHours}h/day toward this goal</div>
+          <div class="goal-daily-task-sub">hrs/day toward this goal</div>
+          <div class="goal-daily-amount-row">
+            ${!tickedToday ? quickBtnsHtml : ''}
+            <input type="number" class="goal-daily-amount-input" id="dailyAmt_${g.id}"
+              value="${loggedAmount}" step="${qStep}" min="0" ${tickedToday ? 'disabled' : ''}
+              onclick="event.stopPropagation()" oninput="event.stopPropagation(); goalsSyncDailyQuickButtons('${g.id}')"/>
+          </div>
         </div>
       </div>` : '';
 
@@ -10275,31 +10696,34 @@ function renderGoals() {
 
         <div class="goal-progress-wrap">
           <div class="goal-progress-header">
-            <span class="goal-progress-label">Progress${prog2.auto ? ' <span class="goal-progress-auto-badge">Auto</span>' : ''}</span>
+            <span class="goal-progress-label">Progress${prog2.tracked ? ' <span class="goal-progress-auto-badge">Tracked</span>' : ''}</span>
             <span class="goal-progress-pct" style="color:${accent};">${displayProg}%</span>
           </div>
           <div class="goal-progress-bar">
             <div class="goal-progress-fill" style="width:${displayProg}%;background:${accent};"></div>
           </div>
-          ${prog2.auto && prog2.notes.length ? `<div class="goal-progress-note">${prog2.notes.join(' · ')}</div>` : ''}
+          ${prog2.tracked && prog2.notes.length ? `<div class="goal-progress-note">${prog2.notes.join(' · ')}</div>` : ''}
         </div>
 
-        <div class="goal-meta-grid">
+        ${(moneyTracked || timeTracked) ? `
+        <div class="goal-meta-grid${(moneyTracked && timeTracked) ? '' : ' single'}">
+          ${moneyTracked ? `
           <div class="goal-meta-item">
             <div class="goal-meta-icon">${GOAL_ICONS.coin}</div>
             <div>
               <div class="goal-meta-label">Budget</div>
-              <div class="goal-meta-val${moneyStr?'':' empty'}">${moneyStr || 'Not tracked'}</div>
+              <div class="goal-meta-val">${moneyStr}</div>
             </div>
-          </div>
+          </div>` : ''}
+          ${timeTracked ? `
           <div class="goal-meta-item">
             <div class="goal-meta-icon">${GOAL_ICONS.clock}</div>
             <div>
               <div class="goal-meta-label">Time</div>
-              <div class="goal-meta-val${timeStr?'':' empty'}">${timeStr || 'Not tracked'}</div>
+              <div class="goal-meta-val">${timeStr}</div>
             </div>
-          </div>
-        </div>
+          </div>` : ''}
+        </div>` : ''}
 
         ${dailyTaskHtml}
         ${deadlineHtml}
@@ -10345,18 +10769,20 @@ function openGoalModal(id) {
     titleEl.textContent = '✏️ Edit Goal';
     document.getElementById('gTitle').value       = g.title || '';
     document.getElementById('gNotes').value       = g.notes || '';
-    document.getElementById('gProgress').value    = g.progress || 0;
-    document.getElementById('gProgressVal').textContent = (g.progress||0)+'%';
     document.getElementById('gMoney').value       = g.money_amount || '';
     document.getElementById('gMoneyUnit').value   = g.money_unit || 'KT';
     document.getElementById('gTime').value        = g.time_amount || '';
     document.getElementById('gDailyHours') && (document.getElementById('gDailyHours').value = g.daily_hours || '');
+    document.getElementById('gDailyStep')  && (document.getElementById('gDailyStep').value  = g.daily_step || 0.25);
 
     renderJalaliPicker('gTargetDatePicker', 'gTargetDateIso', g.target_date || null);
 
     document.getElementById('gMoneySpent') && (document.getElementById('gMoneySpent').value = g.money_spent || '');
     document.getElementById('gTimeSpent')  && (document.getElementById('gTimeSpent').value  = g.time_spent  || '');
-    // sync unit label and show correct mode
+
+    // Seed the single progress bar at the goal's stored value; goalsUpdateProgressMode()
+    // below will immediately re-derive it from spent/total anyway for tracked goals.
+    document.getElementById('gProgress').value = goalsCalcProgress(g).pct;
     goalsUpdateProgressMode();
 
     // Restore chip selections
@@ -10369,13 +10795,13 @@ function openGoalModal(id) {
     document.getElementById('gTitle').value = '';
     document.getElementById('gNotes').value = '';
     document.getElementById('gProgress').value = 0;
-    document.getElementById('gProgressVal').textContent = '0%';
     document.getElementById('gMoney').value = '';
     document.getElementById('gMoneyUnit').value = 'KT';
     document.getElementById('gMoneySpent') && (document.getElementById('gMoneySpent').value = '');
     document.getElementById('gTime').value = '';
     document.getElementById('gTimeSpent')  && (document.getElementById('gTimeSpent').value  = '');
     document.getElementById('gDailyHours') && (document.getElementById('gDailyHours').value = '');
+    document.getElementById('gDailyStep')  && (document.getElementById('gDailyStep').value  = 0.25);
     goalsUpdateProgressMode();
 
     renderJalaliPicker('gTargetDatePicker', 'gTargetDateIso', null);
@@ -10424,18 +10850,18 @@ async function saveGoal() {
     time_amount:  document.getElementById('gTime').value || null,
     time_unit:    'hrs total',
     daily_hours:  document.getElementById('gDailyHours')?.value || null,
+    daily_step:   document.getElementById('gDailyStep')?.value  || 0.25,
     money_spent:  document.getElementById('gMoneySpent')?.value || null,
     time_spent:   document.getElementById('gTimeSpent')?.value  || null,
     last_tick_date: existingGoal?.last_tick_date || null,
+    last_tick_amount: existingGoal?.last_tick_amount || null,
     pinned:       existingGoal?.pinned || false,
     created_at:   existingGoal?.created_at || new Date().toISOString(),
   };
 
-  // Compute final progress
-  const computedProg = goalsCalcProgress(goal);
-  goal.progress = computedProg.auto
-    ? computedProg.pct
-    : (parseInt(document.getElementById('gProgress').value) || 0);
+  // The slider IS the final progress. For tracked goals, its own oninput handler already
+  // backfilled gMoneySpent/gTimeSpent to match — so the two never drift apart.
+  goal.progress = Math.max(0, Math.min(100, parseInt(document.getElementById('gProgress').value) || 0));
 
   if (GOALS.editId) {
     const idx = GOALS.data.findIndex(x=>x.id===GOALS.editId);
@@ -10455,12 +10881,21 @@ async function saveGoal() {
 async function toggleGoalDone(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
+  const moneyTotal = parseFloat(g.money_amount) || 0;
+  const timeTotal  = parseFloat(g.time_amount)  || 0;
+
   if (g.status === 'done') {
     g.status = 'active';
-    if (g.progress === 100) g.progress = 90;
+    if (g.progress === 100) {
+      g.progress = 90;
+      if (moneyTotal > 0) g.money_spent = Math.round(moneyTotal * 0.9);
+      if (timeTotal  > 0) g.time_spent  = Math.round(timeTotal  * 0.9 * 100) / 100;
+    }
   } else {
     g.status = 'done';
     g.progress = 100;
+    if (moneyTotal > 0) g.money_spent = moneyTotal;
+    if (timeTotal  > 0) g.time_spent  = timeTotal;
   }
   await persistGoals();
   renderGoals();
@@ -10478,35 +10913,60 @@ async function deleteGoal(id) {
   goalsShowToast('Goal deleted');
 }
 
+// ── Daily amount quick-picker (default/±interval buttons next to the spinner) ──
+function goalsSetDailyAmount(id, val) {
+  const input = document.getElementById('dailyAmt_' + id);
+  if (!input) return;
+  input.value = Math.round(Math.max(0, val) * 100) / 100;
+  goalsSyncDailyQuickButtons(id);
+}
+
+function goalsSyncDailyQuickButtons(id) {
+  const input = document.getElementById('dailyAmt_' + id);
+  if (!input) return;
+  const row = input.closest('.goal-daily-amount-row');
+  if (!row) return;
+  const val = parseFloat(input.value);
+  row.querySelectorAll('.goal-daily-qbtn').forEach(b => {
+    b.classList.toggle('active', Math.abs(parseFloat(b.textContent) - val) < 0.001);
+  });
+}
+
 // ── Daily task tick (for goals tracking total hours) ──
 async function toggleGoalDailyTick(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
-  const daily = parseFloat(g.daily_hours) || 0;
-  if (!daily) return;
+  const defaultDaily = parseFloat(g.daily_hours) || 0;
+  if (!defaultDaily) return;
 
   const todayIso  = new Date().toISOString().slice(0,10);
   const timeTotal = parseFloat(g.time_amount) || 0;
   let timeSpent   = parseFloat(g.time_spent)  || 0;
 
   if (g.last_tick_date === todayIso) {
-    // Already ticked today — undo it
-    timeSpent = Math.max(0, timeSpent - daily);
+    // Already ticked today — undo using whatever amount was actually logged
+    const loggedAmt = parseFloat(g.last_tick_amount) || defaultDaily;
+    timeSpent = Math.max(0, timeSpent - loggedAmt);
     g.last_tick_date = null;
+    g.last_tick_amount = null;
   } else {
-    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + daily) : timeSpent + daily;
+    // Read the editable amount from the card (defaults to daily_hours, but can be changed
+    // per-session — e.g. studied 2h instead of the usual 1h)
+    const inputEl = document.getElementById('dailyAmt_' + id);
+    const amt = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
+    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amt) : timeSpent + amt;
     g.last_tick_date = todayIso;
+    g.last_tick_amount = amt;
   }
   g.time_spent = timeSpent;
 
-  // Time-based progress is auto-tracked, so recompute it
-  const prog = goalsCalcProgress(g);
-  if (prog.auto) g.progress = prog.pct;
+  // g.progress now recomputes live from the updated time_spent/total ratio.
+  g.progress = goalsCalcProgress(g).pct;
 
   await persistGoals();
   renderGoals();
   renderGoalsHero();
-  goalsShowToast(g.last_tick_date ? `+${daily}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
+  goalsShowToast(g.last_tick_date ? `+${g.last_tick_amount}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
 }
 
 // ── Pin to top ─────────────────────────────────────────

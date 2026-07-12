@@ -276,18 +276,103 @@ function updateMetrics(){
   document.getElementById('mStudyBar').style.width=Math.min(100,study/360*100)+'%';
 }
 
-// ─── SCORE ─────────────────────────────────────────
+// ─── SCORE (speedometer gauge) ─────────────────────
+let _gaugePathLen=null;
+let _lastShownScore=null;
+const SCORE_TIERS=[
+  {min:144,key:'transcendent',c:'#a855f7',c2:'#ec4899',c3:'#22d3ee',fx:'holo',
+    emojis:['✨','🌌','🌠','💫'],msgs:['Transcendent.','Beyond the scale.','You broke the gauge.','Otherworldly.','No ceiling. Never was.']},
+  {min:136,key:'celestial',c:'#6366f1',c2:'#facc15',c3:'#818cf8',fx:'star',
+    emojis:['🌟','🪐','🌌'],msgs:['Celestial.','Among the stars.','Operating on another plane.']},
+  {min:128,key:'royal',c:'#eab308',c2:'#7c3aed',c3:'#facc15',fx:'shimmer',
+    emojis:['👑','🏆','🔮'],msgs:['Royalty today.','Crowned.','Untouchable.']},
+  {min:120,key:'electric',c:'#8b5cf6',c2:'#3b82f6',c3:'#a78bfa',fx:'bolt',
+    emojis:['⚡','🌩️','🔮'],msgs:['Electric.','Storm mode.','Lightning in a bottle.']},
+  {min:112,key:'inferno',c:'#dc2626',c2:'#7c2d12',c3:'#f97316',fx:'ember',
+    emojis:['🌋','🔥','💀'],msgs:['Inferno.','Molten. Unstoppable.','Nothing left standing.']},
+  {min:104,key:'blazing',c:'#ef4444',c2:'#f59e0b',c3:'#fca5a5',fx:'flame',
+    emojis:['🔥','🚀','💯'],msgs:['Blazing!','On fire.','Unstoppable.']},
+  {min:96, key:'crushing',c:'#ea580c',c2:'#dc2626',c3:'#fb923c',fx:'spark',
+    emojis:['💥','⚡','🌟'],msgs:['Crushing it!','Big momentum.','On a roll.']},
+  {min:88, key:'driven',c:'#f97316',c2:'#c2410c',c3:'#fdba74',fx:'spark',
+    emojis:['🏁','⚙️','🔥'],msgs:['Driven.','Foot on the gas.','Full send.']},
+  {min:80, key:'charged',c:'#eab308',c2:'#a16207',c3:'#facc15',fx:'spark',
+    emojis:['⚡','🔋','💛'],msgs:['Charged up.','Power surging.','Wired and locked in.']},
+  {min:72, key:'solid',c:'#65a30d',c2:'#3f6212',c3:'#a3e635',fx:'',
+    emojis:['✅','💪','🎯'],msgs:['Solid day.','Steady progress.','Locked in.']},
+  {min:64, key:'steady',c:'#22c55e',c2:'#15803d',c3:'#4ade80',fx:'',
+    emojis:['🟢','🧭','⚖️'],msgs:['Steady state.','Balanced and building.','Consistent.']},
+  {min:56, key:'momentum',c:'#14b8a6',c2:'#0f766e',c3:'#2dd4bf',fx:'bubble',
+    emojis:['🌊','🌀'],msgs:['Building momentum.','Finding your flow.','Picking up speed.']},
+  {min:48, key:'current',c:'#06b6d4',c2:'#0e7490',c3:'#22d3ee',fx:'wisp',
+    emojis:['🌊','💧'],msgs:['In the current.','Flowing.','Carried forward.']},
+  {min:40, key:'rising',c:'#0ea5e9',c2:'#0369a1',c3:'#38bdf8',fx:'bubble',
+    emojis:['📈','🌤️'],msgs:['Rising.','Getting there.','Keep stacking.']},
+  {min:32, key:'breeze',c:'#38bdf8',c2:'#0284c7',c3:'#7dd3fc',fx:'wisp',
+    emojis:['🍃','🌬️'],msgs:['Catching a breeze.','Light and easy progress.','Moving forward.']},
+  {min:24, key:'sprout',c:'#4ade80',c2:'#166534',c3:'#86efac',fx:'leaf',
+    emojis:['🌱','🍃'],msgs:['Sprouting.','Early growth.','Small wins add up.']},
+  {min:16, key:'kindling',c:'#f59e0b',c2:'#b45309',c3:'#fbbf24',fx:'flame',
+    emojis:['🔥','🕯️'],msgs:['Kindling caught.','A spark took hold.','Warming up.']},
+  {min:8,  key:'ember',c:'#b45309',c2:'#78350f',c3:'#d97706',fx:'ember',
+    emojis:['🔥','♨️'],msgs:['Faint ember.','Something\'s glowing.','A start.']},
+  {min:0,  key:'hollow',c:'#78909c',c2:'#37474f',c3:'#90a4ae',fx:'',
+    emojis:['🌫️','☁️'],msgs:['Waking up.','Just getting started.','Log something.']},
+  {min:-Infinity,key:'rockbottom',c:'#4b5563',c2:'#1f2937',c3:'#6b7280',fx:'ash',
+    emojis:['🌑','🔧'],msgs:['Reset day.',"Tomorrow's fresh.",'Every day is new.']}
+];
+function computeGaugeMax(s){
+  return Math.max(120, Math.ceil((Math.max(s,0)+15)/10)*10);
+}
+function pickFrom(arr,seed){ return arr[Math.abs(seed)%arr.length]; }
+function swapText(el,text){
+  el.style.opacity=0; el.style.transform='translateY(4px)';
+  setTimeout(()=>{ el.textContent=text; el.style.opacity=1; el.style.transform='translateY(0)'; },160);
+}
+function animateNumber(el,from,to){
+  const dur=700, start=performance.now();
+  function step(now){
+    const t=Math.min(1,(now-start)/dur);
+    const eased=1-Math.pow(1-t,3);
+    el.textContent=Math.round(from+(to-from)*eased);
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
 function updateScore(s){
-  document.getElementById('ringPct').textContent=s;
-  const circ=2*Math.PI*52;
-  // Score is raw points now (uncapped, can go negative or past 100) — clamp only the
-  // ring's visual fill so the arc doesn't wrap or invert; the number itself stays exact.
-  const pct=Math.max(0,Math.min(100,s));
-  document.getElementById('ringFg').style.strokeDashoffset=circ-(pct/100)*circ;
-  const e=s>=90?'🔥':s>=75?'⚡':s>=60?'✅':s>=40?'📈':'🌱';
-  const m=s>=90?'Legendary!':s>=75?'Crushing it!':s>=60?'Solid day':s>=40?'Getting there':'Start logging!';
-  document.getElementById('scoreEmoji').textContent=e;
-  document.getElementById('scoreMsg').textContent=m;
+  const track=document.getElementById('gaugeTrack');
+  if(_gaugePathLen===null) _gaugePathLen=track.getTotalLength();
+  const max=computeGaugeMax(s);
+  const pct=Math.max(0,Math.min(1,s/max));
+  track.style.strokeDasharray=_gaugePathLen;
+  track.style.strokeDashoffset=_gaugePathLen*(1-pct);
+  const angle=-125+pct*250;
+  document.getElementById('needleGrp').setAttribute('transform','rotate('+angle+' 110 115)');
+  document.getElementById('gaugeMaxLabel').textContent=max;
+
+  const tier=SCORE_TIERS.find(t=>s>=t.min);
+  const card=document.getElementById('scoreCard');
+  card.className='score-card tier-'+tier.key;
+  card.style.setProperty('--tc',tier.c);
+  card.style.setProperty('--tc2',tier.c2);
+  card.style.setProperty('--tc3',tier.c3||tier.c2);
+  card.style.setProperty('--glow-o',.18);
+  if(tier.fx) card.dataset.fx=tier.fx; else delete card.dataset.fx;
+
+  const ringPctEl=document.getElementById('ringPct');
+  const prev=_lastShownScore===null?s:_lastShownScore;
+  animateNumber(ringPctEl,prev,s);
+
+  swapText(document.getElementById('scoreMsg'),pickFrom(tier.msgs,s));
+  const emojiEl=document.getElementById('scoreEmoji');
+  emojiEl.style.transform='scale(0.6)';
+  setTimeout(()=>{ emojiEl.textContent=pickFrom(tier.emojis,s+1); emojiEl.style.transform='scale(1)'; },160);
+
+  if(_lastShownScore!==null && s>_lastShownScore){
+    const wrap=document.getElementById('gaugeWrap');
+    wrap.classList.remove('pop'); void wrap.offsetWidth; wrap.classList.add('pop');
+  }
+  _lastShownScore=s;
 }
 
 // ─── ADALIMUMAB ────────────────────────────────────

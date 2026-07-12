@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Score Gauge v2 — Unique Shapes Per Tier</title>
+<style>
+  :root {
+    --sky:#38bdf8; --plum:#a855f7; --coral:#f87171; --coral2:#ef4444; --amber:#f59e0b;
+    --sage:#4ade80; --sage2:#22c55e; --skyL:#e0f2fe; --sageL:#dcfce7; --plumL:#f3e8ff; --amberL:#fef3c7;
+    --cream:#faf7f2; --cream2:#f3ede2; --cream3:#e3d9c8; --ink:#2a2420; --text3:#8a7f6f;
+    --r2:16px; --shadow:0 4px 18px rgba(0,0,0,.08);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  body { margin:0; background:#161311; color:#eee; padding:24px; }
+  h1 { font-size:18px; font-weight:800; color:#fff; margin:0 0 4px; }
+  p.sub { color:#999; font-size:13px; margin:0 0 20px; max-width:640px; line-height:1.5; }
+  .layout { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; }
+  .stage {
+    background:var(--cream); border-radius:24px; padding:26px 28px 24px; width:300px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5); flex-shrink:0; position:relative;
+  }
+  .tierlist { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; max-width:520px; }
+  .tierlist button {
+    text-align:left; padding:9px 10px; border-radius:10px; border:1px solid #333;
+    background:#211d1a; color:#ddd; font-size:12px; cursor:pointer; font-weight:600;
+    display:flex; align-items:center; gap:6px; transition:.15s;
+  }
+  .tierlist button:hover { background:#2c2620; }
+  .tierlist button.active { background:#3a2f22; border-color:#f59e0b; color:#ffd28a; }
+  .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .tierlist .n { opacity:.55; font-weight:400; font-size:10px; }
+  .shapekey { font-size:10px; opacity:.5; margin-left:auto; }
+      .score-card{--tc:var(--sky);--tc2:var(--plum);--glow-o:.18;position:relative;overflow:hidden;transition:box-shadow .6s ease;}
+      .score-card-bg{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .6s ease;z-index:0;}
+      .score-card>*:not(.score-card-bg){position:relative;z-index:1;}
+
+      .gauge-wrap{position:relative;width:220px;height:170px;margin:0 auto;}
+      .gauge-glow{position:absolute;inset:-20px;border-radius:50%;pointer-events:none;
+        background:radial-gradient(circle at 50% 62%,color-mix(in srgb,var(--tc) 65%,transparent) 0%,transparent 68%);
+        opacity:var(--glow-o);transition:opacity .6s ease,background .6s ease;filter:blur(6px);}
+      .gauge-svg{position:relative;width:100%;height:100%;overflow:visible;}
+      .gauge-track-bg{fill:none;stroke:var(--cream3);stroke-width:16;stroke-linecap:round;}
+      .gauge-track-fg{fill:none;stroke:url(#gaugeGrad);stroke-width:16;stroke-linecap:round;
+        transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1),filter .6s ease;
+        filter:drop-shadow(0 0 4px color-mix(in srgb,var(--tc) 55%,transparent));}
+      .gauge-tick{stroke:var(--cream3);stroke-width:2.5;}
+      .gauge-tick-minor{stroke:var(--cream3);stroke-width:1.5;opacity:.7;}
+      .gauge-needle-grp{transition:transform .9s cubic-bezier(.22,1.4,.36,1);}
+      .gauge-needle{fill:var(--tc);transition:fill .6s ease;}
+      .gauge-needle-tail{fill:color-mix(in srgb,var(--tc) 55%,var(--text3));opacity:.85;transition:fill .6s ease;}
+      .gauge-hub{fill:var(--tc);transition:fill .6s ease;}
+      .gauge-hub-dot{fill:var(--cream2);}
+      .gauge-endlabel{font-size:10px;font-weight:700;fill:var(--text3);font-family:'JetBrains Mono',monospace;}
+      .shine{opacity:0;transition:opacity .6s ease;mix-blend-mode:screen;}
+      .ring-num{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;}
+      .ring-num .ring-pct{font-size:36px;font-weight:800;color:var(--tc);line-height:1;transition:color .6s ease;}
+      .ring-num .ring-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+      .gauge-wrap.pop{animation:gaugePop .5s cubic-bezier(.34,1.56,.64,1);}
+      @keyframes gaugePop{0%{transform:scale(1);}35%{transform:scale(1.05);}65%{transform:scale(.985);}100%{transform:scale(1);}}
+      .score-emoji{transition:opacity .18s ease,transform .18s ease;display:inline-block;}
+      .score-msg{transition:opacity .2s ease,transform .2s ease;color:var(--tc);font-weight:700;}
+
+      /* ══════════════════════════════════════════════════════════════
+         20-TIER IDENTITY SYSTEM — each tier = unique bg motion + fx
+         Colors come from JS via --tc/--tc2/--tc3. Particle look driven
+         by data-fx on .score-card. Card-level aura on top tiers.
+         ══════════════════════════════════════════════════════════════ */
+      @keyframes glowPulse{0%,100%{opacity:var(--glow-o);transform:scale(1);}50%{opacity:calc(var(--glow-o) + .22);transform:scale(1.06);}}
+      @keyframes staticFlicker{0%,100%{opacity:.08;}45%{opacity:.05;}50%{opacity:.24;}72%{opacity:.09;}100%{opacity:.14;}}
+      @keyframes fogDrift{0%,100%{transform:translate(0,0);}50%{transform:translate(6px,-5px);}}
+      @keyframes emberGlow{0%,100%{opacity:.16;transform:scale(1);}50%{opacity:.3;transform:scale(1.04);}}
+      @keyframes windDrift{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}
+      @keyframes sproutSway{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.035) rotate(1deg);}}
+      @keyframes riseFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+      @keyframes waveShift{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}
+      @keyframes electricJitter{0%,100%{opacity:.22;transform:translate(0,0);}20%{opacity:.36;transform:translate(-1px,1px);}40%{opacity:.18;transform:translate(1px,-1px);}60%{opacity:.32;transform:translate(-1px,0);}80%{opacity:.2;transform:translate(1px,1px);}}
+      @keyframes flameFlicker{0%,100%{opacity:.28;transform:scaleY(1);}50%{opacity:.42;transform:scaleY(1.08);}}
+      @keyframes lavaBubble{0%,100%{opacity:.3;transform:scale(1);filter:hue-rotate(0deg);}50%{opacity:.42;transform:scale(1.1);filter:hue-rotate(-8deg);}}
+      @keyframes boltStrobe{0%,89%,100%{opacity:.2;}90%{opacity:.55;}92%{opacity:.15;}94%{opacity:.5;}}
+      @keyframes royalDrift{0%,100%{transform:scale(1) rotate(0deg);}50%{transform:scale(1.09) rotate(3deg);}}
+      @keyframes starFieldTwinkle{0%,100%{opacity:.28;}50%{opacity:.44;}}
+      @keyframes holoShift{0%{background-position:0% 50%;filter:hue-rotate(0deg) saturate(1.3);}50%{background-position:100% 50%;filter:hue-rotate(25deg) saturate(1.5);}100%{background-position:0% 50%;filter:hue-rotate(0deg) saturate(1.3);}}
+      @keyframes cardAura{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--tc) 0%,transparent);}50%{box-shadow:0 0 26px 2px color-mix(in srgb,var(--tc) 40%,transparent);}}
+      @keyframes hubPulse{0%,100%{r:9;}50%{r:10.8;}}
+
+      /* particle shapes — driven by data-fx on .score-card */
+      .score-card[data-fx]:not([data-fx=""]) .gauge-particles{display:block;}
+      .particle{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--tc);opacity:0;}
+      .particle.p1{left:14%;bottom:26%;animation-delay:.1s;}
+      .particle.p2{left:27%;bottom:10%;animation-delay:.85s;}
+      .particle.p3{left:41%;bottom:20%;animation-delay:1.5s;}
+      .particle.p4{left:55%;bottom:6%;animation-delay:.4s;}
+      .particle.p5{left:68%;bottom:16%;animation-delay:1.15s;}
+      .particle.p6{left:80%;bottom:28%;animation-delay:.65s;}
+      .particle.p7{left:47%;bottom:32%;animation-delay:1.85s;}
+      .particle.p8{left:60%;bottom:8%;animation-delay:2.1s;}
+
+      @keyframes ashFall{0%{transform:translateY(-6px) rotate(0deg);opacity:0;}15%{opacity:.5;}100%{transform:translateY(40px) rotate(60deg);opacity:0;}}
+      [data-fx="ash"] .particle{background:#94a3b8;border-radius:2px;width:3px;height:3px;animation:ashFall 3.6s linear infinite;}
+
+      @keyframes emberRise{0%{transform:translateY(0) scale(.6);opacity:0;}30%{opacity:.85;}100%{transform:translateY(-42px) scale(1);opacity:0;}}
+      [data-fx="ember"] .particle{background:var(--tc);box-shadow:0 0 5px var(--tc);animation:emberRise 3.2s ease-in infinite;}
+
+      @keyframes flameRise{0%{transform:translateY(4px) scale(.5);opacity:0;}25%{opacity:.9;}100%{transform:translateY(-30px) scale(1.15);opacity:0;}}
+      [data-fx="flame"] .particle{background:linear-gradient(var(--tc),var(--tc2));border-radius:50% 50% 50% 4px;width:6px;height:8px;animation:flameRise 1.5s ease-in infinite;}
+
+      @keyframes leafSway{0%,100%{transform:translate(0,0) rotate(0deg);opacity:.7;}50%{transform:translate(4px,-8px) rotate(25deg);opacity:.95;}}
+      [data-fx="leaf"] .particle{background:var(--tc);border-radius:0 70% 0 70%;width:6px;height:6px;animation:leafSway 3s ease-in-out infinite;}
+
+      @keyframes wispDrift{0%{transform:translateX(-10px);opacity:0;}30%{opacity:.7;}100%{transform:translateX(24px);opacity:0;}}
+      [data-fx="wisp"] .particle{width:16px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--tc),transparent);animation:wispDrift 3.1s ease-in-out infinite;}
+
+      @keyframes bubbleRise{0%{transform:translateY(6px) scale(.7);opacity:0;}25%{opacity:.85;}100%{transform:translateY(-44px) scale(1.05) translateX(4px);opacity:0;}}
+      [data-fx="bubble"] .particle{background:radial-gradient(circle at 30% 30%,#fff,var(--tc));animation:bubbleRise 2.7s ease-in infinite;}
+
+      @keyframes sparkFloat{0%{transform:translateY(0) scale(.5);opacity:0;}25%{opacity:1;}100%{transform:translateY(-46px) scale(1.1);opacity:0;}}
+      [data-fx="spark"] .particle{background:var(--tc);box-shadow:0 0 5px var(--tc);animation:sparkFloat 1.7s ease-in infinite;}
+
+      @keyframes boltFlash{0%,100%{opacity:0;}48%{opacity:0;}50%{opacity:1;}54%{opacity:.2;}58%{opacity:.9;}64%{opacity:0;}}
+      [data-fx="bolt"] .particle{width:2px;height:18px;border-radius:1px;background:linear-gradient(var(--tc),var(--tc2));box-shadow:0 0 6px var(--tc);animation:boltFlash 1.6s steps(1) infinite;}
+
+      @keyframes shimmerTwinkle{0%,100%{opacity:.3;transform:rotate(45deg) scale(.8);}50%{opacity:1;transform:rotate(45deg) scale(1.25);}}
+      [data-fx="shimmer"] .particle{background:linear-gradient(135deg,var(--tc),var(--tc2));transform:rotate(45deg);border-radius:2px;animation:shimmerTwinkle 2.3s ease-in-out infinite;}
+
+      @keyframes starTwinkle{0%,100%{opacity:.25;transform:scale(.7);}50%{opacity:1;transform:scale(1.3);}}
+      [data-fx="star"] .particle{background:#fff;box-shadow:0 0 5px var(--tc2);animation:starTwinkle 2.1s ease-in-out infinite;}
+
+      @keyframes holoSpin{0%{filter:hue-rotate(0deg);}100%{filter:hue-rotate(360deg);}}
+      [data-fx="holo"] .particle{background:conic-gradient(from 0deg,#f472b6,#facc15,#4ade80,#38bdf8,#a855f7,#f472b6);box-shadow:0 0 7px var(--tc);animation:holoSpin 2.6s linear infinite,starTwinkle 1.7s ease-in-out infinite;}
+
+      /* ── 1. rockbottom — cracked ash, dying static ── */
+      .tier-rockbottom .score-card-bg{opacity:.16;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--tc) 16%,transparent) 0 2px,transparent 2px 7px);animation:staticFlicker 3.4s steps(4) infinite;}
+
+      /* ── 2. hollow — pale drifting fog ── */
+      .tier-hollow .score-card-bg{opacity:.18;background:radial-gradient(circle at 38% 35%,color-mix(in srgb,var(--tc) 22%,transparent),transparent 70%),radial-gradient(circle at 66% 68%,color-mix(in srgb,var(--tc) 16%,transparent),transparent 70%);animation:fogDrift 6.5s ease-in-out infinite;}
+
+      /* ── 3. ember — dim glow, faint pulse ── */
+      .tier-ember .score-card-bg{opacity:.18;background:radial-gradient(circle at 50% 95%,color-mix(in srgb,var(--tc) 30%,transparent),transparent 65%);animation:emberGlow 3.6s ease-in-out infinite;}
+
+      /* ── 4. kindling — small warm flicker ── */
+      .tier-kindling .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 98%,color-mix(in srgb,var(--tc) 34%,transparent),transparent 66%);animation:flameFlicker 2s ease-in-out infinite;}
+
+      /* ── 5. sprout — green growth sway ── */
+      .tier-sprout .score-card-bg{opacity:.18;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 68%);animation:sproutSway 3.4s ease-in-out infinite;}
+
+      /* ── 6. breeze — diagonal wind wash ── */
+      .tier-breeze .score-card-bg{opacity:.2;background:linear-gradient(100deg,color-mix(in srgb,var(--tc) 10%,transparent),color-mix(in srgb,var(--tc) 28%,transparent) 30%,transparent 60%);background-size:250% 100%;animation:windDrift 4.2s linear infinite;}
+
+      /* ── 7. rising — ascending bloom ── */
+      .tier-rising .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 28%,transparent),transparent 70%);animation:riseFloat 2.8s ease-in-out infinite;}
+
+      /* ── 8. current — flowing wave, cool teal ── */
+      .tier-current .score-card-bg{opacity:.22;background:linear-gradient(120deg,color-mix(in srgb,var(--tc) 26%,transparent),color-mix(in srgb,var(--tc2) 20%,transparent));background-size:220% 220%;animation:waveShift 3.8s ease-in-out infinite;}
+
+      /* ── 9. momentum — faster wave, more contrast ── */
+      .tier-momentum .score-card-bg{opacity:.24;background:linear-gradient(120deg,color-mix(in srgb,var(--tc) 32%,transparent),color-mix(in srgb,var(--tc2) 28%,transparent));background-size:220% 220%;animation:waveShift 2.6s ease-in-out infinite;}
+
+      /* ── 10. steady — calm balanced pulse ── */
+      .tier-steady .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 66%);animation:glowPulse 3s ease-in-out infinite;}
+
+      /* ── 11. solid — stable earthy glow, minimal motion ── */
+      .tier-solid .score-card-bg{opacity:.2;background:radial-gradient(circle at 50% 58%,color-mix(in srgb,var(--tc) 26%,transparent),transparent 66%);}
+
+      /* ── 12. charged — electric jitter ── */
+      .tier-charged .gauge-glow{animation:glowPulse 2s ease-in-out infinite;}
+      .tier-charged .score-card-bg{opacity:.24;background:linear-gradient(135deg,color-mix(in srgb,var(--tc) 34%,transparent),color-mix(in srgb,var(--tc2) 22%,transparent));animation:electricJitter 1.4s steps(6) infinite;}
+
+      /* ── 13. driven — orange engine pulse + sparks ── */
+      .tier-driven .gauge-glow{animation:glowPulse 1.9s ease-in-out infinite;}
+      .tier-driven .score-card-bg{opacity:.26;background:radial-gradient(circle at 50% 96%,color-mix(in srgb,var(--tc) 36%,transparent),transparent 68%);animation:glowPulse 1.9s ease-in-out infinite;}
+
+      /* ── 14. crushing — coral surge, sparks on ── */
+      .tier-crushing .gauge-glow{animation:glowPulse 1.7s ease-in-out infinite;}
+      .tier-crushing .score-card-bg{opacity:.27;background:radial-gradient(circle at 50% 92%,color-mix(in srgb,var(--tc) 36%,transparent),transparent 66%);animation:glowPulse 1.7s ease-in-out infinite;}
+      .tier-crushing .gauge-track-fg{filter:drop-shadow(0 0 7px color-mix(in srgb,var(--tc) 65%,transparent));}
+
+      /* ── 15. blazing — flame flicker, shine, hot track ── */
+      .tier-blazing .gauge-glow{animation:glowPulse 1.4s ease-in-out infinite;}
+      .tier-blazing .shine{opacity:.4;}
+      .tier-blazing .gauge-track-fg{filter:drop-shadow(0 0 8px color-mix(in srgb,var(--tc) 70%,transparent));}
+      .tier-blazing .score-card-bg{opacity:.3;background:radial-gradient(circle at 50% 100%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 72%);animation:flameFlicker 1.3s ease-in-out infinite;}
+
+      /* ── 16. inferno — deep lava bubble, heavy embers ── */
+      .tier-inferno .gauge-glow{animation:glowPulse 1.3s ease-in-out infinite;}
+      .tier-inferno .shine{opacity:.35;}
+      .tier-inferno .gauge-track-fg{filter:drop-shadow(0 0 9px color-mix(in srgb,var(--tc) 75%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-inferno .score-card-bg{opacity:.34;background:radial-gradient(circle at 50% 105%,color-mix(in srgb,var(--tc) 50%,transparent),color-mix(in srgb,var(--tc2) 30%,transparent) 55%,transparent 78%);animation:lavaBubble 2.1s ease-in-out infinite;}
+
+      /* ── 17. electric — strobing bolts, purple-blue storm ── */
+      .tier-electric .gauge-glow{animation:glowPulse 1.2s ease-in-out infinite;}
+      .tier-electric .shine{opacity:.5;}
+      .tier-electric .gauge-hub{animation:hubPulse 1.3s ease-in-out infinite;}
+      .tier-electric .gauge-needle,.tier-electric .gauge-hub{filter:drop-shadow(0 0 5px var(--tc));}
+      .tier-electric .gauge-track-fg{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--tc) 78%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-electric .score-card-bg{opacity:.3;background:linear-gradient(140deg,color-mix(in srgb,var(--tc) 40%,transparent),color-mix(in srgb,var(--tc2) 34%,transparent));animation:boltStrobe 1.9s steps(1) infinite;}
+      .tier-electric .score-card{animation:cardAura 1.8s ease-in-out infinite;}
+
+      /* ── 18. royal — gold+violet shimmer rays ── */
+      .tier-royal .gauge-glow{animation:glowPulse 1.5s ease-in-out infinite;}
+      .tier-royal .shine{opacity:.6;}
+      .tier-royal .gauge-hub{animation:hubPulse 1.4s ease-in-out infinite;}
+      .tier-royal .gauge-track-fg{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--tc) 78%,transparent)) drop-shadow(0 0 3px var(--tc2));}
+      .tier-royal .score-card-bg{opacity:.34;background:radial-gradient(circle at 28% 22%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 60%),radial-gradient(circle at 78% 82%,color-mix(in srgb,var(--tc2) 42%,transparent),transparent 60%);animation:royalDrift 4.6s ease-in-out infinite;}
+      .tier-royal .score-card{animation:cardAura 2.2s ease-in-out infinite;}
+
+      /* ── 19. celestial — deep indigo starfield ── */
+      .tier-celestial .gauge-glow{animation:glowPulse 1.3s ease-in-out infinite;}
+      .tier-celestial .shine{opacity:.62;}
+      .tier-celestial .gauge-hub{animation:hubPulse 1.2s ease-in-out infinite;}
+      .tier-celestial .gauge-needle,.tier-celestial .gauge-hub{filter:drop-shadow(0 0 5px var(--tc));}
+      .tier-celestial .gauge-track-fg{filter:drop-shadow(0 0 11px color-mix(in srgb,var(--tc) 80%,transparent)) drop-shadow(0 0 4px var(--tc2));}
+      .tier-celestial .score-card-bg{opacity:.36;background:radial-gradient(circle at 20% 20%,#fff 0.5px,transparent 1.5px) 0 0/22px 22px,radial-gradient(circle at 60% 40%,#fff 0.5px,transparent 1.5px) 0 0/30px 30px,radial-gradient(circle at 80% 75%,color-mix(in srgb,var(--tc) 46%,transparent),transparent 60%),radial-gradient(circle at 25% 80%,color-mix(in srgb,var(--tc2) 40%,transparent),transparent 60%);animation:starFieldTwinkle 2.4s ease-in-out infinite;}
+      .tier-celestial .score-card{animation:cardAura 2s ease-in-out infinite;}
+
+      /* ── 20. transcendent — full holographic supremacy ── */
+      .tier-transcendent .gauge-glow{animation:glowPulse 1.1s ease-in-out infinite;}
+      .tier-transcendent .shine{opacity:.75;}
+      .tier-transcendent .gauge-hub{animation:hubPulse .95s ease-in-out infinite;}
+      .tier-transcendent .gauge-needle,.tier-transcendent .gauge-hub{filter:drop-shadow(0 0 6px var(--tc));}
+      .tier-transcendent .gauge-track-fg{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--tc) 82%,transparent)) drop-shadow(0 0 4px var(--tc2));}
+      .tier-transcendent .score-card-bg{opacity:.32;background:linear-gradient(120deg,#a855f7,#ec4899,#f59e0b,#22d3ee,#a855f7);background-size:400% 400%;animation:holoShift 4.5s ease infinite;}
+      .tier-transcendent .score-card{animation:cardAura 1.6s ease-in-out infinite;}
+
+
+  /* ═══ SHAPE ARCHETYPES — real geometry differences, not just color ═══ */
+  .gauge-needle{fill:var(--tc);stroke:none;}
+  .gauge-hub{fill:var(--tc);}
+
+  /* cracked — broken dial, drooping needle, jagged hub */
+  .shape-cracked .gauge-track-bg,.shape-cracked .gauge-track-fg{stroke-dasharray:34 6 18 6 40 6;}
+  .shape-cracked .gauge-needle{opacity:.85;}
+  .deco-crack{stroke:#111;stroke-width:2;opacity:.4;stroke-linecap:round;}
+
+  /* orb — minimal hairline ring, no needle, glowing orb travels the arc */
+  .shape-orb .gauge-track-bg,.shape-orb .gauge-track-fg{stroke-width:6;}
+  .orb-marker{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,var(--tc));box-shadow:0 0 10px 2px var(--tc);
+    offset-path:path('M 37.91 165.47 A 88 88 0 1 1 182.09 165.47');offset-rotate:0deg;
+    top:0;left:0;display:none;transition:offset-distance .9s cubic-bezier(.22,1,.36,1);}
+  .shape-orb .orb-marker{display:block;}
+
+  /* wave — droplet needle, teardrop hub, decorative squiggle */
+  .deco-wave{fill:none;stroke:var(--tc);stroke-width:2;opacity:.28;stroke-linecap:round;}
+
+  /* segmented — dashed block ring, diamond needle, hexagon hub */
+  .shape-segmented .gauge-track-bg,.shape-segmented .gauge-track-fg{stroke-dasharray:10 5;}
+
+  /* spike — jagged corona, flame needle, double-core hub */
+  .deco-spike{fill:var(--tc2);opacity:.55;}
+  .shape-spike .gauge-glow{filter:blur(9px);}
+
+  /* elite — concentric inner ring + faceted needle/hub + accessory icon */
+  .deco-innerring{fill:none;stroke:var(--tc2);stroke-width:3;opacity:.4;stroke-linecap:round;
+    stroke-dasharray:6 4;}
+  .accessory-wrap{display:flex;justify-content:center;margin-bottom:-6px;}
+  .accessory-svg{width:30px;height:30px;filter:drop-shadow(0 0 6px var(--tc));}
+
+  .score-card { padding:20px 16px 18px; border-radius:20px; background:#fff; box-shadow:var(--shadow); text-align:center; }
+</style>
+</head>
+<body>
+<h1>Score Gauge v2 — Unique Shapes Per Tier</h1>
+<p class="sub">Six real shape archetypes (cracked dial · minimal orb · wave/droplet · segmented blocks · flame corona · faceted elite) spread across the 20 tiers — different ring, needle, and hub geometry, not just recolored copies. Click through to compare.</p>
+<div class="layout">
+  <div class="stage">
+    <div class="accessory-wrap" id="accWrap"></div>
+    <div class="score-card tier-hollow shape-orb" id="scoreCard">
+      <div class="score-card-bg" id="scoreCardBg"></div>
+      <div class="gauge-wrap" id="gaugeWrap">
+        <div class="gauge-glow" id="gaugeGlow"></div>
+        <div id="svgSlot"></div>
+        <div class="orb-marker" id="orbMarker"></div>
+        <div class="gauge-particles">
+          <span class="particle p1"></span><span class="particle p2"></span><span class="particle p3"></span>
+          <span class="particle p4"></span><span class="particle p5"></span><span class="particle p6"></span>
+          <span class="particle p7"></span><span class="particle p8"></span>
+        </div>
+        <div class="ring-num">
+          <div class="ring-pct" id="ringPct">0</div>
+          <div class="ring-lbl">score</div>
+        </div>
+      </div>
+      <div class="score-emoji" id="scoreEmoji" style="font-size:22px;">🌫️</div>
+      <div class="score-msg" id="scoreMsg">Waking up.</div>
+    </div>
+  </div>
+  <div class="tierlist" id="tierList"></div>
+</div>
+
+<script>
+const SVGS = {
+  cracked: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <line x1="70" y1="66" x2="88" y2="98" class="deco-crack"/>
+    <line x1="132" y1="58" x2="116" y2="92" class="deco-crack"/>
+    <line x1="88" y1="98" x2="80" y2="90" class="deco-crack"/>
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/><polygon class="gauge-needle" points="110,40 125,110 95,110"/>
+          </g>
+          <polygon class="gauge-hub" points="110,104 119,107 124,114 119,123 109,126 100,122 97,114 101,107"/><circle class="gauge-hub-dot" cx="110" cy="115" r="3"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`,
+  orb: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116" opacity="0"/><polygon class="gauge-needle" points="110,30 113,113 107,113" opacity="0"/>
+          </g>
+          <circle class="gauge-hub" cx="110" cy="115" r="4"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`,
+  wave: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="deco-wave" d="M52,120 Q66,102 80,120 T108,120 T136,120 T164,120"/>
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/><path class="gauge-needle" d="M110,30 C119,58 119,90 110,113 C101,90 101,58 110,30 Z"/>
+          </g>
+          <path class="gauge-hub" d="M110,106 C116,110 116,118 110,124 C104,118 104,110 110,106 Z"/><circle class="gauge-hub-dot" cx="110" cy="116" r="2.5"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`,
+  segmented: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/><polygon class="gauge-needle" points="110,28 123,113 110,125 97,113"/>
+          </g>
+          <polygon class="gauge-hub" points="110,105 118.8,110 118.8,120 110,125 101.2,120 101.2,110"/><circle class="gauge-hub-dot" cx="110" cy="115" r="3"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`,
+  spike: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <polygon class="deco-spike" points="60,58 64,46 68,58"/>
+    <polygon class="deco-spike" points="90,38 94,24 98,38"/>
+    <polygon class="deco-spike" points="122,38 126,24 130,38"/>
+    <polygon class="deco-spike" points="152,58 156,46 160,58"/>
+    <polygon class="deco-spike" points="40,100 45,88 50,100"/>
+    <polygon class="deco-spike" points="170,100 175,88 180,100"/>
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/><path class="gauge-needle" d="M110,28 C121,52 125,76 113,97 C118,82 106,72 110,58 C99,76 98,96 110,113 C90,96 95,64 110,28 Z"/>
+          </g>
+          <circle class="gauge-hub" cx="110" cy="115" r="12" opacity="0.35"/><circle class="gauge-hub" cx="110" cy="115" r="8"/><circle class="gauge-hub-dot" cx="110" cy="115" r="3.5"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`,
+  elite: `<svg class="gauge-svg" viewBox="0 0 220 170">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="100%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="var(--tc)"/>
+              <stop offset="100%" stop-color="var(--tc2)"/>
+            </linearGradient>
+            <radialGradient id="shineGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="50%" stop-color="#ec4899"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient>
+          </defs>
+          <path class="gauge-track-bg" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="gauge-track-fg" id="gaugeTrack" d="M 37.91 165.47 A 88 88 0 1 1 182.09 165.47"/>
+          <path class="deco-innerring" d="M 51 148 A 74 74 0 1 1 169 148"/>
+          <line class="gauge-tick" x1="52.7" y1="155.2" x2="38.7" y2="164.9"/>
+          <line class="gauge-tick gauge-tick-minor" x1="37.1" y1="127.8" x2="24.3" y2="130.1"/>
+          <line class="gauge-tick" x1="42.4" y1="96.9" x2="26.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="53.3" y1="67.4" x2="43.4" y2="59.1"/>
+          <line class="gauge-tick" x1="80.4" y1="51.6" x2="73.2" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="110.0" y1="41.0" x2="110.0" y2="28.0"/>
+          <line class="gauge-tick" x1="139.6" y1="51.6" x2="146.8" y2="36.2"/>
+          <line class="gauge-tick gauge-tick-minor" x1="166.7" y1="67.4" x2="176.6" y2="59.1"/>
+          <line class="gauge-tick" x1="177.6" y1="96.9" x2="194.0" y2="92.5"/>
+          <line class="gauge-tick gauge-tick-minor" x1="182.9" y1="127.8" x2="195.7" y2="130.1"/>
+          <line class="gauge-tick" x1="167.3" y1="155.2" x2="181.3" y2="164.9"/>
+          <g class="shine">
+            <circle cx="110" cy="35" r="15" fill="url(#shineGrad)"/>
+            <animateTransform attributeName="transform" type="rotate" from="0 110 115" to="360 110 115" dur="3.2s" repeatCount="indefinite"/>
+          </g>
+          <g class="gauge-needle-grp" id="needleGrp" transform="rotate(-125 110 115)">
+            <polygon class="gauge-needle-tail" points="110,150 114,116 106,116"/><polygon class="gauge-needle" points="110,26 119,55 129,71 110,113 91,71 101,55"/>
+          </g>
+          <polygon class="gauge-hub" points="110,104 119,109.5 119,120.5 110,126 101,120.5 101,109.5"/><line x1="110" y1="104" x2="110" y2="126" stroke="#fff" stroke-width=".6" opacity=".5"/><line x1="101" y1="109.5" x2="119" y2="120.5" stroke="#fff" stroke-width=".6" opacity=".5"/><line x1="119" y1="109.5" x2="101" y2="120.5" stroke="#fff" stroke-width=".6" opacity=".5"/><circle class="gauge-hub-dot" cx="110" cy="115" r="2.5"/>
+          <text class="gauge-endlabel" x="34" y="163">0</text>
+          <text class="gauge-endlabel" id="gaugeMaxLabel" x="186" y="163" text-anchor="end">120</text>
+        </svg>`
+};
+const ACCESSORY = {
+  electric: `<svg viewBox="0 0 40 40" class="accessory-svg"><polygon points="22,2 10,22 18,22 14,38 30,16 21,16" fill="var(--tc)" stroke="var(--tc2)" stroke-width="1"/></svg>`,
+  royal: `<svg viewBox="0 0 40 40" class="accessory-svg"><polygon points="4,30 8,12 15,20 20,8 25,20 32,12 36,30" fill="var(--tc)" stroke="var(--tc2)" stroke-width="1"/><rect x="4" y="30" width="32" height="5" fill="var(--tc2)"/></svg>`,
+  celestial: `<svg viewBox="0 0 40 40" class="accessory-svg"><polygon points="20,2 25,15 39,15 27,24 32,38 20,29 8,38 13,24 1,15 15,15" fill="var(--tc2)" stroke="var(--tc)" stroke-width="1"/></svg>`,
+  transcendent: `<svg viewBox="0 0 40 40" class="accessory-svg"><polygon points="20,2 34,20 20,38 6,20" fill="url(#prismGrad)" stroke="#fff" stroke-width="1"/><line x1="20" y1="2" x2="20" y2="38" stroke="#fff" stroke-width=".7" opacity=".6"/><line x1="6" y1="20" x2="34" y2="20" stroke="#fff" stroke-width=".7" opacity=".6"/></svg>`
+};
+
+const SCORE_TIERS=[
+  {min:144,key:'transcendent',c:'#a855f7',c2:'#ec4899',c3:'#22d3ee',fx:'holo',shape:'elite',acc:'transcendent',name:'Transcendent',emojis:['✨'],msgs:['Transcendent.']},
+  {min:136,key:'celestial',c:'#6366f1',c2:'#facc15',c3:'#818cf8',fx:'star',shape:'elite',acc:'celestial',name:'Celestial',emojis:['🌟'],msgs:['Celestial.']},
+  {min:128,key:'royal',c:'#eab308',c2:'#7c3aed',c3:'#facc15',fx:'shimmer',shape:'elite',acc:'royal',name:'Royal',emojis:['👑'],msgs:['Royalty today.']},
+  {min:120,key:'electric',c:'#8b5cf6',c2:'#3b82f6',c3:'#a78bfa',fx:'bolt',shape:'elite',acc:'electric',name:'Electric',emojis:['⚡'],msgs:['Electric.']},
+  {min:112,key:'inferno',c:'#dc2626',c2:'#7c2d12',c3:'#f97316',fx:'ember',shape:'spike',name:'Inferno',emojis:['🌋'],msgs:['Inferno.']},
+  {min:104,key:'blazing',c:'#ef4444',c2:'#f59e0b',c3:'#fca5a5',fx:'flame',shape:'spike',name:'Blazing',emojis:['🔥'],msgs:['Blazing!']},
+  {min:96, key:'crushing',c:'#ea580c',c2:'#dc2626',c3:'#fb923c',fx:'spark',shape:'spike',name:'Crushing',emojis:['💥'],msgs:['Crushing it!']},
+  {min:88, key:'driven',c:'#f97316',c2:'#c2410c',c3:'#fdba74',fx:'spark',shape:'segmented',name:'Driven',emojis:['🏁'],msgs:['Driven.']},
+  {min:80, key:'charged',c:'#eab308',c2:'#a16207',c3:'#facc15',fx:'spark',shape:'segmented',name:'Charged',emojis:['⚡'],msgs:['Charged up.']},
+  {min:72, key:'solid',c:'#65a30d',c2:'#3f6212',c3:'#a3e635',fx:'',shape:'segmented',name:'Solid',emojis:['✅'],msgs:['Solid day.']},
+  {min:64, key:'steady',c:'#22c55e',c2:'#15803d',c3:'#4ade80',fx:'',shape:'segmented',name:'Steady',emojis:['🟢'],msgs:['Steady state.']},
+  {min:56, key:'momentum',c:'#14b8a6',c2:'#0f766e',c3:'#2dd4bf',fx:'bubble',shape:'wave',name:'Momentum',emojis:['🌊'],msgs:['Building momentum.']},
+  {min:48, key:'current',c:'#06b6d4',c2:'#0e7490',c3:'#22d3ee',fx:'wisp',shape:'wave',name:'Current',emojis:['🌊'],msgs:['In the current.']},
+  {min:40, key:'rising',c:'#0ea5e9',c2:'#0369a1',c3:'#38bdf8',fx:'bubble',shape:'wave',name:'Rising',emojis:['📈'],msgs:['Rising.']},
+  {min:32, key:'breeze',c:'#38bdf8',c2:'#0284c7',c3:'#7dd3fc',fx:'wisp',shape:'wave',name:'Breeze',emojis:['🍃'],msgs:['Catching a breeze.']},
+  {min:24, key:'sprout',c:'#4ade80',c2:'#166534',c3:'#86efac',fx:'leaf',shape:'wave',name:'Sprout',emojis:['🌱'],msgs:['Sprouting.']},
+  {min:16, key:'kindling',c:'#f59e0b',c2:'#b45309',c3:'#fbbf24',fx:'flame',shape:'orb',name:'Kindling',emojis:['🔥'],msgs:['Kindling caught.']},
+  {min:8,  key:'ember',c:'#b45309',c2:'#78350f',c3:'#d97706',fx:'ember',shape:'orb',name:'Ember',emojis:['🔥'],msgs:['Faint ember.']},
+  {min:0,  key:'hollow',c:'#78909c',c2:'#37474f',c3:'#90a4ae',fx:'',shape:'orb',name:'Hollow',emojis:['🌫️'],msgs:['Waking up.']},
+  {min:-999,key:'rockbottom',c:'#4b5563',c2:'#1f2937',c3:'#6b7280',fx:'ash',shape:'cracked',name:'Rock Bottom',emojis:['🌑'],msgs:['Reset day.']}
+];
+
+const listEl = document.getElementById('tierList');
+SCORE_TIERS.slice().reverse().forEach((t)=>{
+  const b=document.createElement('button');
+  b.innerHTML = `<span class="dot" style="background:${t.c}"></span> ${t.emojis[0]} ${t.name} <span class="shapekey">${t.shape}</span>`;
+  b.onclick=()=>applyTier(t,b);
+  listEl.appendChild(b);
+});
+
+let currentShape = null;
+function applyTier(tier, btn){
+  document.querySelectorAll('.tierlist button').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const card=document.getElementById('scoreCard');
+  card.className='score-card tier-'+tier.key+' shape-'+tier.shape;
+  card.style.setProperty('--tc',tier.c);
+  card.style.setProperty('--tc2',tier.c2);
+  card.style.setProperty('--tc3',tier.c3||tier.c2);
+  card.style.setProperty('--glow-o',.18);
+  if(tier.fx) card.dataset.fx=tier.fx; else delete card.dataset.fx;
+  document.getElementById('ringPct').textContent = Math.max(0,tier.min);
+  document.getElementById('scoreEmoji').textContent = tier.emojis[0];
+  document.getElementById('scoreMsg').textContent = tier.msgs[0];
+  document.getElementById('scoreMsg').style.color = tier.c;
+
+  if(currentShape !== tier.shape){
+    document.getElementById('svgSlot').innerHTML = SVGS[tier.shape];
+    currentShape = tier.shape;
+  }
+  const accWrap=document.getElementById('accWrap');
+  accWrap.innerHTML = tier.acc ? ACCESSORY[tier.acc] : '';
+
+  const track=document.getElementById('gaugeTrack');
+  const len=track.getTotalLength();
+  const max=Math.max(120, Math.ceil((Math.max(tier.min,0)+15)/10)*10);
+  const pct=Math.max(0,Math.min(1,Math.max(tier.min,0)/max));
+  track.style.strokeDasharray = (tier.shape==='cracked'||tier.shape==='segmented') ? track.style.strokeDasharray : len;
+  if(tier.shape!=='cracked' && tier.shape!=='segmented'){
+    track.style.strokeDashoffset=len*(1-pct);
+  }
+  const angle=-125+pct*250;
+  const needleGrp=document.getElementById('needleGrp');
+  if(needleGrp) needleGrp.setAttribute('transform','rotate('+angle+' 110 115)');
+  const maxLabel=document.getElementById('gaugeMaxLabel');
+  if(maxLabel) maxLabel.textContent=max;
+  document.getElementById('orbMarker').style.offsetDistance = (pct*100)+'%';
+}
+
+applyTier(SCORE_TIERS[SCORE_TIERS.length-1], null);
+setTimeout(()=>{ document.querySelectorAll('.tierlist button')[19].classList.add('active'); },50);
+</script>
+</body>
+</html>

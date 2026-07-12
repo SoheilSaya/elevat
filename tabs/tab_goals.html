@@ -7,7 +7,7 @@
 
 <style>
 /* ── Goal tab specific styles ──────────────────────── */
-#goals-view { display:none; }
+#goals-view { display:none; padding: 4px 32px 48px; }
 
 .goals-hero {
   display:grid;
@@ -221,12 +221,12 @@
 
 /* Meta grid */
 .goal-meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.goal-meta-grid.single { grid-template-columns:1fr; }
 .goal-meta-item { display:flex; align-items:center; gap:10px; background:var(--cream2); border-radius:var(--r2); padding:10px 12px; }
 .goal-meta-icon { width:26px; height:26px; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--text3); }
 .goal-meta-icon svg { width:13px; height:13px; display:block; }
 .goal-meta-label { font-size:9.5px; color:var(--text3); text-transform:uppercase; letter-spacing:.07em; font-weight:700; }
 .goal-meta-val { font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink); margin-top:1px; }
-.goal-meta-val.empty { color:var(--text3); font-weight:500; font-family:inherit; font-size:12.5px; }
 
 /* Daily task CTA */
 .goal-daily-task {
@@ -252,10 +252,57 @@
 .goal-daily-check:hover { border-color:var(--sage); }
 .goal-daily-check svg { width:15px; height:15px; display:block; }
 .goal-daily-task.done .goal-daily-check { background:var(--sage); border-color:var(--sage); color:#fff; }
-.goal-daily-task-text { flex:1; }
+.goal-daily-task-text { flex:1; min-width:0; }
 .goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
 .goal-daily-task.done .goal-daily-task-label { color:var(--sage); }
 .goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+
+/* Quick amount picker: default/±interval buttons + native number input (spinner kept on purpose) */
+.goal-daily-amount-row {
+  display:flex; align-items:center; gap:6px; margin-top:7px; flex-wrap:wrap;
+}
+.goal-daily-qbtn {
+  font-size:10.5px; font-weight:700; color:var(--text3);
+  background:#fff; border:1.5px solid var(--cream3); border-radius:6px;
+  padding:3px 7px; cursor:pointer; font-family:inherit; line-height:1.3;
+  transition:all .12s;
+}
+.goal-daily-qbtn:hover { border-color:var(--sage); color:var(--sage); }
+.goal-daily-qbtn.default { border-color:var(--sage); color:var(--sage); background:var(--sageL); }
+.goal-daily-qbtn.active { background:var(--sage); border-color:var(--sage); color:#fff; }
+.goal-daily-amount-input {
+  width:52px; font-size:12px; font-weight:700; color:var(--ink);
+  background:#fff; border:1.5px solid var(--cream3); border-radius:6px;
+  padding:3px 5px; text-align:center; font-family:inherit; margin-left:2px;
+}
+.goal-daily-amount-input:focus { outline:none; border-color:var(--sage); }
+.goal-daily-amount-input:disabled { background:transparent; border-color:transparent; color:var(--sage); font-weight:700; }
+
+/* Self-contained slider — deliberately NOT relying on a shared/global slider class,
+   so it can't inherit stray negative margins meant for a different container width. */
+.goal-progress-slider {
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:6px; margin:0; padding:0;
+  background:transparent; cursor:pointer; outline:none;
+  box-sizing:border-box;
+}
+.goal-progress-slider::-webkit-slider-runnable-track {
+  height:6px; border-radius:3px; background:var(--cream3);
+}
+.goal-progress-slider::-moz-range-track {
+  height:6px; border-radius:3px; background:var(--cream3);
+}
+.goal-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none;
+  width:18px; height:18px; border-radius:50%;
+  background:#fff; border:3px solid var(--coral);
+  margin-top:-6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.goal-progress-slider::-moz-range-thumb {
+  width:18px; height:18px; border-radius:50%;
+  background:#fff; border:3px solid var(--coral);
+  cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
 
 .goal-notes {
   font-size:12px;
@@ -518,29 +565,30 @@
             <input type="number" class="modal-input" id="gDailyHours" placeholder="e.g. 1" min="0" step="0.25" style="margin:0;flex:1;"/>
             <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs/day</span>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+            <input type="number" class="modal-input" id="gDailyStep" placeholder="0.25" min="0.05" step="0.05" style="margin:0;width:100px;flex:none;"/>
+            <span style="font-size:12px;color:var(--text3);white-space:nowrap;">hrs step for the quick +/- buttons on the card</span>
+          </div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px;">Adds a checkbox to the goal card — tick it once a day to log these hours automatically.</div>
         </div>
       </div>
 
-      <!-- Auto-derived progress indicator (shown when resource tracking active) -->
-      <div id="gAutoProgressWrap" style="display:none;margin-top:6px;padding:10px 12px;background:var(--cream2);border-radius:8px;">
+      <!-- Single progress bar — always live, always draggable. Dragging it backfills the
+           actual spent hours/money to match (so the numbers below never disagree with the %),
+           and ticking off hours later keeps updating both together. -->
+      <div id="gProgressBox" style="margin-top:6px;padding:10px 12px;background:var(--cream2);border-radius:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Auto progress</span>
-          <span id="gAutoProgressPct" style="font-size:15px;font-weight:700;color:var(--ink);">0%</span>
+          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Progress</span>
+          <span id="gProgressPctDisplay" style="font-size:15px;font-weight:700;color:var(--ink);">0%</span>
         </div>
         <div style="height:6px;background:var(--cream3);border-radius:3px;overflow:hidden;">
-          <div id="gAutoProgressBar" style="height:100%;width:0%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
+          <div id="gProgressBoxBar" style="height:100%;width:0%;background:var(--sage);border-radius:3px;transition:width .3s;"></div>
         </div>
-        <div id="gAutoProgressNote" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
-      </div>
-
-      <!-- Manual progress (shown only when no trackable resource) -->
-      <div id="gManualProgressWrap" style="margin-top:10px;">
-        <div class="builder-label" style="margin-bottom:8px;">Progress (manual, 0 – 100%)</div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <input type="range" class="smart-slider" id="gProgress" min="0" max="100" value="0"
-            oninput="document.getElementById('gProgressVal').textContent=this.value+'%'" style="flex:1;"/>
-          <span class="smart-num" id="gProgressVal" style="min-width:44px;text-align:right;">0%</span>
+        <div id="gProgressTrackedNote" style="font-size:11px;color:var(--text3);margin-top:5px;"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+          <input type="range" class="goal-progress-slider" id="gProgress" min="0" max="100" value="0"
+            oninput="goalsOnProgressDrag()" style="flex:1;"/>
+          <span id="gProgressVal" style="min-width:44px;text-align:right;font-weight:700;color:var(--ink);">0%</span>
         </div>
       </div>
     </div>
