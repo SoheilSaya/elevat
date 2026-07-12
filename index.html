@@ -4587,11 +4587,12 @@ const UNITS = ['g','kg','ml','L','cup','tbsp','tsp','slice','piece','bowl','plat
 // scaled by qty per logged item, and summed into F.entry.nutrients per day.
 const NUTRIENT_GROUPS = [
   { label: 'Macros', items: [
-    { id:'carbs',  label:'Carbs',         unit:'g' },
-    { id:'fat',    label:'Fat',           unit:'g' },
-    { id:'satFat', label:'Saturated fat', unit:'g' },
-    { id:'fiber',  label:'Fiber',         unit:'g' },
-    { id:'sugar',  label:'Sugar',         unit:'g' },
+    { id:'carbs',      label:'Carbs',         unit:'g' },
+    { id:'fat',        label:'Fat',           unit:'g' },
+    { id:'satFat',     label:'Saturated fat', unit:'g' },
+    { id:'fiber',      label:'Fiber',         unit:'g' },
+    { id:'sugar',      label:'Sugar (total)', unit:'g' },
+    { id:'addedSugar', label:'Added sugar',   unit:'g' },
   ]},
   { label: 'Vitamins', items: [
     { id:'vitA',   label:'Vitamin A',       unit:'mcg' },
@@ -4607,17 +4608,21 @@ const NUTRIENT_GROUPS = [
     { id:'folate', label:'Folate',          unit:'mcg' },
   ]},
   { label: 'Minerals', items: [
-    { id:'calcium',    label:'Calcium',    unit:'mg' },
-    { id:'iron',       label:'Iron',       unit:'mg' },
-    { id:'magnesium',  label:'Magnesium',  unit:'mg' },
-    { id:'potassium',  label:'Potassium',  unit:'mg' },
-    { id:'sodium',     label:'Sodium',     unit:'mg' },
-    { id:'zinc',       label:'Zinc',       unit:'mg' },
-    { id:'phosphorus', label:'Phosphorus', unit:'mg' },
+    { id:'calcium',    label:'Calcium',        unit:'mg'  },
+    { id:'iron',       label:'Iron (total)',   unit:'mg'  },
+    { id:'ironHeme',   label:'Iron (heme)',    unit:'mg'  },
+    { id:'magnesium',  label:'Magnesium',      unit:'mg'  },
+    { id:'potassium',  label:'Potassium',      unit:'mg'  },
+    { id:'sodium',     label:'Sodium',         unit:'mg'  },
+    { id:'zinc',       label:'Zinc',           unit:'mg'  },
+    { id:'phosphorus', label:'Phosphorus',     unit:'mg'  },
+    { id:'selenium',   label:'Selenium',       unit:'mcg' },
+    { id:'iodine',     label:'Iodine',         unit:'mcg' },
   ]},
   { label: 'Other', items: [
     { id:'cholesterol', label:'Cholesterol', unit:'mg' },
     { id:'omega3',      label:'Omega-3',     unit:'mg' },
+    { id:'choline',     label:'Choline',     unit:'mg' },
     { id:'collagen',    label:'Collagen',    unit:'mg' },
     { id:'probiotic',   label:'Probiotics',  unit:'B CFU' },
     { id:'caffeine',    label:'Caffeine',    unit:'mg' },
@@ -4835,6 +4840,7 @@ function injectFoodStyles() {
     .ingr-info-primary-cell-v2{ flex:1; background:var(--cream2,#efe6d8); border-radius:12px; padding:10px; text-align:center; }
     .ingr-info-primary-cell-v2 b{ display:block; font-family:'Fraunces',serif; font-size:18px; color:var(--text2,#3a2f22); }
     .ingr-info-primary-cell-v2 span{ font-size:10.5px; color:var(--text4,#a8967c); text-transform:uppercase; letter-spacing:.05em; }
+    .nutrient-bal-note-v2{ font-size:9.5px; font-weight:400; color:var(--text4,#a8967c); margin-top:1px; line-height:1.3; max-width:220px; }
     .nutrient-bal-row-v2{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; align-items:center; padding:6px 2px; border-bottom:1px solid var(--cream2,#efe6d8); }
     .nutrient-bal-label-v2{ font-size:12.5px; color:var(--text2,#3a2f22); font-weight:600; }
     .nutrient-bal-val-v2{ font-size:11.5px; color:var(--text3,#8a7a63); text-align:right; }
@@ -5190,34 +5196,104 @@ function computeExtraFoodStats(data) {
   return { streak, hitRate, avgWd, avgWe, avgLast7, avgPrev7, trendDelta, mealCals, mealCalTotal };
 }
 
-// Rough general reference values, used only to flag under/over patterns —
-// not medical guidance, just a "what am I missing / overgetting" nudge.
-// type 'min' = aim for at least this; 'max' = try to stay under this;
-// 'info' = no established target, just show the tracked average.
+// Personal reference profile — used only to size the "too little / OK /
+// too much" ranges below. Update these numbers if they change.
+// Disclosed conditions: thalassemia minor, arthritis, Behçet's disease
+// with uveitis. These aren't diagnosed or managed by this app — just used
+// to shift a couple of reference ranges and add context notes below.
+// Always defer to your actual doctors' guidance over this.
+const USER_PROFILE = { sex:'male', ageYears:24, weightKg:88, heightCm:175,
+  conditions:['thalassemia minor','arthritis',"Behçet's disease with uveitis"] };
+
+// Measured BMR (actual test result) — overrides the Mifflin-St Jeor
+// estimate since a real measurement beats a formula guess. TDEE uses a
+// sedentary/extremely-inactive multiplier (1.2) on top of it. This is
+// still a planning number, not a prescription.
+const BMR = 1500;
+const TDEE = Math.round(BMR * 1.2);
+const PROTEIN_TARGET_G = Math.round(USER_PROFILE.weightKg * 1.7); // ~active-maintenance range
+
+// Reference ranges, sized to the profile above (adult male). min = aim for
+// at least this; max = try to stay under this; both = a comfortable
+// range. Rough general guidance, not medical advice. `note` = a short
+// context line shown under that nutrient's label, tied to a disclosed
+// condition above — only added where it's directly relevant.
 const NUTRIENT_TARGETS = {
-  carbs:{target:250,type:'min'}, fat:{target:70,type:'min'}, satFat:{target:20,type:'max'},
-  fiber:{target:30,type:'min'}, sugar:{target:50,type:'max'},
-  vitA:{target:900,type:'min'}, vitC:{target:90,type:'min'}, vitD:{target:20,type:'min'},
-  vitE:{target:15,type:'min'}, vitK:{target:120,type:'min'}, b1:{target:1.2,type:'min'},
-  b2:{target:1.3,type:'min'}, b3:{target:16,type:'min'}, b6:{target:1.7,type:'min'},
-  b12:{target:2.4,type:'min'}, folate:{target:400,type:'min'},
-  calcium:{target:1000,type:'min'}, iron:{target:10,type:'min'}, magnesium:{target:400,type:'min'},
-  potassium:{target:3400,type:'min'}, sodium:{target:2300,type:'max'}, zinc:{target:11,type:'min'},
-  phosphorus:{target:700,type:'min'}, cholesterol:{target:300,type:'max'}, omega3:{target:1600,type:'min'},
-  caffeine:{target:400,type:'max'}, alcohol:{target:0,type:'max'},
-  collagen:{target:null,type:'info'}, probiotic:{target:null,type:'info'},
+  calories:{ min:Math.round(TDEE*0.85), max:Math.round(TDEE*1.15) },
+  protein:{ min:PROTEIN_TARGET_G, max:Math.round(PROTEIN_TARGET_G*1.8) },
+  carbs:{ min:180, max:350 }, fat:{ min:55, max:100 }, satFat:{ max:22 },
+  fiber:{ min:32 }, sugar:{ max:70 },
+  addedSugar:{ max:36, note:'Added sugar (not natural fruit/dairy sugar) — the one that actually correlates with inflammation.' },
+  vitA:{ min:900 }, vitC:{ min:90, note:'Antioxidant, relevant for arthritis/Behçet\'s inflammation.' },
+  vitD:{ min:20, note:'Watch alongside calcium if ever on steroids for a flare (bone health).' },
+  vitE:{ min:15, note:'Antioxidant, relevant for inflammatory conditions.' },
+  vitK:{ min:120 },
+  b1:{ min:1.2 }, b2:{ min:1.3 }, b3:{ min:16 }, b6:{ min:1.7 }, b12:{ min:2.4 }, folate:{ min:400 },
+  calcium:{ min:1000, note:'Watch alongside vitamin D if ever on steroids for a flare (bone health).' },
+  // Iron ceiling, not floor: thalassemia minor + male (no menstrual iron
+  // loss) means overload is the actual risk here, not deficiency. A "Low"
+  // reading is usually fine — ask your hematologist before ever
+  // supplementing iron.
+  iron:{ min:6, max:20, note:'Thalassemia minor — overload risk matters more than a low reading here. Don\'t supplement without your hematologist.' },
+  ironHeme:{ note:'Portion of total iron that\'s heme (meat/fish) — absorbs far more efficiently than plant iron.' },
+  magnesium:{ min:420 }, potassium:{ min:3400 },
+  sodium:{ max:2300, note:'Watch closer if ever on steroids for a flare (fluid retention).' },
+  zinc:{ min:11 }, phosphorus:{ min:700 },
+  selenium:{ min:55, note:'Antioxidant, supports immune regulation — relevant for autoimmune/inflammatory conditions.' },
+  iodine:{ min:150 },
+  cholesterol:{ max:300 },
+  omega3:{ min:1600, note:'Anti-inflammatory — relevant for arthritis/Behçet\'s. Fatty fish, walnuts, flax.' },
+  choline:{ min:550 },
+  caffeine:{ max:400 }, alcohol:{ max:20 },
+  collagen:{}, probiotic:{},
 };
+
+// Turns a value into Low / OK / High against the ranges above.
+function nutrientStatus(id, value) {
+  const t = NUTRIENT_TARGETS[id];
+  if (!t || (t.min == null && t.max == null)) return { label:'tracked', color:'var(--text4)', pct:null };
+  if (t.min != null && value < t.min) {
+    const pct = Math.round((value / t.min) * 100);
+    return { label: pct < 60 ? 'Very low' : 'Low', color:'var(--f-warn)', pct };
+  }
+  if (t.max != null && value > t.max) {
+    const pct = Math.round((value / t.max) * 100);
+    return { label: pct > 150 ? 'Very high' : 'High', color:'var(--f-bad)', pct };
+  }
+  const pct = t.min != null ? Math.round((value / t.min) * 100) : Math.round((value / t.max) * 100);
+  return { label:'OK', color:'var(--f-ok)', pct };
+}
+
+// One nutrient row: label (+ context note if this nutrient has one), value,
+// status bar + Low/OK/High badge. Shared by the stats "Nutrient Balance"
+// card and each Full History day.
+function nutrientStatusRowHtml(labelText, unit, value, targetId, valSuffix) {
+  const s = nutrientStatus(targetId, value);
+  const barPct = s.pct != null ? Math.min(100, s.pct) : 0;
+  const note = (NUTRIENT_TARGETS[targetId] || {}).note;
+  return `<div class="nutrient-bal-row-v2">
+    <div class="nutrient-bal-label-v2">${labelText}${note ? `<div class="nutrient-bal-note-v2">${note}</div>` : ''}</div>
+    <div class="nutrient-bal-val-v2">${value} ${unit}${valSuffix ? '<span>'+valSuffix+'</span>' : ''}</div>
+    ${s.pct != null ? `<div class="nutrient-bal-bar-v2"><div class="nutrient-bal-fill-v2" style="width:${barPct}%;background:${s.color}"></div></div>` : '<div></div>'}
+    <span class="nutrient-bal-status-v2" style="color:${s.color}">${s.label}${s.pct!=null?' · '+s.pct+'%':''}</span>
+  </div>`;
+}
 
 // Averages nutrient totals across days that actually have logged food —
 // only counts a nutrient's average over the days it was present at all,
 // so one unlogged field doesn't drag its own average toward zero.
 function computeNutrientAverages(fullLog) {
-  const loggedDays = (fullLog||[]).filter(e => (e.calories||0) > 0 || (e.nutrients && Object.keys(e.nutrients).length));
+  const loggedDays = (fullLog||[]).filter(e => (e.calories||0) > 0 || (e.meals||[]).some(m => (m.items||[]).length));
   const sums = {}, dayCounts = {};
   loggedDays.forEach(e => {
-    const n = e.nutrients || {};
-    ALL_NUTRIENT_IDS.forEach(id => {
-      if (n[id]) { sums[id] = (sums[id]||0) + n[id]; dayCounts[id] = (dayCounts[id]||0) + 1; }
+    const dayTotals = {};
+    (e.meals||[]).forEach(m => (m.items||[]).forEach(it => {
+      const n = computeItemNutrients(it);
+      Object.keys(n).forEach(k => { dayTotals[k] = (dayTotals[k]||0) + n[k]; });
+    }));
+    Object.keys(dayTotals).forEach(id => {
+      sums[id] = (sums[id]||0) + dayTotals[id];
+      dayCounts[id] = (dayCounts[id]||0) + 1;
     });
   });
   const averages = {};
@@ -5243,32 +5319,44 @@ function renderNutrientBalanceCard(fullLog) {
     if (!items.length) return '';
     const rows = items.map(n => {
       const a = averages[n.id];
-      const t = NUTRIENT_TARGETS[n.id] || { target:null, type:'info' };
-      let barHtml = '', statusHtml;
-      if (t.target) {
-        const pct = Math.round((a.avg / t.target) * 100);
-        let status, color;
-        if (t.type === 'max') { status = pct > 100 ? 'High' : 'OK'; color = pct > 100 ? 'var(--f-bad)' : 'var(--f-ok)'; }
-        else { status = pct < 70 ? 'Low' : 'OK'; color = pct < 70 ? 'var(--f-warn)' : 'var(--f-ok)'; }
-        barHtml = `<div class="nutrient-bal-bar-v2"><div class="nutrient-bal-fill-v2" style="width:${Math.min(100,pct)}%;background:${color}"></div></div>`;
-        statusHtml = `<span class="nutrient-bal-status-v2" style="color:${color}">${status} · ${pct}%</span>`;
-      } else {
-        barHtml = '<div></div>';
-        statusHtml = `<span class="nutrient-bal-status-v2" style="color:var(--text4)">tracked</span>`;
-      }
-      return `<div class="nutrient-bal-row-v2">
-        <div class="nutrient-bal-label-v2">${n.label}</div>
-        <div class="nutrient-bal-val-v2">${a.avg} ${n.unit}<span> /day avg · ${a.daysTracked}d</span></div>
-        ${barHtml}${statusHtml}
-      </div>`;
+      return nutrientStatusRowHtml(n.label, n.unit, a.avg, n.id, ' /day avg · '+a.daysTracked+'d');
     }).join('');
     return `<div class="nutrient-group-label-v2">${g.label}</div>${rows}`;
   }).join('');
   return `<div class="fm-card" style="margin-bottom:20px;">
     <div class="fm-card-title">🧬 Nutrient Balance <span>avg over ${totalDays} logged day${totalDays!==1?'s':''}</span></div>
-    <div style="font-size:11px;color:var(--text4);font-style:italic;margin-bottom:10px;">Rough general reference ranges — flags what you're consistently under or over, not medical advice. Only nutrients you've logged data for are shown.</div>
+    <div style="font-size:11px;color:var(--text4);font-style:italic;margin-bottom:10px;">Reference ranges sized to your profile (${USER_PROFILE.ageYears}${USER_PROFILE.sex==='male'?'M':'F'}, ${USER_PROFILE.weightKg}kg, ${USER_PROFILE.heightCm}cm), with iron flipped to a ceiling not a floor (thalassemia minor) and a few notes tied to arthritis/Behçet's — a rough nudge, not medical advice. Only nutrients you've logged data for are shown.</div>
     ${groupsHtml}
   </div>`;
+}
+
+// For chart display only: fills unlogged (0-value) days with the average
+// of the nearest logged day before and after, instead of dropping to zero
+// (which would misleadingly look like "ate nothing" rather than "didn't
+// log"). Runs of several unlogged days in a row all get the same filled
+// average. Days at the very start/end with no anchor on one side just
+// borrow the nearest available value. Marks each filled point so the
+// chart can render it visually distinct from real logged data.
+function interpolateZeroGaps(rows) {
+  const vals = rows.map(r => r.val || 0);
+  const n = vals.length;
+  const filled = vals.slice();
+  let i = 0;
+  while (i < n) {
+    if (filled[i] > 0) { i++; continue; }
+    let j = i;
+    while (j < n && vals[j] === 0) j++; // j = first index after this gap (or n)
+    const prevVal = i > 0 ? filled[i-1] : null;
+    const nextVal = j < n ? vals[j] : null;
+    let fillVal;
+    if (prevVal != null && nextVal != null) fillVal = Math.round((prevVal + nextVal) / 2);
+    else if (prevVal != null) fillVal = prevVal;
+    else if (nextVal != null) fillVal = nextVal;
+    else fillVal = 0;
+    for (let k = i; k < j; k++) filled[k] = fillVal;
+    i = j;
+  }
+  return rows.map((r, idx) => ({ ...r, val: filled[idx], interpolated: vals[idx] === 0 && filled[idx] > 0 }));
 }
 
 function renderFoodStats(data) {
@@ -5363,12 +5451,12 @@ function renderFoodStats(data) {
   <div class="fcharts-col-v2">
     <div class="fchart-card-v2">
       <div class="fchart-title-v2">🔥 Daily Calories</div>
-      <div class="fchart-sub-v2">Last 30 days · red dashes = ${CAL_TARGET} kcal target</div>
+      <div class="fchart-sub-v2">Last 30 days · red dashes = ${CAL_TARGET} kcal target · faded bars = no log that day, estimated from neighbors</div>
       <div class="mchart-wrap" style="height:240px"><canvas id="fCalChart"></canvas></div>
     </div>
     <div class="fchart-card-v2">
       <div class="fchart-title-v2">💪 Daily Protein</div>
-      <div class="fchart-sub-v2">Last 30 days · red dashes = ${PROT_TARGET}g target</div>
+      <div class="fchart-sub-v2">Last 30 days · red dashes = ${PROT_TARGET}g target · faded bars = no log that day, estimated from neighbors</div>
       <div class="mchart-wrap" style="height:240px"><canvas id="fProtChart"></canvas></div>
     </div>
     <div class="fchart-card-v2">
@@ -5434,19 +5522,23 @@ function renderFoodStats(data) {
       plugins:{legend:{display:false}},
       scales:{x:{grid:{color:gc},ticks:{color:tc,maxTicksLimit:10}},y:{grid:{color:gc},ticks:{color:tc}}} };
 
-    const calLabels = cals.map(d=>d.jalali||d.date);
-    const calVals = cals.map(d=>d.val);
+    const calRows = interpolateZeroGaps(cals);
+    const calLabels = calRows.map(d=>d.jalali||d.date);
+    const calVals = calRows.map(d=>d.val);
+    const calColors = calRows.map(d=>d.interpolated?'rgba(212,130,26,.28)':'rgba(212,130,26,.65)');
     const c1 = document.getElementById('fCalChart');
     if (c1) foodHistChart.cal = new Chart(c1, { type:'bar', data:{ labels:calLabels, datasets:[
-      {label:'Calories',data:calVals,backgroundColor:'rgba(212,130,26,.65)',borderRadius:4,maxBarThickness:26},
+      {label:'Calories',data:calVals,backgroundColor:calColors,borderRadius:4,maxBarThickness:26},
       {label:'Target',data:calLabels.map(()=>CAL_TARGET),type:'line',borderColor:'var(--coral)',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false}
     ]}, options:{...base,plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}}});
 
-    const protLabels = prots.map(d=>d.jalali||d.date);
-    const protVals = prots.map(d=>d.val);
+    const protRows = interpolateZeroGaps(prots);
+    const protLabels = protRows.map(d=>d.jalali||d.date);
+    const protVals = protRows.map(d=>d.val);
+    const protColors = protRows.map(d=>d.interpolated?'rgba(58,122,90,.28)':'rgba(58,122,90,.65)');
     const c2 = document.getElementById('fProtChart');
     if (c2) foodHistChart.prot = new Chart(c2, { type:'bar', data:{ labels:protLabels, datasets:[
-      {label:'Protein',data:protVals,backgroundColor:'rgba(58,122,90,.65)',borderRadius:4,maxBarThickness:26},
+      {label:'Protein',data:protVals,backgroundColor:protColors,borderRadius:4,maxBarThickness:26},
       {label:'Target',data:protLabels.map(()=>PROT_TARGET),type:'line',borderColor:'var(--coral)',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false}
     ]}, options:{...base,plugins:{legend:{display:true,labels:{color:'#6b5c48',boxWidth:10,font:{size:11}}}}}});
 
@@ -5505,13 +5597,42 @@ function renderFoodFullHistory(fullLog) {
         </div>
         <div class="fhist-chevron-v2">▸</div>
       </div>
-      <div class="fhist-details-v2">${detailsHtml}${entry.notes ? '<div class="fhist-meal-line-v2" style="margin-top:6px;"><b>Notes:</b> '+entry.notes+'</div>' : ''}</div>`;
+      <div class="fhist-details-v2">${detailsHtml}${entry.notes ? '<div class="fhist-meal-line-v2" style="margin-top:6px;"><b>Notes:</b> '+entry.notes+'</div>' : ''}
+        ${renderDayNutrientsFor(entry)}
+      </div>`;
   }).join('');
 
   return `
   <div class="fm-card">
     <div class="fm-card-title">🗂️ Full History <span>${sorted.length} days</span></div>
     <div class="fhist-list-v2">${rows || '<div style="padding:20px;text-align:center;color:var(--text4);font-style:italic;">No history yet</div>'}</div>
+  </div>`;
+}
+
+// Every macro/nutrient number for one logged day, each flagged Low / OK /
+// High against the personal reference ranges — computed live from current
+// ingredient data so it's accurate for old entries too.
+function renderDayNutrientsFor(entry) {
+  const totals = {};
+  (entry.meals||[]).forEach(m => (m.items||[]).forEach(it => {
+    const n = computeItemNutrients(it);
+    Object.keys(n).forEach(k => { totals[k] = Math.round(((totals[k]||0) + n[k]) * 100) / 100; });
+  }));
+  const cal = entry.calories || 0, prot = entry.protein || 0;
+  const primaryHtml = (cal || prot) ? `
+    ${cal ? nutrientStatusRowHtml('Calories','kcal',cal,'calories') : ''}
+    ${prot ? nutrientStatusRowHtml('Protein','g',prot,'protein') : ''}` : '';
+  const hasAny = ALL_NUTRIENT_IDS.some(id => totals[id]);
+  const groupsHtml = NUTRIENT_GROUPS.map(g => {
+    const rows = g.items.filter(n => totals[n.id]);
+    if (!rows.length) return '';
+    return `<div class="nutrient-group-label-v2">${g.label}</div>
+      ${rows.map(n => nutrientStatusRowHtml(n.label, n.unit, totals[n.id], n.id)).join('')}`;
+  }).join('');
+  return `<div class="nutrient-panel-v2" style="display:block;margin-top:8px;">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text4);font-weight:700;margin-bottom:4px;">Full nutrient breakdown <span style="text-transform:none;font-weight:400;">— vs. your reference (${USER_PROFILE.ageYears}${USER_PROFILE.sex==='male'?'M':'F'}, ${USER_PROFILE.weightKg}kg, ${USER_PROFILE.heightCm}cm)</span></div>
+    ${primaryHtml}
+    ${hasAny ? groupsHtml : '<div style="color:var(--text4);font-size:11.5px;font-style:italic;margin-top:4px;">No extended nutrient data for items logged this day.</div>'}
   </div>`;
 }
 
@@ -5631,6 +5752,25 @@ async function deleteIngredient(id) {
   F.ingredients = d.ingredients;
   if (F.editingIngrId === id) F.editingIngrId = null;
   renderFoodView();
+}
+
+// Computes a logged item's nutrients from the CURRENT ingredient database
+// (id lookup × qty) rather than trusting whatever was frozen on the item
+// when it was added. This is what makes nutrient data show up for food
+// logged before this feature existed, and keeps it correct if you edit an
+// ingredient's nutrients later. Falls back to whatever's stored on the
+// item itself only if the ingredient no longer exists (e.g. deleted).
+function computeItemNutrients(item) {
+  const ingr = F.ingredients.find(i => i.id === item.ingredient_id);
+  if (ingr && ingr.nutrients && Object.keys(ingr.nutrients).length) {
+    const out = {};
+    ALL_NUTRIENT_IDS.forEach(id => {
+      const v = ingr.nutrients[id];
+      if (v) out[id] = Math.round(v * (item.qty||0) * 100) / 100;
+    });
+    return out;
+  }
+  return item.nutrients || {};
 }
 
 // ── Ingredient select: type-to-jump (Windows Explorer style) ──────
@@ -5788,7 +5928,7 @@ function openMealItemInfoCard(mealId, idx) {
   document.getElementById('ingrInfoCard').innerHTML = buildInfoCardHTML(
     `${item.icon||'🍽️'} ${item.name}`,
     `Your logged amount: ${item.qty} ${item.unit}${item.note ? ' · ' + item.note : ''}`,
-    item.calories, item.protein, item.nutrients
+    item.calories, item.protein, computeItemNutrients(item)
   );
   el.classList.add('open');
 }
@@ -5904,8 +6044,9 @@ function recalcMacrosFromItems() {
   (F.entry.meals||[]).forEach(m => (m.items||[]).forEach(it => {
     cal += it.calories || 0;
     prot += it.protein || 0;
-    if (it.nutrients) Object.keys(it.nutrients).forEach(k => {
-      nutrTotals[k] = Math.round(((nutrTotals[k]||0) + it.nutrients[k]) * 100) / 100;
+    const n = computeItemNutrients(it);
+    Object.keys(n).forEach(k => {
+      nutrTotals[k] = Math.round(((nutrTotals[k]||0) + n[k]) * 100) / 100;
     });
   }));
   F.entry.calories = Math.round(cal);
