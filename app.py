@@ -1330,6 +1330,14 @@ def manage_people():
             "circles":    [],
             "activities": [],
         })
+    elif action == "update_person":
+            for p in db["people"]:
+                if p["id"] == data["id"]:
+                    p["name"]       = data.get("name", p.get("name", ""))
+                    p["category"]   = data.get("category", p.get("category", "friend"))
+                    p["importance"] = data.get("importance", p.get("importance", 0))
+                    p["contact"]    = data.get("contact", p.get("contact", ""))
+                    break
 
     elif action == "delete":
         pid = data["id"]
@@ -1381,6 +1389,9 @@ def manage_people():
             if p["id"] == data["id"]:
                 p["photo"] = data.get("photo", "")
                 break
+
+
+
 
     save_people(db)
     return jsonify({"ok": True})
