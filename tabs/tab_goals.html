@@ -238,24 +238,44 @@
   margin-bottom:12px;
   transition:all .15s;
 }
-.goal-daily-task.done { background:var(--sageL); border:1.5px solid var(--sage); }
-.goal-daily-check {
-  width:32px; height:32px; flex-shrink:0;
+.goal-daily-task.logged { background:var(--sageL); border:1.5px solid var(--sage); }
+.goal-daily-submit {
+  display:flex; align-items:center; gap:5px; flex-shrink:0;
+  height:32px; padding:0 12px;
+  border-radius:16px;
+  border:1.5px solid var(--sage);
+  background:var(--sage);
+  color:#fff;
+  font-size:12px; font-weight:700; font-family:inherit;
+  cursor:pointer;
+  transition:all .15s;
+}
+.goal-daily-submit:hover { filter:brightness(1.08); }
+.goal-daily-submit:active { transform:scale(0.96); }
+.goal-daily-submit svg { width:13px; height:13px; display:block; }
+.goal-daily-task-text { flex:1; min-width:0; }
+.goal-daily-task-toprow { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
+.goal-daily-task.logged .goal-daily-task-label { color:var(--sage); }
+.goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+.goal-daily-mins-badge {
+  flex-shrink:0; font-size:10.5px; font-weight:700; color:var(--sage);
+  background:var(--sageL); border-radius:8px; padding:2px 7px;
+  font-family:'JetBrains Mono',monospace;
+}
+.goal-daily-undo {
+  width:24px; height:24px; flex-shrink:0;
   border-radius:50%;
-  border:2px solid var(--cream3);
+  border:1.5px solid var(--cream3);
   background:#fff;
+  color:var(--text3);
   cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   transition:all .15s;
-  color:transparent;
+  margin-left:2px;
 }
-.goal-daily-check:hover { border-color:var(--sage); }
-.goal-daily-check svg { width:15px; height:15px; display:block; }
-.goal-daily-task.done .goal-daily-check { background:var(--sage); border-color:var(--sage); color:#fff; }
-.goal-daily-task-text { flex:1; min-width:0; }
-.goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
-.goal-daily-task.done .goal-daily-task-label { color:var(--sage); }
-.goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+.goal-daily-undo:hover { border-color:var(--coral); color:var(--coral); }
+.goal-daily-undo svg { width:11px; height:11px; display:block; }
 
 /* Quick amount picker: default/±interval buttons + native number input (spinner kept on purpose) */
 .goal-daily-amount-row {

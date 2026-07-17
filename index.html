@@ -669,6 +669,171 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
       </div>
     </div>
   </div>
+
+  <!-- POWER OUTAGE WARNING -->
+  <style>
+    .outage-panel{margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;}
+    .outage-card{flex:1;min-width:240px;cursor:pointer;position:relative;overflow:hidden;
+      border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);
+      background:linear-gradient(160deg,#1c2333,#252d40);border:1px solid rgba(255,255,255,.07);
+      color:#e8ecf5;transition:box-shadow .3s ease,transform .15s ease;}
+    .outage-card:hover{transform:translateY(-1px);}
+    .outage-card::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.05;
+      background-image:linear-gradient(90deg,#fff 1px,transparent 1px),linear-gradient(0deg,#fff 1px,transparent 1px);
+      background-size:14px 14px;}
+    .outage-card-head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;}
+    .outage-loc{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.2px;color:#c9d2e8;}
+    .outage-bolt{width:18px;height:18px;flex-shrink:0;transition:filter .4s ease;}
+    .outage-bolt path{fill:#7a839c;transition:fill .4s ease;}
+    .outage-card.state-active .outage-bolt path{fill:#f87171;filter:drop-shadow(0 0 4px rgba(248,113,113,.75));}
+    .outage-card.state-active .outage-bolt{animation:outageBoltPulse 1.4s ease-in-out infinite;}
+    .outage-card.state-upcoming .outage-bolt path{fill:#fbbf24;}
+    .outage-card.state-done .outage-bolt path{fill:#4ade80;}
+    @keyframes outageBoltPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+    .outage-livewrap{display:flex;align-items:center;gap:5px;}
+    .outage-livedot{width:6px;height:6px;border-radius:50%;background:#f87171;box-shadow:0 0 6px #f87171;
+      animation:outageLiveBlink 1.2s ease-in-out infinite;}
+    @keyframes outageLiveBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
+    .outage-datebadge{font-size:9px;font-weight:700;letter-spacing:.4px;color:#9aa3ba;
+      background:rgba(255,255,255,.07);padding:2px 7px;border-radius:20px;}
+    .outage-time{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:8px;
+      color:#f4f6fb;letter-spacing:.4px;position:relative;z-index:1;}
+    .outage-status{font-size:11px;font-weight:600;margin-top:2px;color:#aab3c8;position:relative;z-index:1;}
+    .outage-timeline{margin-top:11px;position:relative;z-index:1;}
+    .outage-timeline-track{position:relative;height:6px;border-radius:4px;background:rgba(255,255,255,.09);overflow:visible;}
+    .outage-timeline-window{position:absolute;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,#f87171,#ef4444);}
+    .outage-timeline-now{position:absolute;display:none;top:-3px;width:2px;height:12px;border-radius:1px;
+      background:#f4f6fb;box-shadow:0 0 4px #fff;}
+    .outage-timeline-labels{display:flex;justify-content:space-between;font-size:9px;color:#6b7386;
+      margin-top:4px;font-family:'JetBrains Mono',monospace;}
+    .outage-edit-hint{font-size:9px;color:#7a839c;}
+    .outage-alert-row{margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;}
+    .outage-alert-btn{font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;
+      border:1px solid rgba(0,0,0,.08);background:#fff7ed;color:#9a3412;cursor:pointer;
+      transition:background .2s ease,opacity .2s ease;}
+    .outage-alert-btn:hover{background:#ffedd5;}
+    .outage-alert-btn.armed{background:#f0fdf4;color:#166534;border-color:rgba(0,0,0,.06);}
+    .outage-telegram-btn{background:#eff6ff;color:#1d4ed8;}
+    .outage-telegram-btn:hover{background:#dbeafe;}
+    .outage-telegram-btn.armed{background:#f0fdf4;color:#166534;}
+    .outage-toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;display:none;
+      align-items:center;gap:10px;background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;
+      padding:12px 20px;border-radius:12px;font-weight:700;font-size:13px;
+      box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;max-width:90vw;text-align:center;}
+  </style>
+  <div class="outage-alert-row">
+    <button type="button" id="outageAlertBtn" class="outage-alert-btn" onclick="enableOutageAlerts()">🔔 Enable sound + desktop alerts</button>
+    <button type="button" id="outageTelegramBtn" class="outage-alert-btn outage-telegram-btn" onclick="connectTelegramAlerts()">📨 Connect Telegram alerts</button>
+  </div>
+  <div id="outagePanel" class="outage-panel">
+    <div class="outage-card" id="outageCard-home" onclick="toggleOutageEdit('home')">
+      <div class="outage-card-head">
+        <div class="outage-loc">
+          <svg class="outage-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          Home
+          <span class="outage-livewrap" id="outageLiveWrap-home" style="display:none;"><span class="outage-livedot"></span></span>
+        </div>
+        <span class="outage-datebadge" id="outageDateBadge-home">—</span>
+      </div>
+      <div id="outageTime-home" class="outage-time">—:— – —:—</div>
+      <div id="outageStatus-home" class="outage-status">Loading…</div>
+      <div class="outage-timeline">
+        <div class="outage-timeline-track">
+          <div class="outage-timeline-window" id="outageTimelineWindow-home"></div>
+          <div class="outage-timeline-now" id="outageTimelineNow-home"></div>
+        </div>
+        <div class="outage-timeline-labels">
+          <span id="outageTimelineStart-home">—:—</span>
+          <span class="outage-edit-hint">✎ tap to edit</span>
+          <span id="outageTimelineEnd-home">—:—</span>
+        </div>
+      </div>
+    </div>
+    <div class="outage-card" id="outageCard-work" onclick="toggleOutageEdit('work')">
+      <div class="outage-card-head">
+        <div class="outage-loc">
+          <svg class="outage-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          Work
+          <span class="outage-livewrap" id="outageLiveWrap-work" style="display:none;"><span class="outage-livedot"></span></span>
+        </div>
+        <span class="outage-datebadge" id="outageDateBadge-work">—</span>
+      </div>
+      <div id="outageTime-work" class="outage-time">—:— – —:—</div>
+      <div id="outageStatus-work" class="outage-status">Loading…</div>
+      <div class="outage-timeline">
+        <div class="outage-timeline-track">
+          <div class="outage-timeline-window" id="outageTimelineWindow-work"></div>
+          <div class="outage-timeline-now" id="outageTimelineNow-work"></div>
+        </div>
+        <div class="outage-timeline-labels">
+          <span id="outageTimelineStart-work">—:—</span>
+          <span class="outage-edit-hint">✎ tap to edit</span>
+          <span id="outageTimelineEnd-work">—:—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outage edit panels (hidden until a card is clicked) -->
+  <div id="outageEdit-home" style="display:none;margin-bottom:14px;background:#fff5f5;border:1.5px solid #ef4444;border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);">
+    <div style="font-size:12px;font-weight:700;color:#7f1d1d;margin-bottom:10px;">✎ Edit Home Outage Schedule</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Active hours (cycle window)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="time" id="outageActiveStart-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+          <span style="color:#7f1d1d;font-size:11px;">to</span>
+          <input type="time" id="outageActiveEnd-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Duration (minutes)</div>
+        <input type="number" id="outageDuration-home" min="15" max="720" step="15" style="width:80px;padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#7f1d1d;cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="outageOverrideCheck-home" onchange="toggleOutageOverride('home')">
+      Today's outage is different from predicted
+    </label>
+    <div id="outageOverrideWrap-home" style="display:none;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#7f1d1d;">Actual start today:</span>
+      <input type="time" id="outageOverride-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveOutageSettings('home')" style="padding:6px 14px;border-radius:50px;border:none;background:#ef4444;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+      <button onclick="toggleOutageEdit('home')" style="padding:6px 14px;border-radius:50px;border:1.5px solid #f0a0a0;background:transparent;color:#7f1d1d;font-weight:600;font-size:12px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+  <div id="outageEdit-work" style="display:none;margin-bottom:14px;background:#fff5f5;border:1.5px solid #ef4444;border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);">
+    <div style="font-size:12px;font-weight:700;color:#7f1d1d;margin-bottom:10px;">✎ Edit Work Outage Schedule</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Active hours (cycle window)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="time" id="outageActiveStart-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+          <span style="color:#7f1d1d;font-size:11px;">to</span>
+          <input type="time" id="outageActiveEnd-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Duration (minutes)</div>
+        <input type="number" id="outageDuration-work" min="15" max="720" step="15" style="width:80px;padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#7f1d1d;cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="outageOverrideCheck-work" onchange="toggleOutageOverride('work')">
+      Today's outage is different from predicted
+    </label>
+    <div id="outageOverrideWrap-work" style="display:none;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#7f1d1d;">Actual start today:</span>
+      <input type="time" id="outageOverride-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveOutageSettings('work')" style="padding:6px 14px;border-radius:50px;border:none;background:#ef4444;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+      <button onclick="toggleOutageEdit('work')" style="padding:6px 14px;border-radius:50px;border:1.5px solid #f0a0a0;background:transparent;color:#7f1d1d;font-weight:600;font-size:12px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+
   <!-- HERO -->
   <div class="hero">
     <!-- Score gauge (speedometer) -->
@@ -2055,24 +2220,44 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
   margin-bottom:12px;
   transition:all .15s;
 }
-.goal-daily-task.done { background:var(--sageL); border:1.5px solid var(--sage); }
-.goal-daily-check {
-  width:32px; height:32px; flex-shrink:0;
+.goal-daily-task.logged { background:var(--sageL); border:1.5px solid var(--sage); }
+.goal-daily-submit {
+  display:flex; align-items:center; gap:5px; flex-shrink:0;
+  height:32px; padding:0 12px;
+  border-radius:16px;
+  border:1.5px solid var(--sage);
+  background:var(--sage);
+  color:#fff;
+  font-size:12px; font-weight:700; font-family:inherit;
+  cursor:pointer;
+  transition:all .15s;
+}
+.goal-daily-submit:hover { filter:brightness(1.08); }
+.goal-daily-submit:active { transform:scale(0.96); }
+.goal-daily-submit svg { width:13px; height:13px; display:block; }
+.goal-daily-task-text { flex:1; min-width:0; }
+.goal-daily-task-toprow { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
+.goal-daily-task.logged .goal-daily-task-label { color:var(--sage); }
+.goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+.goal-daily-mins-badge {
+  flex-shrink:0; font-size:10.5px; font-weight:700; color:var(--sage);
+  background:var(--sageL); border-radius:8px; padding:2px 7px;
+  font-family:'JetBrains Mono',monospace;
+}
+.goal-daily-undo {
+  width:24px; height:24px; flex-shrink:0;
   border-radius:50%;
-  border:2px solid var(--cream3);
+  border:1.5px solid var(--cream3);
   background:#fff;
+  color:var(--text3);
   cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   transition:all .15s;
-  color:transparent;
+  margin-left:2px;
 }
-.goal-daily-check:hover { border-color:var(--sage); }
-.goal-daily-check svg { width:15px; height:15px; display:block; }
-.goal-daily-task.done .goal-daily-check { background:var(--sage); border-color:var(--sage); color:#fff; }
-.goal-daily-task-text { flex:1; min-width:0; }
-.goal-daily-task-label { font-size:12.5px; font-weight:700; color:var(--ink); }
-.goal-daily-task.done .goal-daily-task-label { color:var(--sage); }
-.goal-daily-task-sub { font-size:11px; color:var(--text3); margin-top:1px; }
+.goal-daily-undo:hover { border-color:var(--coral); color:var(--coral); }
+.goal-daily-undo svg { width:11px; height:11px; display:block; }
 
 /* Quick amount picker: default/±interval buttons + native number input (spinner kept on purpose) */
 .goal-daily-amount-row {
@@ -3618,6 +3803,7 @@ const state = {
   teeth_brushed:0, meditated:false
 };
 let saveTimer=null, statsData=[], userCharts=[];
+let outageData = {};
 let activeDate = null; // null = today
 
 // ─── INIT ──────────────────────────────────────────
@@ -3657,6 +3843,15 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   renderDateSwitcher();
   loadToday();
   loadStickyNotes();
+  loadOutages();
+  renderOutageAlertButtons();
+  renderTelegramButton();
+  checkOutageAlerts();
+  setInterval(()=>{
+    if(outageData.home) renderOutageCard('home');
+    if(outageData.work) renderOutageCard('work');
+    checkOutageAlerts();
+  }, 30000);
 });
 
 // ─── DATE SWITCHER ─────────────────────────────────
@@ -3710,6 +3905,10 @@ async function switchDate(iso){
     SLEEP.date = iso || todayISO();
     if (document.getElementById('sleep-view').style.display !== 'none') loadSleepEntry();
   }
+  // Sync goals daily totals to whichever date is now active
+  if (document.getElementById('goals-view').style.display !== 'none' && typeof renderGoals === 'function') {
+    renderGoals();
+  }
   // show/hide editing banner
   const banner = document.getElementById('editingBanner');
   if(iso){
@@ -3720,6 +3919,8 @@ async function switchDate(iso){
   } else {
     banner.classList.remove('show');
   }
+  // Sync outage cards to whichever day is now active
+  loadOutages();
   await loadToday();
 }
 
@@ -4631,7 +4832,266 @@ function delChart(id){
   saveUserCharts();
 }
 
-// ══════════════════════════════════════════════════// ─── POMODORO TIMER ───────────────────────────────
+// ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// POWER OUTAGE PREDICTOR (home / work)
+// ══════════════════════════════════════════════════
+function _outMin(hm){ const [h,m] = hm.split(':').map(Number); return h*60+m; }
+
+// ── Sound + desktop alerts, fired at 10 and 5 minutes before an outage ──
+const OUTAGE_DESKTOP_THRESHOLDS_MIN = [10, 5];
+let _outageAudioCtx = null;
+
+function _outageBeep(){
+  try{
+    if(!_outageAudioCtx) _outageAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = _outageAudioCtx;
+    if(ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    [0,0.35,0.7].forEach(offset=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, now+offset);
+      gain.gain.exponentialRampToValueAtTime(0.25, now+offset+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now+offset+0.28);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now+offset);
+      osc.stop(now+offset+0.3);
+    });
+  }catch(e){ console.warn('[Elevate] outage beep failed', e); }
+}
+
+// Browsers require a user gesture before audio/notifications will actually
+// fire, so this button both unlocks the AudioContext and asks permission.
+function enableOutageAlerts(){
+  try{
+    if(!_outageAudioCtx) _outageAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(_outageAudioCtx.state === 'suspended') _outageAudioCtx.resume();
+    _outageBeep();
+  }catch(e){}
+  localStorage.setItem('outageAlertsArmed','1');
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().then(renderOutageAlertButtons);
+  } else {
+    renderOutageAlertButtons();
+  }
+}
+
+function renderOutageAlertButtons(){
+  const btn = document.getElementById('outageAlertBtn');
+  if(!btn) return;
+  const armed = localStorage.getItem('outageAlertsArmed') === '1';
+  const notifOk = !('Notification' in window) || Notification.permission === 'granted';
+  if(armed && notifOk){
+    btn.textContent = '🔔 Sound + desktop alerts on';
+    btn.classList.add('armed');
+  } else {
+    btn.textContent = '🔔 Enable sound + desktop alerts';
+    btn.classList.remove('armed');
+  }
+}
+
+function showOutageBanner(text){
+  let el = document.getElementById('outageAlertBanner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'outageAlertBanner';
+    el.className = 'outage-toast';
+    el.onclick = ()=>{ el.style.display='none'; };
+    document.body.appendChild(el);
+  }
+  el.textContent = text + ' (tap to dismiss)';
+  el.style.display = 'flex';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=>{ el.style.display='none'; }, 30000);
+}
+
+function fireDesktopOutageAlert(loc, threshold, cfg){
+  const label = loc === 'home' ? 'Home' : 'Work';
+  const msg = threshold <= 5
+    ? label+' power out in ~5 min ('+cfg.today_start+') — shut down now'
+    : label+' power out in ~10 min ('+cfg.today_start+') — start wrapping up';
+  if(localStorage.getItem('outageAlertsArmed') === '1') _outageBeep();
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification('⚡ '+label+' outage soon', { body: msg, tag: 'outage-'+loc+'-'+threshold }); }catch(e){}
+  }
+  showOutageBanner('⚡ '+msg);
+}
+
+// Always checks REAL today's outage, independent of whatever day is shown
+// in the date switcher, so browsing past days doesn't suppress live alerts.
+function checkOutageAlerts(){
+  fetch('/api/outage').then(r=>r.json()).then(data=>{
+    const todayIso = todayISO();
+    ['home','work'].forEach(loc=>{
+      const cfg = data[loc];
+      if(!cfg || !cfg.is_today) return;
+      const now = new Date();
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      const minsUntil = _outMin(cfg.today_start) - nowMin;
+      OUTAGE_DESKTOP_THRESHOLDS_MIN.forEach(threshold=>{
+        if(minsUntil > threshold || minsUntil < 0) return;
+        const key = 'outageAlerted:'+loc+':'+threshold+':'+todayIso+':'+cfg.today_start;
+        if(localStorage.getItem(key) === '1') return;
+        localStorage.setItem(key, '1');
+        fireDesktopOutageAlert(loc, threshold, cfg);
+      });
+    });
+  }).catch(e=>console.warn('[Elevate] outage alert check failed', e));
+}
+
+// ── Telegram alerts (30/15/5 min before, scheduled server-side) ──
+function renderTelegramButton(){
+  fetch('/api/telegram/status').then(r=>r.json()).then(s=>{
+    const btn = document.getElementById('outageTelegramBtn');
+    if(!btn) return;
+    if(s.connected){
+      btn.textContent = '📨 Telegram alerts on (tap to test)';
+      btn.classList.add('armed');
+      btn.onclick = ()=>{
+        fetch('/api/telegram/test',{method:'POST'}).then(r=>r.json()).then(res=>{
+          showOutageBanner(res.ok ? '📨 Test message sent to Telegram' : '📨 Test failed — check your VPN/connection');
+        });
+      };
+    } else {
+      btn.textContent = s.bot_username ? ('📨 Connect Telegram (@'+s.bot_username+')') : '📨 Connect Telegram alerts';
+      btn.classList.remove('armed');
+      btn.onclick = connectTelegramAlerts;
+    }
+  }).catch(e=>console.warn('[Elevate] telegram status failed', e));
+}
+
+function connectTelegramAlerts(){
+  fetch('/api/telegram/setup',{method:'POST'}).then(r=>r.json()).then(res=>{
+    if(res.ok){
+      renderTelegramButton();
+      showOutageBanner('📨 Telegram connected — you\'ll get reminders there too');
+    } else {
+      alert('Not connected yet.\n\n' + (res.error || 'Open Telegram, message your bot, then click this button again.'));
+    }
+  }).catch(e=>{ alert('Could not reach the server to connect Telegram.'); });
+}
+
+async function loadOutages(){
+  const iso = activeDate || todayISO();
+  try{
+    const r = await fetch('/api/outage?date='+iso);
+    outageData = await r.json();
+    renderOutageCard('home');
+    renderOutageCard('work');
+  }catch(e){ console.warn('[Elevate] outage load failed', e); }
+}
+
+function renderOutageCard(loc){
+  const cfg = outageData[loc];
+  if(!cfg) return;
+  const card = document.getElementById('outageCard-'+loc);
+  const timeEl = document.getElementById('outageTime-'+loc);
+  const statusEl = document.getElementById('outageStatus-'+loc);
+  const dateBadgeEl = document.getElementById('outageDateBadge-'+loc);
+  const winEl = document.getElementById('outageTimelineWindow-'+loc);
+  const nowEl = document.getElementById('outageTimelineNow-'+loc);
+  const lblStartEl = document.getElementById('outageTimelineStart-'+loc);
+  const lblEndEl = document.getElementById('outageTimelineEnd-'+loc);
+
+  if(timeEl) timeEl.textContent = cfg.today_start + ' – ' + cfg.today_end;
+  if(lblStartEl) lblStartEl.textContent = cfg.active_start;
+  if(lblEndEl) lblEndEl.textContent = cfg.active_end;
+
+  // Position the outage window on the active-hours timeline bar
+  const aStart = _outMin(cfg.active_start), aEnd = _outMin(cfg.active_end);
+  const span = Math.max(aEnd - aStart, 1);
+  const oStart = _outMin(cfg.today_start), oEnd = _outMin(cfg.today_end);
+  const winLeft = Math.max(0, Math.min(100, ((oStart-aStart)/span)*100));
+  const winWidth = Math.max(2, Math.min(100-winLeft, ((oEnd-oStart)/span)*100));
+  if(winEl){ winEl.style.left = winLeft+'%'; winEl.style.width = winWidth+'%'; }
+
+  let state, msg;
+  if(cfg.is_today){
+    const now = new Date();
+    const nowMin = now.getHours()*60 + now.getMinutes();
+    if(nowEl){
+      nowEl.style.display = 'block';
+      nowEl.style.left = Math.max(0,Math.min(100,((nowMin-aStart)/span)*100)) + '%';
+    }
+    if(nowMin < oStart){
+      state = 'upcoming';
+      const mins = oStart - nowMin;
+      const h = Math.floor(mins/60), m = mins%60;
+      msg = 'Starts in ' + (h>0?h+'h ':'') + m + 'm';
+    } else if(nowMin < oEnd){
+      state = 'active';
+      const mins = oEnd - nowMin;
+      const h = Math.floor(mins/60), m = mins%60;
+      msg = 'Out now — back in ' + (h>0?h+'h ':'') + m + 'm';
+    } else {
+      state = 'done';
+      msg = 'Power restored for today';
+    }
+    if(dateBadgeEl) dateBadgeEl.textContent = 'TODAY';
+  } else {
+    if(nowEl) nowEl.style.display = 'none';
+    state = 'other';
+    const qd = new Date(cfg.query_date+'T12:00:00');
+    const isPast = qd < new Date(new Date().toDateString());
+    msg = isPast ? 'Predicted outage that day' : 'Predicted outage';
+    if(dateBadgeEl) dateBadgeEl.textContent = qd.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+  }
+  if(statusEl) statusEl.textContent = msg;
+  if(card){
+    card.classList.remove('state-active','state-upcoming','state-done','state-other');
+    card.classList.add('state-'+state);
+  }
+  const liveEl = document.getElementById('outageLiveWrap-'+loc);
+  if(liveEl) liveEl.style.display = (state === 'active') ? 'inline-flex' : 'none';
+
+  // keep the edit form pre-filled with current settings
+  const asEl = document.getElementById('outageActiveStart-'+loc);
+  const aeEl = document.getElementById('outageActiveEnd-'+loc);
+  const durEl = document.getElementById('outageDuration-'+loc);
+  const ovEl = document.getElementById('outageOverride-'+loc);
+  if(asEl) asEl.value = cfg.active_start;
+  if(aeEl) aeEl.value = cfg.active_end;
+  if(durEl) durEl.value = cfg.duration_min;
+  if(ovEl) ovEl.value = cfg.today_start;
+}
+
+function toggleOutageEdit(loc){
+  const panel = document.getElementById('outageEdit-'+loc);
+  if(!panel) return;
+  panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+}
+
+function toggleOutageOverride(loc){
+  const cb = document.getElementById('outageOverrideCheck-'+loc);
+  const wrap = document.getElementById('outageOverrideWrap-'+loc);
+  if(wrap) wrap.style.display = (cb && cb.checked) ? 'flex' : 'none';
+}
+
+async function saveOutageSettings(loc){
+  const activeStart = document.getElementById('outageActiveStart-'+loc).value;
+  const activeEnd = document.getElementById('outageActiveEnd-'+loc).value;
+  const duration = parseInt(document.getElementById('outageDuration-'+loc).value,10) || 120;
+  const cb = document.getElementById('outageOverrideCheck-'+loc);
+  const overrideVal = (cb && cb.checked) ? document.getElementById('outageOverride-'+loc).value : null;
+
+  const body = {location:loc, active_start:activeStart, active_end:activeEnd, duration_min:duration};
+  if(overrideVal) body.today_start = overrideVal;
+
+  try{
+    const iso = activeDate || todayISO();
+    const r = await fetch('/api/outage?date='+iso,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    outageData = await r.json();
+    if(cb) cb.checked = false;
+    toggleOutageOverride(loc);
+    renderOutageCard('home');
+    renderOutageCard('work');
+    toggleOutageEdit(loc);
+  }catch(e){ console.warn('[Elevate] outage save failed', e); }
+}
+// ─── POMODORO TIMER ───────────────────────────────
 // ══════════════════════════════════════════════════
 
 const POMO = {
@@ -10357,6 +10817,8 @@ const GOAL_ICONS = {
   briefcase:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2.5"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
   sparkle:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M5 12h4M15 12h4M7.5 7.5l1.8 1.8M14.7 14.7l1.8 1.8M16.5 7.5l-1.8 1.8M9.3 14.7l-1.8 1.8"/></svg>`,
   users:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2.3 20c0-3.2 3-5.3 6.7-5.3s6.7 2.1 6.7 5.3"/><circle cx="17.5" cy="8.3" r="2.5"/><path d="M16 12.8c2.4.5 4 2.3 4 4.7"/></svg>`,
+  plus:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  undo:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-6.7L3 9"/></svg>`,
 };
 
 // ── Helpers ───────────────────────────────────────────
@@ -10380,6 +10842,33 @@ function getSelectedChipVal(groupId) {
   if (!group) return null;
   const active = group.querySelector('.goal-chip-sel.active');
   return active ? active.dataset.val : null;
+}
+
+// The date whose numbers the Goals tab should show — follows the app-wide header date
+// switcher (Today/Yesterday/2 Days Ago), same as the Food/Sleep tabs. `activeDate` is the
+// global set by switchDate() in js_core.js; null means "today".
+function goalsViewDate() {
+  const iso = (typeof activeDate !== 'undefined') ? activeDate : null;
+  return iso || new Date().toISOString().slice(0,10);
+}
+
+// Human label for a date relative to real today, matching the switcher's own wording.
+function goalsDayLabel(dateIso) {
+  const realToday = new Date().toISOString().slice(0,10);
+  if (dateIso === realToday) return 'today';
+  const diffDays = Math.round((new Date(realToday+'T00:00:00') - new Date(dateIso+'T00:00:00')) / 86400000);
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays === 2) return '2 days ago';
+  return dateIso;
+}
+
+// Total minutes logged toward a goal on a given date (defaults to whatever day the header
+// switcher is currently on). Exposed for other parts of the app to read directly.
+function goalsMinutesForDate(goalId, dateIso) {
+  const g = GOALS.data.find(x=>x.id===goalId);
+  if (!g || !g.daily_log) return 0;
+  const day = g.daily_log[dateIso || goalsViewDate()];
+  return day ? day.mins : 0;
 }
 
 // ── API calls ─────────────────────────────────────────
@@ -10625,13 +11114,18 @@ function renderGoals() {
       ? `${timeSpentNum} / ${timeTotalNum} hrs`
       : null;
 
-    // Daily task tick (only for goals with a total-hours target + a daily hours amount)
-    const todayIso = new Date().toISOString().slice(0,10);
+    // Daily session log (only for goals with a total-hours target + a daily hours amount).
+    // Repeatable: unlike a one-time checkbox, this can be submitted as many times a day as
+    // needed (e.g. 3 separate study sessions), each one adding to the running total.
+    // The numbers shown here track whichever date the header's date switcher is on —
+    // browse to Yesterday/2 Days Ago to see those days' totals.
+    const viewDateIso = goalsViewDate();
     const dailyHours = parseFloat(g.daily_hours) || 0;
-    const tickedToday = g.last_tick_date === todayIso;
-    // The amount defaults to the goal's configured daily hours, but is editable per-session
-    // (e.g. studied 2h instead of the usual 1h) — read from this input when the checkbox is ticked.
-    const loggedAmount = tickedToday ? (parseFloat(g.last_tick_amount) || dailyHours) : dailyHours;
+    const dayLog = (g.daily_log && g.daily_log[viewDateIso]) || null;
+    const loggedThatDay = !!dayLog;
+    const dayMins = dayLog ? dayLog.mins : 0;
+    const dayCount = dayLog ? dayLog.count : 0;
+    const canUndo = g.last_log_date === viewDateIso && (parseFloat(g.last_log_amount_hrs) || 0) > 0;
 
     // Quick-pick buttons: one step below the default, the default itself, then +1/+2/+3 steps —
     // fast access to nearby amounts without hammering the spinner arrows. Step size is configurable
@@ -10641,20 +11135,26 @@ function renderGoals() {
     const quickAmounts = [dailyHours - qStep, dailyHours, dailyHours + qStep, dailyHours + qStep*2, dailyHours + qStep*3]
       .map(fmtHrs);
     const quickBtnsHtml = quickAmounts.map((amt, qi) => `
-      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${!tickedToday && amt===loggedAmount.toString()?' active':''}"
+      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${amt===fmtHrs(dailyHours)?' active':''}"
         onclick="event.stopPropagation(); goalsSetDailyAmount('${g.id}', ${amt})">${amt}</button>`).join('');
 
     const dailyTaskHtml = (parseFloat(g.time_amount) > 0 && dailyHours > 0) ? `
-      <div class="goal-daily-task ${tickedToday ? 'done' : ''}">
-        <button class="goal-daily-check" onclick="toggleGoalDailyTick('${g.id}')" title="${tickedToday ? "Undo today's log" : "Log today's session"}">${tickedToday ? GOAL_ICONS.check : ''}</button>
+      <div class="goal-daily-task${loggedThatDay ? ' logged' : ''}">
+        <button class="goal-daily-submit" onclick="logGoalDailySession('${g.id}')" title="Log a session toward this goal">
+          ${GOAL_ICONS.plus}<span>Log</span>
+        </button>
         <div class="goal-daily-task-text">
-          <div class="goal-daily-task-label">${tickedToday ? "Today's session logged" : "Log today's session"}</div>
+          <div class="goal-daily-task-toprow">
+            <div class="goal-daily-task-label">${loggedThatDay ? `${dayCount} session${dayCount!==1?'s':''} logged ${goalsDayLabel(viewDateIso)}` : 'Log a session toward this goal'}</div>
+            <div class="goal-daily-mins-badge" data-goal-id="${g.id}" data-date="${viewDateIso}" data-mins="${dayMins}">${dayMins} min</div>
+          </div>
           <div class="goal-daily-task-sub">hrs/day toward this goal</div>
           <div class="goal-daily-amount-row">
-            ${!tickedToday ? quickBtnsHtml : ''}
+            ${quickBtnsHtml}
             <input type="number" class="goal-daily-amount-input" id="dailyAmt_${g.id}"
-              value="${loggedAmount}" step="${qStep}" min="0" ${tickedToday ? 'disabled' : ''}
+              value="${dailyHours}" step="${qStep}" min="0"
               onclick="event.stopPropagation()" oninput="event.stopPropagation(); goalsSyncDailyQuickButtons('${g.id}')"/>
+            ${canUndo ? `<button class="goal-daily-undo" onclick="event.stopPropagation(); undoLastGoalLog('${g.id}')" title="Undo last session logged ${goalsDayLabel(viewDateIso)}">${GOAL_ICONS.undo}</button>` : ''}
           </div>
         </div>
       </div>` : '';
@@ -10853,8 +11353,9 @@ async function saveGoal() {
     daily_step:   document.getElementById('gDailyStep')?.value  || 0.25,
     money_spent:  document.getElementById('gMoneySpent')?.value || null,
     time_spent:   document.getElementById('gTimeSpent')?.value  || null,
-    last_tick_date: existingGoal?.last_tick_date || null,
-    last_tick_amount: existingGoal?.last_tick_amount || null,
+    daily_log:    existingGoal?.daily_log || {},
+    last_log_date: existingGoal?.last_log_date || null,
+    last_log_amount_hrs: existingGoal?.last_log_amount_hrs || null,
     pinned:       existingGoal?.pinned || false,
     created_at:   existingGoal?.created_at || new Date().toISOString(),
   };
@@ -10932,33 +11433,42 @@ function goalsSyncDailyQuickButtons(id) {
   });
 }
 
-// ── Daily task tick (for goals tracking total hours) ──
-async function toggleGoalDailyTick(id) {
+// ── Daily session log (for goals tracking total hours) ───────────────────
+// Repeatable: each click adds another session's worth of hours to the goal —
+// not a one-time-per-day checkbox. Submit as many times a day as you actually did the thing.
+// Logs against whichever date the header's date switcher is on (same as Food/Sleep), so
+// browsing to Yesterday and logging there records it for that day, not real-today.
+async function logGoalDailySession(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
   const defaultDaily = parseFloat(g.daily_hours) || 0;
   if (!defaultDaily) return;
 
-  const todayIso  = new Date().toISOString().slice(0,10);
-  const timeTotal = parseFloat(g.time_amount) || 0;
-  let timeSpent   = parseFloat(g.time_spent)  || 0;
+  // Read the editable amount from the card (defaults to daily_hours, but can be changed
+  // per-session — e.g. this particular watch/session was 2h instead of the usual 1h)
+  const inputEl = document.getElementById('dailyAmt_' + id);
+  const amtHrs = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
+  if (amtHrs <= 0) { goalsShowToast('Enter an amount to log', ''); return; }
 
-  if (g.last_tick_date === todayIso) {
-    // Already ticked today — undo using whatever amount was actually logged
-    const loggedAmt = parseFloat(g.last_tick_amount) || defaultDaily;
-    timeSpent = Math.max(0, timeSpent - loggedAmt);
-    g.last_tick_date = null;
-    g.last_tick_amount = null;
-  } else {
-    // Read the editable amount from the card (defaults to daily_hours, but can be changed
-    // per-session — e.g. studied 2h instead of the usual 1h)
-    const inputEl = document.getElementById('dailyAmt_' + id);
-    const amt = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
-    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amt) : timeSpent + amt;
-    g.last_tick_date = todayIso;
-    g.last_tick_amount = amt;
-  }
+  const dateIso    = goalsViewDate();
+  const timeTotal  = parseFloat(g.time_amount) || 0;
+  let timeSpent    = parseFloat(g.time_spent)  || 0;
+
+  const before = timeSpent;
+  timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amtHrs) : timeSpent + amtHrs;
+  const actuallyAddedHrs = Math.round((timeSpent - before) * 100) / 100;
+  const addedMins = Math.round(actuallyAddedHrs * 60);
+
   g.time_spent = timeSpent;
+
+  if (!g.daily_log) g.daily_log = {};
+  const day = g.daily_log[dateIso] || { mins: 0, count: 0 };
+  day.mins += addedMins;
+  day.count += 1;
+  g.daily_log[dateIso] = day;
+
+  g.last_log_date = dateIso;
+  g.last_log_amount_hrs = actuallyAddedHrs; // most recent submission for this date — powers the single-step undo
 
   // g.progress now recomputes live from the updated time_spent/total ratio.
   g.progress = goalsCalcProgress(g).pct;
@@ -10966,7 +11476,38 @@ async function toggleGoalDailyTick(id) {
   await persistGoals();
   renderGoals();
   renderGoalsHero();
-  goalsShowToast(g.last_tick_date ? `+${g.last_tick_amount}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
+  goalsShowToast(`+${actuallyAddedHrs}h logged ✓`, 'success');
+}
+
+// Undo only the most recent session logged on the currently-viewed date (one step back,
+// not a full-day reset). Only available while that same date is still the one being viewed.
+async function undoLastGoalLog(id) {
+  const g = GOALS.data.find(x=>x.id===id);
+  if (!g) return;
+  const dateIso = goalsViewDate();
+  const lastAmt = parseFloat(g.last_log_amount_hrs) || 0;
+  if (g.last_log_date !== dateIso || lastAmt <= 0) return;
+
+  let timeSpent = parseFloat(g.time_spent) || 0;
+  timeSpent = Math.max(0, timeSpent - lastAmt);
+  g.time_spent = timeSpent;
+
+  const removedMins = Math.round(lastAmt * 60);
+  const day = (g.daily_log && g.daily_log[dateIso]) || { mins: 0, count: 0 };
+  day.mins = Math.max(0, day.mins - removedMins);
+  day.count = Math.max(0, day.count - 1);
+  if (day.count === 0) { if (g.daily_log) delete g.daily_log[dateIso]; }
+  else g.daily_log[dateIso] = day;
+
+  g.last_log_amount_hrs = 0; // only one undo per submit — can't chain further back
+  if (day.count === 0) g.last_log_date = null;
+
+  g.progress = goalsCalcProgress(g).pct;
+
+  await persistGoals();
+  renderGoals();
+  renderGoalsHero();
+  goalsShowToast('Last session removed');
 }
 
 // ── Pin to top ─────────────────────────────────────────

@@ -29,6 +29,8 @@ const GOAL_ICONS = {
   briefcase:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2.5"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
   sparkle:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M5 12h4M15 12h4M7.5 7.5l1.8 1.8M14.7 14.7l1.8 1.8M16.5 7.5l-1.8 1.8M9.3 14.7l-1.8 1.8"/></svg>`,
   users:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2.3 20c0-3.2 3-5.3 6.7-5.3s6.7 2.1 6.7 5.3"/><circle cx="17.5" cy="8.3" r="2.5"/><path d="M16 12.8c2.4.5 4 2.3 4 4.7"/></svg>`,
+  plus:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  undo:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-6.7L3 9"/></svg>`,
 };
 
 // ── Helpers ───────────────────────────────────────────
@@ -52,6 +54,33 @@ function getSelectedChipVal(groupId) {
   if (!group) return null;
   const active = group.querySelector('.goal-chip-sel.active');
   return active ? active.dataset.val : null;
+}
+
+// The date whose numbers the Goals tab should show — follows the app-wide header date
+// switcher (Today/Yesterday/2 Days Ago), same as the Food/Sleep tabs. `activeDate` is the
+// global set by switchDate() in js_core.js; null means "today".
+function goalsViewDate() {
+  const iso = (typeof activeDate !== 'undefined') ? activeDate : null;
+  return iso || new Date().toISOString().slice(0,10);
+}
+
+// Human label for a date relative to real today, matching the switcher's own wording.
+function goalsDayLabel(dateIso) {
+  const realToday = new Date().toISOString().slice(0,10);
+  if (dateIso === realToday) return 'today';
+  const diffDays = Math.round((new Date(realToday+'T00:00:00') - new Date(dateIso+'T00:00:00')) / 86400000);
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays === 2) return '2 days ago';
+  return dateIso;
+}
+
+// Total minutes logged toward a goal on a given date (defaults to whatever day the header
+// switcher is currently on). Exposed for other parts of the app to read directly.
+function goalsMinutesForDate(goalId, dateIso) {
+  const g = GOALS.data.find(x=>x.id===goalId);
+  if (!g || !g.daily_log) return 0;
+  const day = g.daily_log[dateIso || goalsViewDate()];
+  return day ? day.mins : 0;
 }
 
 // ── API calls ─────────────────────────────────────────
@@ -297,13 +326,18 @@ function renderGoals() {
       ? `${timeSpentNum} / ${timeTotalNum} hrs`
       : null;
 
-    // Daily task tick (only for goals with a total-hours target + a daily hours amount)
-    const todayIso = new Date().toISOString().slice(0,10);
+    // Daily session log (only for goals with a total-hours target + a daily hours amount).
+    // Repeatable: unlike a one-time checkbox, this can be submitted as many times a day as
+    // needed (e.g. 3 separate study sessions), each one adding to the running total.
+    // The numbers shown here track whichever date the header's date switcher is on —
+    // browse to Yesterday/2 Days Ago to see those days' totals.
+    const viewDateIso = goalsViewDate();
     const dailyHours = parseFloat(g.daily_hours) || 0;
-    const tickedToday = g.last_tick_date === todayIso;
-    // The amount defaults to the goal's configured daily hours, but is editable per-session
-    // (e.g. studied 2h instead of the usual 1h) — read from this input when the checkbox is ticked.
-    const loggedAmount = tickedToday ? (parseFloat(g.last_tick_amount) || dailyHours) : dailyHours;
+    const dayLog = (g.daily_log && g.daily_log[viewDateIso]) || null;
+    const loggedThatDay = !!dayLog;
+    const dayMins = dayLog ? dayLog.mins : 0;
+    const dayCount = dayLog ? dayLog.count : 0;
+    const canUndo = g.last_log_date === viewDateIso && (parseFloat(g.last_log_amount_hrs) || 0) > 0;
 
     // Quick-pick buttons: one step below the default, the default itself, then +1/+2/+3 steps —
     // fast access to nearby amounts without hammering the spinner arrows. Step size is configurable
@@ -313,20 +347,26 @@ function renderGoals() {
     const quickAmounts = [dailyHours - qStep, dailyHours, dailyHours + qStep, dailyHours + qStep*2, dailyHours + qStep*3]
       .map(fmtHrs);
     const quickBtnsHtml = quickAmounts.map((amt, qi) => `
-      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${!tickedToday && amt===loggedAmount.toString()?' active':''}"
+      <button type="button" class="goal-daily-qbtn${qi===1?' default':''}${amt===fmtHrs(dailyHours)?' active':''}"
         onclick="event.stopPropagation(); goalsSetDailyAmount('${g.id}', ${amt})">${amt}</button>`).join('');
 
     const dailyTaskHtml = (parseFloat(g.time_amount) > 0 && dailyHours > 0) ? `
-      <div class="goal-daily-task ${tickedToday ? 'done' : ''}">
-        <button class="goal-daily-check" onclick="toggleGoalDailyTick('${g.id}')" title="${tickedToday ? "Undo today's log" : "Log today's session"}">${tickedToday ? GOAL_ICONS.check : ''}</button>
+      <div class="goal-daily-task${loggedThatDay ? ' logged' : ''}">
+        <button class="goal-daily-submit" onclick="logGoalDailySession('${g.id}')" title="Log a session toward this goal">
+          ${GOAL_ICONS.plus}<span>Log</span>
+        </button>
         <div class="goal-daily-task-text">
-          <div class="goal-daily-task-label">${tickedToday ? "Today's session logged" : "Log today's session"}</div>
+          <div class="goal-daily-task-toprow">
+            <div class="goal-daily-task-label">${loggedThatDay ? `${dayCount} session${dayCount!==1?'s':''} logged ${goalsDayLabel(viewDateIso)}` : 'Log a session toward this goal'}</div>
+            <div class="goal-daily-mins-badge" data-goal-id="${g.id}" data-date="${viewDateIso}" data-mins="${dayMins}">${dayMins} min</div>
+          </div>
           <div class="goal-daily-task-sub">hrs/day toward this goal</div>
           <div class="goal-daily-amount-row">
-            ${!tickedToday ? quickBtnsHtml : ''}
+            ${quickBtnsHtml}
             <input type="number" class="goal-daily-amount-input" id="dailyAmt_${g.id}"
-              value="${loggedAmount}" step="${qStep}" min="0" ${tickedToday ? 'disabled' : ''}
+              value="${dailyHours}" step="${qStep}" min="0"
               onclick="event.stopPropagation()" oninput="event.stopPropagation(); goalsSyncDailyQuickButtons('${g.id}')"/>
+            ${canUndo ? `<button class="goal-daily-undo" onclick="event.stopPropagation(); undoLastGoalLog('${g.id}')" title="Undo last session logged ${goalsDayLabel(viewDateIso)}">${GOAL_ICONS.undo}</button>` : ''}
           </div>
         </div>
       </div>` : '';
@@ -525,8 +565,9 @@ async function saveGoal() {
     daily_step:   document.getElementById('gDailyStep')?.value  || 0.25,
     money_spent:  document.getElementById('gMoneySpent')?.value || null,
     time_spent:   document.getElementById('gTimeSpent')?.value  || null,
-    last_tick_date: existingGoal?.last_tick_date || null,
-    last_tick_amount: existingGoal?.last_tick_amount || null,
+    daily_log:    existingGoal?.daily_log || {},
+    last_log_date: existingGoal?.last_log_date || null,
+    last_log_amount_hrs: existingGoal?.last_log_amount_hrs || null,
     pinned:       existingGoal?.pinned || false,
     created_at:   existingGoal?.created_at || new Date().toISOString(),
   };
@@ -604,33 +645,42 @@ function goalsSyncDailyQuickButtons(id) {
   });
 }
 
-// ── Daily task tick (for goals tracking total hours) ──
-async function toggleGoalDailyTick(id) {
+// ── Daily session log (for goals tracking total hours) ───────────────────
+// Repeatable: each click adds another session's worth of hours to the goal —
+// not a one-time-per-day checkbox. Submit as many times a day as you actually did the thing.
+// Logs against whichever date the header's date switcher is on (same as Food/Sleep), so
+// browsing to Yesterday and logging there records it for that day, not real-today.
+async function logGoalDailySession(id) {
   const g = GOALS.data.find(x=>x.id===id);
   if (!g) return;
   const defaultDaily = parseFloat(g.daily_hours) || 0;
   if (!defaultDaily) return;
 
-  const todayIso  = new Date().toISOString().slice(0,10);
-  const timeTotal = parseFloat(g.time_amount) || 0;
-  let timeSpent   = parseFloat(g.time_spent)  || 0;
+  // Read the editable amount from the card (defaults to daily_hours, but can be changed
+  // per-session — e.g. this particular watch/session was 2h instead of the usual 1h)
+  const inputEl = document.getElementById('dailyAmt_' + id);
+  const amtHrs = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
+  if (amtHrs <= 0) { goalsShowToast('Enter an amount to log', ''); return; }
 
-  if (g.last_tick_date === todayIso) {
-    // Already ticked today — undo using whatever amount was actually logged
-    const loggedAmt = parseFloat(g.last_tick_amount) || defaultDaily;
-    timeSpent = Math.max(0, timeSpent - loggedAmt);
-    g.last_tick_date = null;
-    g.last_tick_amount = null;
-  } else {
-    // Read the editable amount from the card (defaults to daily_hours, but can be changed
-    // per-session — e.g. studied 2h instead of the usual 1h)
-    const inputEl = document.getElementById('dailyAmt_' + id);
-    const amt = inputEl ? (parseFloat(inputEl.value) || 0) : defaultDaily;
-    timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amt) : timeSpent + amt;
-    g.last_tick_date = todayIso;
-    g.last_tick_amount = amt;
-  }
+  const dateIso    = goalsViewDate();
+  const timeTotal  = parseFloat(g.time_amount) || 0;
+  let timeSpent    = parseFloat(g.time_spent)  || 0;
+
+  const before = timeSpent;
+  timeSpent = timeTotal > 0 ? Math.min(timeTotal, timeSpent + amtHrs) : timeSpent + amtHrs;
+  const actuallyAddedHrs = Math.round((timeSpent - before) * 100) / 100;
+  const addedMins = Math.round(actuallyAddedHrs * 60);
+
   g.time_spent = timeSpent;
+
+  if (!g.daily_log) g.daily_log = {};
+  const day = g.daily_log[dateIso] || { mins: 0, count: 0 };
+  day.mins += addedMins;
+  day.count += 1;
+  g.daily_log[dateIso] = day;
+
+  g.last_log_date = dateIso;
+  g.last_log_amount_hrs = actuallyAddedHrs; // most recent submission for this date — powers the single-step undo
 
   // g.progress now recomputes live from the updated time_spent/total ratio.
   g.progress = goalsCalcProgress(g).pct;
@@ -638,7 +688,38 @@ async function toggleGoalDailyTick(id) {
   await persistGoals();
   renderGoals();
   renderGoalsHero();
-  goalsShowToast(g.last_tick_date ? `+${g.last_tick_amount}h logged ✓` : 'Tick undone', g.last_tick_date ? 'success' : '');
+  goalsShowToast(`+${actuallyAddedHrs}h logged ✓`, 'success');
+}
+
+// Undo only the most recent session logged on the currently-viewed date (one step back,
+// not a full-day reset). Only available while that same date is still the one being viewed.
+async function undoLastGoalLog(id) {
+  const g = GOALS.data.find(x=>x.id===id);
+  if (!g) return;
+  const dateIso = goalsViewDate();
+  const lastAmt = parseFloat(g.last_log_amount_hrs) || 0;
+  if (g.last_log_date !== dateIso || lastAmt <= 0) return;
+
+  let timeSpent = parseFloat(g.time_spent) || 0;
+  timeSpent = Math.max(0, timeSpent - lastAmt);
+  g.time_spent = timeSpent;
+
+  const removedMins = Math.round(lastAmt * 60);
+  const day = (g.daily_log && g.daily_log[dateIso]) || { mins: 0, count: 0 };
+  day.mins = Math.max(0, day.mins - removedMins);
+  day.count = Math.max(0, day.count - 1);
+  if (day.count === 0) { if (g.daily_log) delete g.daily_log[dateIso]; }
+  else g.daily_log[dateIso] = day;
+
+  g.last_log_amount_hrs = 0; // only one undo per submit — can't chain further back
+  if (day.count === 0) g.last_log_date = null;
+
+  g.progress = goalsCalcProgress(g).pct;
+
+  await persistGoals();
+  renderGoals();
+  renderGoalsHero();
+  goalsShowToast('Last session removed');
 }
 
 // ── Pin to top ─────────────────────────────────────────

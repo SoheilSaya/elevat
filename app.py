@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, request, jsonify, send_from_directory
 import json, os, ctypes, subprocess, threading, atexit, shutil, time
+import urllib.request, urllib.parse
 from datetime import datetime, date, timedelta
 
 app = Flask(__name__)
@@ -11,12 +12,29 @@ MARKER_START = "# === ELEVATE BLOCKER START ==="
 MARKER_END   = "# === ELEVATE BLOCKER END ==="
 _blocker_lock = threading.Lock()
 
+# ── Telegram outage alerts ──────────────────────────
+# NOTE: this token lets anyone send/read messages as this bot — treat it like
+# a password (don't share this file, don't commit it to a public repo).
+TELEGRAM_BOT_TOKEN = "8203003667:AAF0XuyQvRK9uNyWqEHZilzV9VkA2yMi_1E"
+TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+TELEGRAM_CONFIG_FILE = os.path.join(BASE_DIR, "telegram_config.json")
+TELEGRAM_LOG_FILE = os.path.join(BASE_DIR, "telegram_alert_log.json")
+TELEGRAM_ALERT_THRESHOLDS_MIN = [30, 15, 5]  # minutes before outage start
+_telegram_bot_username_cache = {"value": None}
+
+# Pipedream sync: paste the HTTP trigger URL from the "sync receiver" workflow here.
+# Whenever this app is online, it pushes the current outage config + chat_id to
+# Pipedream, which runs its own cron 24/7 and sends alerts even if this PC is off.
+PIPEDREAM_SYNC_URL = "https://YOUR-WORKFLOW-ID.m.pipedream.net"
+
 # ── Backup system ───────────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 JSON_FILES = ["habits.json","budget.json","calendar.json","food.json","people.json","sleep.json","sticky.json",
     "goals.json",   
     "car.json",
-    "score_config.json"]
+    "score_config.json",
+    "outage.json",
+    "telegram_config.json"]
 _backup_lock = threading.Lock()
 _last_sizes = {}  # filename → last known size
 
@@ -90,6 +108,7 @@ def _rotate_backups():
 def _backup_loop():
     while True:
         time.sleep(3600)  # every hour
+        _pipedream_sync_async()
         try:
             with _backup_lock:
                 shrunk = _rotate_backups()
@@ -291,7 +310,7 @@ def adal_reminder(db):
     if du<=2: return {"status":"soon","message":f"In {du} day(s)","days_until":du,"next_date":str(nd)}
     return {"status":"ok","message":f"In {du} days","days_until":du,"next_date":str(nd)}
 
-API_VERSION = "2026-06-22-v7-goals-car"
+API_VERSION = "2026-07-16-v8-outage-predictor"
 
 @app.route("/api/version")
 def get_version():
@@ -1263,6 +1282,303 @@ def sticky_notes():
     with open(STICKY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     return jsonify({"ok": True})
+
+# ══════════════════════════════════════
+# POWER OUTAGE PREDICTOR
+# Iran's rolling blackout schedule shifts forward by `duration_min` each
+# day within a fixed daily "active window" (e.g. 09:00-21:00), wrapping
+# back to the start of the window once it runs past the end.
+# Each location (home/work) keeps a "reference" anchor: the last known
+# actual start date+time. Every future day is predicted by shifting that
+# anchor forward. Saving new settings (or a "today is different" override)
+# always re-anchors to today, so predictions always follow the latest edit.
+# ══════════════════════════════════════
+
+OUTAGE_FILE = os.path.join(BASE_DIR, "outage.json")
+
+def _outage_default():
+    return {"active_start": "09:00", "active_end": "21:00",
+            "duration_min": 120, "ref_date": str(date.today()), "ref_start": "09:00"}
+
+def load_outage():
+    if not os.path.exists(OUTAGE_FILE):
+        return {"home": _outage_default(), "work": _outage_default()}
+    try:
+        with open(OUTAGE_FILE, encoding="utf-8") as f:
+            d = json.load(f)
+        for loc in ("home", "work"):
+            if loc not in d:
+                d[loc] = _outage_default()
+        return d
+    except (json.JSONDecodeError, ValueError):
+        return {"home": _outage_default(), "work": _outage_default()}
+
+def save_outage(data):
+    with open(OUTAGE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def _hm_to_min(s):
+    h, m = s.split(":")
+    return int(h) * 60 + int(m)
+
+def _min_to_hm(x):
+    x = int(round(x)) % 1440
+    return f"{x//60:02d}:{x%60:02d}"
+
+def _predict_outage(cfg, for_date):
+    """Predict the outage start/end for `for_date` (a date obj) from a reference anchor."""
+    ref_d = datetime.strptime(cfg["ref_date"], "%Y-%m-%d").date()
+    days_diff = (for_date - ref_d).days
+    a_start = _hm_to_min(cfg["active_start"])
+    a_end = _hm_to_min(cfg["active_end"])
+    span = max(a_end - a_start, 1)
+    dur = max(int(cfg["duration_min"]), 1)
+    ref_start = _hm_to_min(cfg["ref_start"])
+    pos0 = (ref_start - a_start) % span
+    pos = (pos0 + days_diff * dur) % span
+    start_min = a_start + pos
+    return {"start": _min_to_hm(start_min), "end": _min_to_hm(start_min + dur)}
+
+@app.route("/api/outage", methods=["GET", "POST"])
+def outage():
+    data = load_outage()
+
+    # Which day this request concerns: the day the user is currently viewing
+    # in the app (via the date switcher), defaulting to real "today" if
+    # unset/bad. This is used both to anchor edits and to predict the response.
+    qdate_str = request.args.get("date")
+    if qdate_str:
+        try:
+            qdate = datetime.strptime(qdate_str, "%Y-%m-%d").date()
+        except ValueError:
+            qdate = date.today()
+    else:
+        qdate = date.today()
+
+    if request.method == "POST":
+        body = request.json or {}
+        loc = body.get("location")
+        if loc not in ("home", "work"):
+            return jsonify({"error": "invalid location"}), 400
+        cfg = data[loc]
+        active_start = body.get("active_start") or cfg["active_start"]
+        active_end = body.get("active_end") or cfg["active_end"]
+        try:
+            duration_min = int(body.get("duration_min") or cfg["duration_min"])
+        except (TypeError, ValueError):
+            duration_min = cfg["duration_min"]
+        override = body.get("today_start")
+        if override:
+            new_start = override
+        else:
+            # Re-anchor to the VIEWED day's predicted start under the OLD
+            # settings, so changing active hours / duration doesn't silently
+            # jump the schedule for that day.
+            new_start = _predict_outage(cfg, qdate)["start"]
+        data[loc] = {
+            "active_start": active_start,
+            "active_end": active_end,
+            "duration_min": duration_min,
+            "ref_date": str(qdate),
+            "ref_start": new_start
+        }
+        save_outage(data)
+        _pipedream_sync_async()
+
+    result = {}
+    for loc in ("home", "work"):
+        w = _predict_outage(data[loc], qdate)
+        result[loc] = {
+            **data[loc],
+            "today_start": w["start"],
+            "today_end": w["end"],
+            "query_date": str(qdate),
+            "is_today": qdate == date.today(),
+        }
+    return jsonify(result)
+
+# ══════════════════════════════════════
+# TELEGRAM OUTAGE ALERTS
+# ══════════════════════════════════════
+# Sends "power going out in N minutes" reminders via a Telegram bot, since
+# the desktop browser alerts only work while the app tab is open. Runs on a
+# background thread independent of any page being open, and simply retries
+# every tick until it succeeds or the outage has already started -- this is
+# what covers "VPN might be off at that exact moment": there's no way to make
+# Telegram itself hold and deliver a message later, so instead we keep trying
+# every 30s using whatever the CURRENT predicted schedule is (so edits to the
+# schedule are picked up automatically, no separate re-scheduling needed).
+
+def _telegram_load_config():
+    if not os.path.exists(TELEGRAM_CONFIG_FILE):
+        return {"chat_id": None}
+    try:
+        with open(TELEGRAM_CONFIG_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError, OSError):
+        return {"chat_id": None}
+
+def _telegram_save_config(cfg):
+    with open(TELEGRAM_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+def _telegram_load_log():
+    if not os.path.exists(TELEGRAM_LOG_FILE):
+        return {}
+    try:
+        with open(TELEGRAM_LOG_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError, OSError):
+        return {}
+
+def _telegram_save_log(log):
+    with open(TELEGRAM_LOG_FILE, "w", encoding="utf-8") as f:
+        json.dump(log, f, indent=2, ensure_ascii=False)
+
+def _telegram_api_call(method, params=None, timeout=8):
+    url = f"{TELEGRAM_API}/{method}"
+    data = urllib.parse.urlencode(params or {}).encode()
+    req = urllib.request.Request(url, data=data)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode())
+
+def telegram_send(text):
+    cfg = _telegram_load_config()
+    chat_id = cfg.get("chat_id")
+    if not chat_id:
+        return False, "no chat_id configured"
+    try:
+        result = _telegram_api_call("sendMessage", {"chat_id": chat_id, "text": text})
+        if result.get("ok"):
+            return True, None
+        return False, result.get("description", "unknown error")
+    except Exception as e:
+        return False, str(e)
+
+def _pipedream_sync():
+    """Push current outage config + chat_id to Pipedream so its own cron can
+    keep sending alerts even while this machine is off. Best-effort: failures
+    (no internet, URL not set yet) are swallowed, next sync point retries."""
+    if "YOUR-WORKFLOW-ID" in PIPEDREAM_SYNC_URL:
+        return
+    try:
+        payload = json.dumps({
+            "outage": load_outage(),
+            "chat_id": _telegram_load_config().get("chat_id"),
+        }).encode()
+        req = urllib.request.Request(
+            PIPEDREAM_SYNC_URL, data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=8)
+    except Exception as e:
+        print("Pipedream sync error:", e)
+
+def _pipedream_sync_async():
+    threading.Thread(target=_pipedream_sync, daemon=True).start()
+
+# Sync once on startup so Pipedream has a fresh copy as soon as we're online
+threading.Thread(target=_pipedream_sync, daemon=True).start()
+
+def _telegram_bot_username():
+    if _telegram_bot_username_cache["value"]:
+        return _telegram_bot_username_cache["value"]
+    try:
+        result = _telegram_api_call("getMe", {}, timeout=5)
+        if result.get("ok"):
+            uname = result["result"].get("username")
+            _telegram_bot_username_cache["value"] = uname
+            return uname
+    except Exception:
+        pass
+    return None
+
+@app.route("/api/telegram/status")
+def telegram_status():
+    cfg = _telegram_load_config()
+    return jsonify({"connected": bool(cfg.get("chat_id")), "bot_username": _telegram_bot_username()})
+
+@app.route("/api/telegram/setup", methods=["POST"])
+def telegram_setup():
+    """User must have already messaged the bot at least once; we grab the
+    chat_id off the most recent update Telegram has queued for us."""
+    try:
+        result = _telegram_api_call("getUpdates", {"limit": 5, "offset": -5}, timeout=8)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "Couldn't reach Telegram: " + str(e)}), 502
+    if not result.get("ok"):
+        return jsonify({"ok": False, "error": result.get("description", "Telegram API error")}), 502
+    updates = result.get("result", [])
+    if not updates:
+        return jsonify({"ok": False, "error": "No messages from you yet — open Telegram, message the bot, then click again."}), 404
+    last = updates[-1]
+    msg = last.get("message") or last.get("channel_post")
+    if not msg:
+        return jsonify({"ok": False, "error": "No usable message found — try sending the bot a plain text message."}), 404
+    chat_id = msg["chat"]["id"]
+    cfg = _telegram_load_config()
+    cfg["chat_id"] = chat_id
+    _telegram_save_config(cfg)
+    _pipedream_sync_async()
+    telegram_send("✅ Elevate is connected. You'll get power-outage reminders here 30/15/5 minutes before.")
+    return jsonify({"ok": True, "chat_id": chat_id})
+
+@app.route("/api/telegram/test", methods=["POST"])
+def telegram_test():
+    ok, err = telegram_send("🔔 Test alert from Elevate — if you see this, alerts are working.")
+    return jsonify({"ok": ok, "error": err})
+
+def _telegram_alert_tick():
+    cfg = _telegram_load_config()
+    if not cfg.get("chat_id"):
+        return
+    outage_data = load_outage()
+    now = datetime.now()
+    today = now.date()
+    log = _telegram_load_log()
+
+    # keep the log file small
+    cutoff = str(today - timedelta(days=7))
+    log = {k: v for k, v in log.items() if k.split("|")[0] >= cutoff}
+
+    dirty = False
+    loc_labels = {"home": "🏠 Home", "work": "🏢 Work"}
+    for loc in ("home", "work"):
+        cfg_loc = outage_data.get(loc)
+        if not cfg_loc:
+            continue
+        w = _predict_outage(cfg_loc, today)
+        start_dt = datetime.combine(today, datetime.strptime(w["start"], "%H:%M").time())
+        for threshold in TELEGRAM_ALERT_THRESHOLDS_MIN:
+            target_dt = start_dt - timedelta(minutes=threshold)
+            key = f"{today}|{loc}|{threshold}|{w['start']}"
+            if log.get(key) in ("sent", "expired"):
+                continue
+            if now < target_dt:
+                continue  # not due yet
+            if now >= start_dt:
+                log[key] = "expired"  # missed the whole window, don't send a stale "in N min"
+                dirty = True
+                continue
+            text = f"{loc_labels[loc]} power going out in ~{threshold} min (at {w['start']})."
+            text += " Shut down your PC and unplug sensitive devices now." if threshold <= 5 else " Start wrapping up."
+            ok, _err = telegram_send(text)
+            if ok:
+                log[key] = "sent"
+                dirty = True
+            # if it failed (e.g. VPN off), leave it unmarked -- next tick retries automatically
+    if dirty:
+        _telegram_save_log(log)
+
+def _telegram_alert_loop():
+    while True:
+        try:
+            _telegram_alert_tick()
+        except Exception as e:
+            print("Telegram alert error:", e)
+        time.sleep(30)
+
+threading.Thread(target=_telegram_alert_loop, daemon=True).start()
 
 # ══════════════════════════════════════
 # PEOPLE / SOCIAL TRACKER API

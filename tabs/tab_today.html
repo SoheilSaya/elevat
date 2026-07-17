@@ -17,6 +17,171 @@
       </div>
     </div>
   </div>
+
+  <!-- POWER OUTAGE WARNING -->
+  <style>
+    .outage-panel{margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;}
+    .outage-card{flex:1;min-width:240px;cursor:pointer;position:relative;overflow:hidden;
+      border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);
+      background:linear-gradient(160deg,#1c2333,#252d40);border:1px solid rgba(255,255,255,.07);
+      color:#e8ecf5;transition:box-shadow .3s ease,transform .15s ease;}
+    .outage-card:hover{transform:translateY(-1px);}
+    .outage-card::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.05;
+      background-image:linear-gradient(90deg,#fff 1px,transparent 1px),linear-gradient(0deg,#fff 1px,transparent 1px);
+      background-size:14px 14px;}
+    .outage-card-head{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;}
+    .outage-loc{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.2px;color:#c9d2e8;}
+    .outage-bolt{width:18px;height:18px;flex-shrink:0;transition:filter .4s ease;}
+    .outage-bolt path{fill:#7a839c;transition:fill .4s ease;}
+    .outage-card.state-active .outage-bolt path{fill:#f87171;filter:drop-shadow(0 0 4px rgba(248,113,113,.75));}
+    .outage-card.state-active .outage-bolt{animation:outageBoltPulse 1.4s ease-in-out infinite;}
+    .outage-card.state-upcoming .outage-bolt path{fill:#fbbf24;}
+    .outage-card.state-done .outage-bolt path{fill:#4ade80;}
+    @keyframes outageBoltPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+    .outage-livewrap{display:flex;align-items:center;gap:5px;}
+    .outage-livedot{width:6px;height:6px;border-radius:50%;background:#f87171;box-shadow:0 0 6px #f87171;
+      animation:outageLiveBlink 1.2s ease-in-out infinite;}
+    @keyframes outageLiveBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
+    .outage-datebadge{font-size:9px;font-weight:700;letter-spacing:.4px;color:#9aa3ba;
+      background:rgba(255,255,255,.07);padding:2px 7px;border-radius:20px;}
+    .outage-time{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:8px;
+      color:#f4f6fb;letter-spacing:.4px;position:relative;z-index:1;}
+    .outage-status{font-size:11px;font-weight:600;margin-top:2px;color:#aab3c8;position:relative;z-index:1;}
+    .outage-timeline{margin-top:11px;position:relative;z-index:1;}
+    .outage-timeline-track{position:relative;height:6px;border-radius:4px;background:rgba(255,255,255,.09);overflow:visible;}
+    .outage-timeline-window{position:absolute;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,#f87171,#ef4444);}
+    .outage-timeline-now{position:absolute;display:none;top:-3px;width:2px;height:12px;border-radius:1px;
+      background:#f4f6fb;box-shadow:0 0 4px #fff;}
+    .outage-timeline-labels{display:flex;justify-content:space-between;font-size:9px;color:#6b7386;
+      margin-top:4px;font-family:'JetBrains Mono',monospace;}
+    .outage-edit-hint{font-size:9px;color:#7a839c;}
+    .outage-alert-row{margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;}
+    .outage-alert-btn{font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;
+      border:1px solid rgba(0,0,0,.08);background:#fff7ed;color:#9a3412;cursor:pointer;
+      transition:background .2s ease,opacity .2s ease;}
+    .outage-alert-btn:hover{background:#ffedd5;}
+    .outage-alert-btn.armed{background:#f0fdf4;color:#166534;border-color:rgba(0,0,0,.06);}
+    .outage-telegram-btn{background:#eff6ff;color:#1d4ed8;}
+    .outage-telegram-btn:hover{background:#dbeafe;}
+    .outage-telegram-btn.armed{background:#f0fdf4;color:#166534;}
+    .outage-toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;display:none;
+      align-items:center;gap:10px;background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fff;
+      padding:12px 20px;border-radius:12px;font-weight:700;font-size:13px;
+      box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;max-width:90vw;text-align:center;}
+  </style>
+  <div class="outage-alert-row">
+    <button type="button" id="outageAlertBtn" class="outage-alert-btn" onclick="enableOutageAlerts()">🔔 Enable sound + desktop alerts</button>
+    <button type="button" id="outageTelegramBtn" class="outage-alert-btn outage-telegram-btn" onclick="connectTelegramAlerts()">📨 Connect Telegram alerts</button>
+  </div>
+  <div id="outagePanel" class="outage-panel">
+    <div class="outage-card" id="outageCard-home" onclick="toggleOutageEdit('home')">
+      <div class="outage-card-head">
+        <div class="outage-loc">
+          <svg class="outage-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          Home
+          <span class="outage-livewrap" id="outageLiveWrap-home" style="display:none;"><span class="outage-livedot"></span></span>
+        </div>
+        <span class="outage-datebadge" id="outageDateBadge-home">—</span>
+      </div>
+      <div id="outageTime-home" class="outage-time">—:— – —:—</div>
+      <div id="outageStatus-home" class="outage-status">Loading…</div>
+      <div class="outage-timeline">
+        <div class="outage-timeline-track">
+          <div class="outage-timeline-window" id="outageTimelineWindow-home"></div>
+          <div class="outage-timeline-now" id="outageTimelineNow-home"></div>
+        </div>
+        <div class="outage-timeline-labels">
+          <span id="outageTimelineStart-home">—:—</span>
+          <span class="outage-edit-hint">✎ tap to edit</span>
+          <span id="outageTimelineEnd-home">—:—</span>
+        </div>
+      </div>
+    </div>
+    <div class="outage-card" id="outageCard-work" onclick="toggleOutageEdit('work')">
+      <div class="outage-card-head">
+        <div class="outage-loc">
+          <svg class="outage-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          Work
+          <span class="outage-livewrap" id="outageLiveWrap-work" style="display:none;"><span class="outage-livedot"></span></span>
+        </div>
+        <span class="outage-datebadge" id="outageDateBadge-work">—</span>
+      </div>
+      <div id="outageTime-work" class="outage-time">—:— – —:—</div>
+      <div id="outageStatus-work" class="outage-status">Loading…</div>
+      <div class="outage-timeline">
+        <div class="outage-timeline-track">
+          <div class="outage-timeline-window" id="outageTimelineWindow-work"></div>
+          <div class="outage-timeline-now" id="outageTimelineNow-work"></div>
+        </div>
+        <div class="outage-timeline-labels">
+          <span id="outageTimelineStart-work">—:—</span>
+          <span class="outage-edit-hint">✎ tap to edit</span>
+          <span id="outageTimelineEnd-work">—:—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outage edit panels (hidden until a card is clicked) -->
+  <div id="outageEdit-home" style="display:none;margin-bottom:14px;background:#fff5f5;border:1.5px solid #ef4444;border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);">
+    <div style="font-size:12px;font-weight:700;color:#7f1d1d;margin-bottom:10px;">✎ Edit Home Outage Schedule</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Active hours (cycle window)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="time" id="outageActiveStart-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+          <span style="color:#7f1d1d;font-size:11px;">to</span>
+          <input type="time" id="outageActiveEnd-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Duration (minutes)</div>
+        <input type="number" id="outageDuration-home" min="15" max="720" step="15" style="width:80px;padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#7f1d1d;cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="outageOverrideCheck-home" onchange="toggleOutageOverride('home')">
+      Today's outage is different from predicted
+    </label>
+    <div id="outageOverrideWrap-home" style="display:none;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#7f1d1d;">Actual start today:</span>
+      <input type="time" id="outageOverride-home" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveOutageSettings('home')" style="padding:6px 14px;border-radius:50px;border:none;background:#ef4444;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+      <button onclick="toggleOutageEdit('home')" style="padding:6px 14px;border-radius:50px;border:1.5px solid #f0a0a0;background:transparent;color:#7f1d1d;font-weight:600;font-size:12px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+  <div id="outageEdit-work" style="display:none;margin-bottom:14px;background:#fff5f5;border:1.5px solid #ef4444;border-radius:var(--r2);padding:14px 16px;box-shadow:var(--shadow);">
+    <div style="font-size:12px;font-weight:700;color:#7f1d1d;margin-bottom:10px;">✎ Edit Work Outage Schedule</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Active hours (cycle window)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="time" id="outageActiveStart-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+          <span style="color:#7f1d1d;font-size:11px;">to</span>
+          <input type="time" id="outageActiveEnd-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:600;color:#7f1d1d;margin-bottom:4px;">Duration (minutes)</div>
+        <input type="number" id="outageDuration-work" min="15" max="720" step="15" style="width:80px;padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#7f1d1d;cursor:pointer;margin-bottom:8px;">
+      <input type="checkbox" id="outageOverrideCheck-work" onchange="toggleOutageOverride('work')">
+      Today's outage is different from predicted
+    </label>
+    <div id="outageOverrideWrap-work" style="display:none;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#7f1d1d;">Actual start today:</span>
+      <input type="time" id="outageOverride-work" style="padding:5px 8px;border:1.5px solid #f0a0a0;border-radius:8px;font-size:12px;">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveOutageSettings('work')" style="padding:6px 14px;border-radius:50px;border:none;background:#ef4444;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
+      <button onclick="toggleOutageEdit('work')" style="padding:6px 14px;border-radius:50px;border:1.5px solid #f0a0a0;background:transparent;color:#7f1d1d;font-weight:600;font-size:12px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+
   <!-- HERO -->
   <div class="hero">
     <!-- Score gauge (speedometer) -->

@@ -8,6 +8,7 @@ const state = {
   teeth_brushed:0, meditated:false
 };
 let saveTimer=null, statsData=[], userCharts=[];
+let outageData = {};
 let activeDate = null; // null = today
 
 // ─── INIT ──────────────────────────────────────────
@@ -47,6 +48,15 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   renderDateSwitcher();
   loadToday();
   loadStickyNotes();
+  loadOutages();
+  renderOutageAlertButtons();
+  renderTelegramButton();
+  checkOutageAlerts();
+  setInterval(()=>{
+    if(outageData.home) renderOutageCard('home');
+    if(outageData.work) renderOutageCard('work');
+    checkOutageAlerts();
+  }, 30000);
 });
 
 // ─── DATE SWITCHER ─────────────────────────────────
@@ -100,6 +110,10 @@ async function switchDate(iso){
     SLEEP.date = iso || todayISO();
     if (document.getElementById('sleep-view').style.display !== 'none') loadSleepEntry();
   }
+  // Sync goals daily totals to whichever date is now active
+  if (document.getElementById('goals-view').style.display !== 'none' && typeof renderGoals === 'function') {
+    renderGoals();
+  }
   // show/hide editing banner
   const banner = document.getElementById('editingBanner');
   if(iso){
@@ -110,6 +124,8 @@ async function switchDate(iso){
   } else {
     banner.classList.remove('show');
   }
+  // Sync outage cards to whichever day is now active
+  loadOutages();
   await loadToday();
 }
 
@@ -1022,3 +1038,261 @@ function delChart(id){
 }
 
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// POWER OUTAGE PREDICTOR (home / work)
+// ══════════════════════════════════════════════════
+function _outMin(hm){ const [h,m] = hm.split(':').map(Number); return h*60+m; }
+
+// ── Sound + desktop alerts, fired at 10 and 5 minutes before an outage ──
+const OUTAGE_DESKTOP_THRESHOLDS_MIN = [10, 5];
+let _outageAudioCtx = null;
+
+function _outageBeep(){
+  try{
+    if(!_outageAudioCtx) _outageAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = _outageAudioCtx;
+    if(ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    [0,0.35,0.7].forEach(offset=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, now+offset);
+      gain.gain.exponentialRampToValueAtTime(0.25, now+offset+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now+offset+0.28);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now+offset);
+      osc.stop(now+offset+0.3);
+    });
+  }catch(e){ console.warn('[Elevate] outage beep failed', e); }
+}
+
+// Browsers require a user gesture before audio/notifications will actually
+// fire, so this button both unlocks the AudioContext and asks permission.
+function enableOutageAlerts(){
+  try{
+    if(!_outageAudioCtx) _outageAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(_outageAudioCtx.state === 'suspended') _outageAudioCtx.resume();
+    _outageBeep();
+  }catch(e){}
+  localStorage.setItem('outageAlertsArmed','1');
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().then(renderOutageAlertButtons);
+  } else {
+    renderOutageAlertButtons();
+  }
+}
+
+function renderOutageAlertButtons(){
+  const btn = document.getElementById('outageAlertBtn');
+  if(!btn) return;
+  const armed = localStorage.getItem('outageAlertsArmed') === '1';
+  const notifOk = !('Notification' in window) || Notification.permission === 'granted';
+  if(armed && notifOk){
+    btn.textContent = '🔔 Sound + desktop alerts on';
+    btn.classList.add('armed');
+  } else {
+    btn.textContent = '🔔 Enable sound + desktop alerts';
+    btn.classList.remove('armed');
+  }
+}
+
+function showOutageBanner(text){
+  let el = document.getElementById('outageAlertBanner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'outageAlertBanner';
+    el.className = 'outage-toast';
+    el.onclick = ()=>{ el.style.display='none'; };
+    document.body.appendChild(el);
+  }
+  el.textContent = text + ' (tap to dismiss)';
+  el.style.display = 'flex';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=>{ el.style.display='none'; }, 30000);
+}
+
+function fireDesktopOutageAlert(loc, threshold, cfg){
+  const label = loc === 'home' ? 'Home' : 'Work';
+  const msg = threshold <= 5
+    ? label+' power out in ~5 min ('+cfg.today_start+') — shut down now'
+    : label+' power out in ~10 min ('+cfg.today_start+') — start wrapping up';
+  if(localStorage.getItem('outageAlertsArmed') === '1') _outageBeep();
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification('⚡ '+label+' outage soon', { body: msg, tag: 'outage-'+loc+'-'+threshold }); }catch(e){}
+  }
+  showOutageBanner('⚡ '+msg);
+}
+
+// Always checks REAL today's outage, independent of whatever day is shown
+// in the date switcher, so browsing past days doesn't suppress live alerts.
+function checkOutageAlerts(){
+  fetch('/api/outage').then(r=>r.json()).then(data=>{
+    const todayIso = todayISO();
+    ['home','work'].forEach(loc=>{
+      const cfg = data[loc];
+      if(!cfg || !cfg.is_today) return;
+      const now = new Date();
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      const minsUntil = _outMin(cfg.today_start) - nowMin;
+      OUTAGE_DESKTOP_THRESHOLDS_MIN.forEach(threshold=>{
+        if(minsUntil > threshold || minsUntil < 0) return;
+        const key = 'outageAlerted:'+loc+':'+threshold+':'+todayIso+':'+cfg.today_start;
+        if(localStorage.getItem(key) === '1') return;
+        localStorage.setItem(key, '1');
+        fireDesktopOutageAlert(loc, threshold, cfg);
+      });
+    });
+  }).catch(e=>console.warn('[Elevate] outage alert check failed', e));
+}
+
+// ── Telegram alerts (30/15/5 min before, scheduled server-side) ──
+function renderTelegramButton(){
+  fetch('/api/telegram/status').then(r=>r.json()).then(s=>{
+    const btn = document.getElementById('outageTelegramBtn');
+    if(!btn) return;
+    if(s.connected){
+      btn.textContent = '📨 Telegram alerts on (tap to test)';
+      btn.classList.add('armed');
+      btn.onclick = ()=>{
+        fetch('/api/telegram/test',{method:'POST'}).then(r=>r.json()).then(res=>{
+          showOutageBanner(res.ok ? '📨 Test message sent to Telegram' : '📨 Test failed — check your VPN/connection');
+        });
+      };
+    } else {
+      btn.textContent = s.bot_username ? ('📨 Connect Telegram (@'+s.bot_username+')') : '📨 Connect Telegram alerts';
+      btn.classList.remove('armed');
+      btn.onclick = connectTelegramAlerts;
+    }
+  }).catch(e=>console.warn('[Elevate] telegram status failed', e));
+}
+
+function connectTelegramAlerts(){
+  fetch('/api/telegram/setup',{method:'POST'}).then(r=>r.json()).then(res=>{
+    if(res.ok){
+      renderTelegramButton();
+      showOutageBanner('📨 Telegram connected — you\'ll get reminders there too');
+    } else {
+      alert('Not connected yet.\n\n' + (res.error || 'Open Telegram, message your bot, then click this button again.'));
+    }
+  }).catch(e=>{ alert('Could not reach the server to connect Telegram.'); });
+}
+
+async function loadOutages(){
+  const iso = activeDate || todayISO();
+  try{
+    const r = await fetch('/api/outage?date='+iso);
+    outageData = await r.json();
+    renderOutageCard('home');
+    renderOutageCard('work');
+  }catch(e){ console.warn('[Elevate] outage load failed', e); }
+}
+
+function renderOutageCard(loc){
+  const cfg = outageData[loc];
+  if(!cfg) return;
+  const card = document.getElementById('outageCard-'+loc);
+  const timeEl = document.getElementById('outageTime-'+loc);
+  const statusEl = document.getElementById('outageStatus-'+loc);
+  const dateBadgeEl = document.getElementById('outageDateBadge-'+loc);
+  const winEl = document.getElementById('outageTimelineWindow-'+loc);
+  const nowEl = document.getElementById('outageTimelineNow-'+loc);
+  const lblStartEl = document.getElementById('outageTimelineStart-'+loc);
+  const lblEndEl = document.getElementById('outageTimelineEnd-'+loc);
+
+  if(timeEl) timeEl.textContent = cfg.today_start + ' – ' + cfg.today_end;
+  if(lblStartEl) lblStartEl.textContent = cfg.active_start;
+  if(lblEndEl) lblEndEl.textContent = cfg.active_end;
+
+  // Position the outage window on the active-hours timeline bar
+  const aStart = _outMin(cfg.active_start), aEnd = _outMin(cfg.active_end);
+  const span = Math.max(aEnd - aStart, 1);
+  const oStart = _outMin(cfg.today_start), oEnd = _outMin(cfg.today_end);
+  const winLeft = Math.max(0, Math.min(100, ((oStart-aStart)/span)*100));
+  const winWidth = Math.max(2, Math.min(100-winLeft, ((oEnd-oStart)/span)*100));
+  if(winEl){ winEl.style.left = winLeft+'%'; winEl.style.width = winWidth+'%'; }
+
+  let state, msg;
+  if(cfg.is_today){
+    const now = new Date();
+    const nowMin = now.getHours()*60 + now.getMinutes();
+    if(nowEl){
+      nowEl.style.display = 'block';
+      nowEl.style.left = Math.max(0,Math.min(100,((nowMin-aStart)/span)*100)) + '%';
+    }
+    if(nowMin < oStart){
+      state = 'upcoming';
+      const mins = oStart - nowMin;
+      const h = Math.floor(mins/60), m = mins%60;
+      msg = 'Starts in ' + (h>0?h+'h ':'') + m + 'm';
+    } else if(nowMin < oEnd){
+      state = 'active';
+      const mins = oEnd - nowMin;
+      const h = Math.floor(mins/60), m = mins%60;
+      msg = 'Out now — back in ' + (h>0?h+'h ':'') + m + 'm';
+    } else {
+      state = 'done';
+      msg = 'Power restored for today';
+    }
+    if(dateBadgeEl) dateBadgeEl.textContent = 'TODAY';
+  } else {
+    if(nowEl) nowEl.style.display = 'none';
+    state = 'other';
+    const qd = new Date(cfg.query_date+'T12:00:00');
+    const isPast = qd < new Date(new Date().toDateString());
+    msg = isPast ? 'Predicted outage that day' : 'Predicted outage';
+    if(dateBadgeEl) dateBadgeEl.textContent = qd.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+  }
+  if(statusEl) statusEl.textContent = msg;
+  if(card){
+    card.classList.remove('state-active','state-upcoming','state-done','state-other');
+    card.classList.add('state-'+state);
+  }
+  const liveEl = document.getElementById('outageLiveWrap-'+loc);
+  if(liveEl) liveEl.style.display = (state === 'active') ? 'inline-flex' : 'none';
+
+  // keep the edit form pre-filled with current settings
+  const asEl = document.getElementById('outageActiveStart-'+loc);
+  const aeEl = document.getElementById('outageActiveEnd-'+loc);
+  const durEl = document.getElementById('outageDuration-'+loc);
+  const ovEl = document.getElementById('outageOverride-'+loc);
+  if(asEl) asEl.value = cfg.active_start;
+  if(aeEl) aeEl.value = cfg.active_end;
+  if(durEl) durEl.value = cfg.duration_min;
+  if(ovEl) ovEl.value = cfg.today_start;
+}
+
+function toggleOutageEdit(loc){
+  const panel = document.getElementById('outageEdit-'+loc);
+  if(!panel) return;
+  panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+}
+
+function toggleOutageOverride(loc){
+  const cb = document.getElementById('outageOverrideCheck-'+loc);
+  const wrap = document.getElementById('outageOverrideWrap-'+loc);
+  if(wrap) wrap.style.display = (cb && cb.checked) ? 'flex' : 'none';
+}
+
+async function saveOutageSettings(loc){
+  const activeStart = document.getElementById('outageActiveStart-'+loc).value;
+  const activeEnd = document.getElementById('outageActiveEnd-'+loc).value;
+  const duration = parseInt(document.getElementById('outageDuration-'+loc).value,10) || 120;
+  const cb = document.getElementById('outageOverrideCheck-'+loc);
+  const overrideVal = (cb && cb.checked) ? document.getElementById('outageOverride-'+loc).value : null;
+
+  const body = {location:loc, active_start:activeStart, active_end:activeEnd, duration_min:duration};
+  if(overrideVal) body.today_start = overrideVal;
+
+  try{
+    const iso = activeDate || todayISO();
+    const r = await fetch('/api/outage?date='+iso,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    outageData = await r.json();
+    if(cb) cb.checked = false;
+    toggleOutageOverride(loc);
+    renderOutageCard('home');
+    renderOutageCard('work');
+    toggleOutageEdit(loc);
+  }catch(e){ console.warn('[Elevate] outage save failed', e); }
+}
