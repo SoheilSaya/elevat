@@ -337,7 +337,14 @@ const SCORE_TIERS=[
   {min:-Infinity,key:'rockbottom',c:'#4b5563',c2:'#1f2937',c3:'#6b7280',fx:'ash',
     emojis:['🌑','🔧'],msgs:['Reset day.',"Tomorrow's fresh.",'Every day is new.']}
 ];
+// ── Gauge scaling config ──
+// GAUGE_SCALING_ENABLED: true  = dynamic max that grows as the score climbs (current behavior)
+//                         false = fixed max, set via GAUGE_FIXED_MAX below
+let GAUGE_SCALING_ENABLED = false;
+let GAUGE_FIXED_MAX = 125;
+
 function computeGaugeMax(s){
+  if(!GAUGE_SCALING_ENABLED) return GAUGE_FIXED_MAX;
   return Math.max(120, Math.ceil((Math.max(s,0)+15)/10)*10);
 }
 function pickFrom(arr,seed){ return arr[Math.abs(seed)%arr.length]; }
