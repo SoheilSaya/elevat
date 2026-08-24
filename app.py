@@ -1857,21 +1857,45 @@ def car_api():
 
 PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
 
+def _parts_defaults():
+    return {"products": [], "stores": [], "car_models": [], "purchases": [], "sales": [], "capital_transactions": [],
+            "low_stock_threshold": 2, "unit_migrated_v1": True}
+
 def load_parts():
     if not os.path.exists(PARTS_FILE):
-        return {"products": [], "stores": [], "purchases": [], "sales": [], "capital_transactions": [], "low_stock_threshold": 2}
+        return _parts_defaults()
     try:
         with open(PARTS_FILE, encoding="utf-8") as f:
             d = json.load(f)
         d.setdefault("products", [])
         d.setdefault("stores", [])
+        d.setdefault("car_models", [])
         d.setdefault("purchases", [])
         d.setdefault("sales", [])
         d.setdefault("capital_transactions", [])
         d.setdefault("low_stock_threshold", 2)
+
+        # ── One-time migration: money in this file used to be stored in
+        # full Tomans; everywhere else in the app (Money tab, Car tab)
+        # uses "K T" (thousand Tomans) as the unit, so Parts now matches.
+        # Guarded by a flag so this only ever runs once per file.
+        if not d.get("unit_migrated_v1"):
+            for pur in d["purchases"]:
+                for it in pur.get("items", []):
+                    if "unit_price" in it and it["unit_price"] is not None:
+                        it["unit_price"] = it["unit_price"] / 1000
+            for sale in d["sales"]:
+                for it in sale.get("items", []):
+                    if "unit_price" in it and it["unit_price"] is not None:
+                        it["unit_price"] = it["unit_price"] / 1000
+            for tx in d["capital_transactions"]:
+                if "amount" in tx and tx["amount"] is not None:
+                    tx["amount"] = tx["amount"] / 1000
+            d["unit_migrated_v1"] = True
+            save_parts(d)
         return d
     except (json.JSONDecodeError, ValueError):
-        return {"products": [], "stores": [], "purchases": [], "sales": [], "capital_transactions": [], "low_stock_threshold": 2}
+        return _parts_defaults()
 
 def save_parts(data):
     with open(PARTS_FILE, "w", encoding="utf-8") as f:
@@ -2053,6 +2077,7 @@ def parts_api():
         return jsonify({
             "products": data["products"],
             "stores": data["stores"],
+            "car_models": data["car_models"],
             "purchases": data["purchases"],
             "sales": analytics["sales"],
             "capital_transactions": data["capital_transactions"],
@@ -2080,13 +2105,14 @@ def parts_api():
             "oem_code": body.get("oem_code", "").strip(),
             "category": body.get("category", "").strip(),
             "notes": body.get("notes", "").strip(),
+            "torob_link": body.get("torob_link", "").strip(),
             "image": body.get("image", ""),
             "created_at": str(date.today()),
         })
     elif action == "update_product":
         for p in data["products"]:
             if p["id"] == body.get("id"):
-                for k in ["name", "car_model", "part_type", "brand", "variant", "oem_code", "category", "notes"]:
+                for k in ["name", "car_model", "part_type", "brand", "variant", "oem_code", "category", "notes", "torob_link"]:
                     if k in body:
                         p[k] = (body.get(k) or "").strip()
                 if "image" in body:
@@ -2106,6 +2132,7 @@ def parts_api():
             "torob_link": body.get("torob_link", "").strip(),
             "website": body.get("website", "").strip(),
             "notes": body.get("notes", "").strip(),
+            "image": body.get("image", ""),
             "created_at": str(date.today()),
         })
     elif action == "update_store":
@@ -2114,10 +2141,29 @@ def parts_api():
                 for k in ["name", "address", "phone", "torob_link", "website", "notes"]:
                     if k in body:
                         s[k] = (body.get(k) or "").strip()
+                if "image" in body:
+                    s["image"] = body.get("image", "")
                 break
     elif action == "delete_store":
         sid = body.get("id")
         data["stores"] = [s for s in data["stores"] if s["id"] != sid]
+
+    # ── CAR MODELS (managed list, used by the product multi-select) ──
+    elif action == "add_car_model":
+        data["car_models"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_car_model":
+        for cm in data["car_models"]:
+            if cm["id"] == body.get("id"):
+                if "name" in body:
+                    cm["name"] = (body.get("name") or "").strip()
+                break
+    elif action == "delete_car_model":
+        cmid = body.get("id")
+        data["car_models"] = [cm for cm in data["car_models"] if cm["id"] != cmid]
 
     # ── PURCHASES (one store visit, many line items) ──
     elif action == "add_purchase":
@@ -2215,6 +2261,7 @@ def parts_api():
         "ok": True,
         "products": data["products"],
         "stores": data["stores"],
+        "car_models": data["car_models"],
         "purchases": data["purchases"],
         "sales": analytics["sales"],
         "capital_transactions": data["capital_transactions"],

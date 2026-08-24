@@ -6,7 +6,7 @@
 //  and the shared helpers/classes in js_core.js + head.html.
 // ══════════════════════════════════════════════════════
 
-const PARTS = {products:[],stores:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
+const PARTS = {products:[],stores:[],car_models:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
   totals:{},low_stock:[],low_stock_threshold:2};
 let partsLoaded = false;
 let partsCurrentSub = 'products';
@@ -18,7 +18,17 @@ let editingCashTxId = null;
 let cashTxType = 'deposit';
 let productModalReturnTo = null; // null | 'purchase' | 'sale'
 let productImageData = null;     // base64 currently staged in the product modal
+let storeImageData = null;       // base64 currently staged in the store modal
 let partImgAutoName = '';        // last value we auto-wrote into pfName, so we know if the user overrode it
+let selectedCarModels = [];      // array of car models currently checked in the open product modal
+let cropTarget = 'product';      // which modal's photo is currently being cropped: 'product' | 'store'
+const IMG_TARGETS = {
+  product: {uploadInput:'partImgFileInput', preview:'partImgPreview', hintIcon:'partImgHintIcon', hintText:'partImgHintText', removeBtn:'partImgRemoveBtn'},
+  store:   {uploadInput:'storeImgFileInput', preview:'storeImgPreview', hintIcon:'storeImgHintIcon', hintText:'storeImgHintText', removeBtn:'storeImgRemoveBtn'},
+};
+const CROP_ASPECT = 1;           // square, like Torob product photos
+let cropState = null;            // {img, naturalW, naturalH, scale, minScale, maxScale, offsetX, offsetY, frameW, frameH}
+let cropDrag = null;             // {startX, startY, startOffX, startOffY} while dragging, else null
 let partsReportRange = 'all';
 let partsRevenueChartInstance = null;
 let partsStoreChartInstance = null;
@@ -26,7 +36,7 @@ const QTY_PRESET_VALUES = [1,2,3,4,5,7,10,15,20,30,50];
 
 function fmtT(n){
   n = Math.round(Number(n)||0);
-  return n.toLocaleString('en-US') + ' T';
+  return n.toLocaleString('en-US') + ' K T';
 }
 function fmtNum(n){
   n = Number(n)||0;
@@ -72,6 +82,7 @@ async function postParts(action, data){
 function renderPartsAll(){
   renderPartsFilters();
   renderPartsProducts();
+  renderCarModelsGrid();
   renderStoreGrid();
   renderStoreSelect();
   renderProductSelects();
@@ -197,7 +208,7 @@ function renderCashLedger(){
 // ─── SUB-NAV ───────────────────────────────────────
 function showPartsSub(name){
   partsCurrentSub = name;
-  ['products','stores','purchase','sales','cash','reports'].forEach(s=>{
+  ['products','carmodels','stores','purchase','sales','cash','reports'].forEach(s=>{
     document.getElementById('partsSub-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.parts-subtab').forEach(b=>b.classList.toggle('active', b.dataset.sub===name));
@@ -207,13 +218,19 @@ function showPartsSub(name){
 // ─── HELPERS ───────────────────────────────────────
 function productById(id){ return PARTS.products.find(p=>p.id===id); }
 function storeById(id){ return PARTS.stores.find(s=>s.id===id); }
+const CAR_MODEL_SEP = '|'; // stored inside the single car_model text field so it survives backends that only know that one field
+function productCarModels(p){
+  // Multi-select car models are packed into the existing car_model string, separated by CAR_MODEL_SEP.
+  if(!p || !p.car_model) return [];
+  return String(p.car_model).split(CAR_MODEL_SEP).map(s=>s.trim()).filter(Boolean);
+}
 function productLabel(p){
   if(!p) return '(deleted product)';
-  const parts = [p.part_type, p.car_model, p.brand, p.variant ? '('+p.variant+')' : ''].filter(Boolean);
+  const parts = [p.part_type, productCarModels(p).join('/'), p.brand, p.variant ? '('+p.variant+')' : ''].filter(Boolean);
   return p.name || parts.join(' — ') || 'Unnamed product';
 }
 function productShortSpec(p){
-  return [p.car_model, p.brand, p.variant].filter(Boolean).join(' · ');
+  return [productCarModels(p).join('/'), p.brand, p.variant].filter(Boolean).join(' · ');
 }
 
 function renderQtyPresets(containerId, targetInputId){
@@ -241,7 +258,11 @@ function renderPartsFilters(){
     });
     if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
   };
-  fill('partsFilterCarModel', PARTS.products.map(p=>p.car_model));
+  // Car model filter is sourced from the managed list (Car Models tab), plus any
+  // legacy values still sitting on old products that were saved before that tab existed.
+  const managedNames = PARTS.car_models.map(c=>c.name);
+  const legacyNames = PARTS.products.flatMap(p=>productCarModels(p));
+  fill('partsFilterCarModel', [...managedNames, ...legacyNames]);
   fill('partsFilterBrand', PARTS.products.map(p=>p.brand));
   fill('partsFilterCategory', PARTS.products.map(p=>p.category));
   const dl = document.getElementById('pfCategoryList');
@@ -261,11 +282,11 @@ function renderPartsProducts(){
   const fCat = document.getElementById('partsFilterCategory').value;
 
   let list = PARTS.products.filter(p=>{
-    if(fCar && p.car_model !== fCar) return false;
+    if(fCar && !productCarModels(p).includes(fCar)) return false;
     if(fBrand && p.brand !== fBrand) return false;
     if(fCat && p.category !== fCat) return false;
     if(q){
-      const hay = [p.name,p.car_model,p.brand,p.part_type,p.variant,p.oem_code,p.notes].join(' ').toLowerCase();
+      const hay = [p.name,productCarModels(p).join(' '),p.brand,p.part_type,p.variant,p.oem_code,p.notes].join(' ').toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -300,6 +321,7 @@ function renderPartsProducts(){
         ${stock>0 ? `<div class="part-card-cost">avg cost ${fmtT(cost)}</div>` : ''}
       </div>
       <div class="part-card-actions">
+        ${p.torob_link ? `<a href="${escHtml(p.torob_link)}" target="_blank" rel="noopener" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;color:var(--text2);text-align:center;text-decoration:none;">Torob ↗</a>` : ''}
         <button onclick="openProductModal('${p.id}')">✎ Edit</button>
         <button class="del" onclick="deleteProduct('${p.id}')">🗑 Delete</button>
       </div>`;
@@ -331,14 +353,15 @@ function openProductModal(id, returnTo){
   if(id){
     const p = productById(id);
     document.getElementById('pfPartType').value = p.part_type||'';
-    document.getElementById('pfCarModel').value = p.car_model||'';
     document.getElementById('pfBrand').value = p.brand||'';
     document.getElementById('pfVariant').value = p.variant||'';
     document.getElementById('pfOemCode').value = p.oem_code||'';
     document.getElementById('pfCategory').value = p.category||'';
+    document.getElementById('pfTorob').value = p.torob_link||'';
     document.getElementById('pfName').value = p.name||'';
     document.getElementById('pfNotes').value = p.notes||'';
     partImgAutoName = '';
+    renderCarModelTags(productCarModels(p));
     if(p.image){
       productImageData = p.image;
       preview.src = p.image; preview.style.display='block';
@@ -347,11 +370,104 @@ function openProductModal(id, returnTo){
       preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     }
   } else {
-    ['pfPartType','pfCarModel','pfBrand','pfVariant','pfOemCode','pfCategory','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    ['pfPartType','pfCarModel','pfBrand','pfVariant','pfOemCode','pfCategory','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
     preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     partImgAutoName = '';
+    renderCarModelTags([]);
   }
   document.getElementById('productModalOverlay').classList.add('open');
+}
+
+// ─── CAR MODEL PICKER (product modal) ──────────────
+// Pure multi-select against the managed list from the "Car Models" tab.
+// Adding/renaming/deleting car models happens ONLY in that tab — see
+// renderCarModelsGrid / openCarModelModal / saveCarModelModal below.
+function renderCarModelTags(selected){
+  selectedCarModels = Array.isArray(selected) ? [...new Set(selected.filter(Boolean))] : (selected ? [selected] : []);
+  const wrap = document.getElementById('pfCarModelTags');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(!PARTS.car_models.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text4);font-style:italic;">No car models yet — add some in the Car Models tab first.</div>';
+    return;
+  }
+  PARTS.car_models.forEach(cm=>{
+    const active = selectedCarModels.includes(cm.name);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'preset cm-tag' + (active ? ' active' : '');
+    b.textContent = cm.name;
+    b.onclick = ()=>toggleCarModel(cm.name);
+    wrap.appendChild(b);
+  });
+  syncCarModelHidden();
+}
+function toggleCarModel(m){
+  const i = selectedCarModels.indexOf(m);
+  if(i===-1) selectedCarModels.push(m); else selectedCarModels.splice(i,1);
+  renderCarModelTags(selectedCarModels);
+  suggestProductName();
+}
+function syncCarModelHidden(){
+  // pfCarModel keeps a plain-text mirror (CAR_MODEL_SEP-joined) for legacy code paths that read it directly.
+  const hidden = document.getElementById('pfCarModel');
+  if(hidden) hidden.value = selectedCarModels.join(CAR_MODEL_SEP);
+}
+
+// ─── CAR MODELS TAB (add / edit / delete, independent of products) ──
+function renderCarModelsGrid(){
+  const grid = document.getElementById('partsCarModelGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.car_models.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🚗</div><div class="pe-text">No car models yet — click "+ Add Car Model" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.car_models].sort((a,b)=>a.name.localeCompare(b.name)).forEach(cm=>{
+    const usedBy = PARTS.products.filter(p=>productCarModels(p).includes(cm.name)).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(cm.name)}">🚗</div>
+          <div class="store-card-name">${escHtml(cm.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openCarModelModal('${cm.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteCarModelEntry('${cm.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openCarModelModal(id){
+  document.getElementById('carModelModalId').value = id||'';
+  document.getElementById('carModelModalTitle').textContent = id ? 'Edit Car Model' : 'Add Car Model';
+  document.getElementById('cmfName').value = id ? (PARTS.car_models.find(c=>c.id===id)||{}).name||'' : '';
+  document.getElementById('carModelModalOverlay').classList.add('open');
+}
+function closeCarModelModal(){ document.getElementById('carModelModalOverlay').classList.remove('open'); }
+async function saveCarModelModal(){
+  const id = document.getElementById('carModelModalId').value;
+  const name = document.getElementById('cmfName').value.trim();
+  if(!name){ showToast('Give the car model a name','error'); return; }
+  const dupe = PARTS.car_models.find(c=>c.name.toLowerCase()===name.toLowerCase() && c.id!==id);
+  if(dupe){ showToast('That car model already exists','error'); return; }
+  if(id){ await postParts('update_car_model', {id, name}); }
+  else { await postParts('add_car_model', {name}); }
+  closeCarModelModal();
+  showToast(id ? 'Car model updated' : 'Car model added','success');
+}
+function deleteCarModelEntry(id){
+  const cm = PARTS.car_models.find(c=>c.id===id);
+  if(cm){
+    const usedBy = PARTS.products.filter(p=>productCarModels(p).includes(cm.name)).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${cm.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_car_model',{id});
+  showToast('Car model deleted','success');
 }
 function closeProductModal(){
   document.getElementById('productModalOverlay').classList.remove('open');
@@ -359,7 +475,7 @@ function closeProductModal(){
 }
 function suggestProductName(){
   const nameField = document.getElementById('pfName');
-  const suggestion = [document.getElementById('pfPartType').value, document.getElementById('pfCarModel').value,
+  const suggestion = [document.getElementById('pfPartType').value, selectedCarModels.join('/'),
     document.getElementById('pfBrand').value, document.getElementById('pfVariant').value ? '('+document.getElementById('pfVariant').value+')' : '']
     .filter(Boolean).join(' — ');
   if(nameField.value === '' || nameField.value === partImgAutoName){
@@ -367,31 +483,121 @@ function suggestProductName(){
     partImgAutoName = suggestion;
   }
 }
-function onProductImageSelected(ev){
+function onProductImageSelected(ev){ onPartImageFileSelected(ev, 'product'); }
+function onStoreImageSelected(ev){ onPartImageFileSelected(ev, 'store'); }
+function onPartImageFileSelected(ev, target){
   const file = ev.target.files[0];
   if(!file) return;
   const reader = new FileReader();
   reader.onload = e=>{
     const img = new Image();
-    img.onload = ()=>{
-      const maxW = 640;
-      const scale = Math.min(1, maxW/img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width*scale);
-      canvas.height = Math.round(img.height*scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img,0,0,canvas.width,canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg',0.82);
-      productImageData = dataUrl;
-      const preview = document.getElementById('partImgPreview');
-      preview.src = dataUrl; preview.style.display='block';
-      document.getElementById('partImgHintIcon').style.display='none';
-      document.getElementById('partImgHintText').style.display='none';
-      document.getElementById('partImgRemoveBtn').style.display='flex';
-    };
+    img.onload = ()=> openImageCrop(img, target);
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// ─── IMAGE CROP (pick + reposition, like a profile photo) ──
+// Shared by the product modal and the store modal — cropTarget says which one to write the result back to.
+function openImageCrop(img, target){
+  cropTarget = target || 'product';
+  const frame = document.getElementById('cropFrame');
+  const frameW = frame.clientWidth || 400;
+  const frameH = frameW / CROP_ASPECT;
+  const minScale = Math.max(frameW/img.naturalWidth, frameH/img.naturalHeight);
+  cropState = {
+    img, naturalW: img.naturalWidth, naturalH: img.naturalHeight,
+    scale: minScale, minScale, maxScale: minScale*3,
+    offsetX: 0, offsetY: 0, frameW, frameH,
+  };
+  const cropImg = document.getElementById('cropImg');
+  cropImg.src = img.src;
+  document.getElementById('cropZoomSlider').value = 0;
+  renderCrop();
+
+  const overlay = document.getElementById('partImgCropOverlay');
+  overlay.classList.add('open');
+
+  frame.onpointerdown = onCropPointerDown;
+  frame.onpointermove = onCropPointerMove;
+  frame.onpointerup = onCropPointerEnd;
+  frame.onpointercancel = onCropPointerEnd;
+  frame.onpointerleave = onCropPointerEnd;
+}
+function renderCrop(){
+  if(!cropState) return;
+  const {scale, naturalW, naturalH, frameW, frameH} = cropState;
+  const dispW = naturalW*scale, dispH = naturalH*scale;
+  // clamp offsets so the image always fully covers the frame
+  const maxOffX = Math.max(0, (dispW - frameW)/2);
+  const maxOffY = Math.max(0, (dispH - frameH)/2);
+  cropState.offsetX = Math.min(maxOffX, Math.max(-maxOffX, cropState.offsetX));
+  cropState.offsetY = Math.min(maxOffY, Math.max(-maxOffY, cropState.offsetY));
+  const left = frameW/2 - dispW/2 + cropState.offsetX;
+  const top = frameH/2 - dispH/2 + cropState.offsetY;
+  const cropImg = document.getElementById('cropImg');
+  cropImg.style.width = dispW+'px';
+  cropImg.style.height = dispH+'px';
+  cropImg.style.left = left+'px';
+  cropImg.style.top = top+'px';
+}
+function onCropZoomInput(v){
+  if(!cropState) return;
+  const t = Math.max(0, Math.min(100, Number(v)))/100;
+  cropState.scale = cropState.minScale + t*(cropState.maxScale - cropState.minScale);
+  renderCrop();
+}
+function onCropPointerDown(ev){
+  if(!cropState) return;
+  const frame = document.getElementById('cropFrame');
+  frame.classList.add('dragging');
+  frame.setPointerCapture(ev.pointerId);
+  cropDrag = {startX: ev.clientX, startY: ev.clientY, startOffX: cropState.offsetX, startOffY: cropState.offsetY};
+}
+function onCropPointerMove(ev){
+  if(!cropDrag || !cropState) return;
+  cropState.offsetX = cropDrag.startOffX + (ev.clientX - cropDrag.startX);
+  cropState.offsetY = cropDrag.startOffY + (ev.clientY - cropDrag.startY);
+  renderCrop();
+}
+function onCropPointerEnd(){
+  cropDrag = null;
+  const frame = document.getElementById('cropFrame');
+  if(frame) frame.classList.remove('dragging');
+}
+function cancelImageCrop(){
+  document.getElementById('partImgCropOverlay').classList.remove('open');
+  const t = IMG_TARGETS[cropTarget] || IMG_TARGETS.product;
+  document.getElementById(t.uploadInput).value = '';
+  cropState = null; cropDrag = null;
+}
+function confirmImageCrop(){
+  if(!cropState) return;
+  const {img, scale, offsetX, offsetY, frameW, frameH} = cropState;
+  const dispW = img.naturalWidth*scale, dispH = img.naturalHeight*scale;
+  const left = frameW/2 - dispW/2 + offsetX;
+  const top = frameH/2 - dispH/2 + offsetY;
+  const srcX = -left/scale, srcY = -top/scale;
+  const srcW = frameW/scale, srcH = frameH/scale;
+
+  const OUT_W = 640, OUT_H = Math.round(OUT_W/CROP_ASPECT);
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT_W; canvas.height = OUT_H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUT_W, OUT_H);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+  const t = IMG_TARGETS[cropTarget] || IMG_TARGETS.product;
+  if(cropTarget==='store') storeImageData = dataUrl; else productImageData = dataUrl;
+  const preview = document.getElementById(t.preview);
+  preview.src = dataUrl; preview.style.display='block';
+  document.getElementById(t.hintIcon).style.display='none';
+  document.getElementById(t.hintText).style.display='none';
+  document.getElementById(t.removeBtn).style.display='flex';
+
+  document.getElementById('partImgCropOverlay').classList.remove('open');
+  document.getElementById(t.uploadInput).value = '';
+  cropState = null; cropDrag = null;
 }
 function removeProductImage(){
   productImageData = '';
@@ -401,19 +607,28 @@ function removeProductImage(){
   document.getElementById('partImgHintText').style.display='block';
   document.getElementById('partImgRemoveBtn').style.display='none';
 }
+function removeStoreImage(){
+  storeImageData = '';
+  document.getElementById('storeImgFileInput').value = '';
+  document.getElementById('storeImgPreview').style.display='none';
+  document.getElementById('storeImgHintIcon').style.display='block';
+  document.getElementById('storeImgHintText').style.display='block';
+  document.getElementById('storeImgRemoveBtn').style.display='none';
+}
 async function saveProductModal(){
   const id = document.getElementById('productModalId').value;
   const partType = document.getElementById('pfPartType').value.trim();
-  const carModel = document.getElementById('pfCarModel').value.trim();
-  if(!partType && !carModel && !document.getElementById('pfName').value.trim()){
+  const carModels = selectedCarModels.slice();
+  if(!partType && !carModels.length && !document.getElementById('pfName').value.trim()){
     showToast('Give the product at least a name or a part type','error'); return;
   }
   const payload = {
-    part_type: partType, car_model: carModel,
+    part_type: partType, car_model: carModels.join(CAR_MODEL_SEP),
     brand: document.getElementById('pfBrand').value.trim(),
     variant: document.getElementById('pfVariant').value.trim(),
     oem_code: document.getElementById('pfOemCode').value.trim(),
     category: document.getElementById('pfCategory').value.trim(),
+    torob_link: document.getElementById('pfTorob').value.trim(),
     name: document.getElementById('pfName').value.trim(),
     notes: document.getElementById('pfNotes').value.trim(),
   };
@@ -452,21 +667,24 @@ function renderStoreGrid(){
     const el = document.createElement('div');
     el.className = 'store-card';
     el.innerHTML = `
-      <div class="store-card-headrow">
-        <div class="store-avatar" style="background:${avatarColor}">${escHtml(initial)}</div>
-        <div class="store-card-name">${escHtml(s.name)}</div>
-      </div>
-      ${s.address ? `<div class="store-card-row"><span class="lbl">📍</span>${escHtml(s.address)}</div>` : ''}
-      ${s.phone ? `<div class="store-card-row"><span class="lbl">📞</span>${escHtml(s.phone)}</div>` : ''}
-      ${s.notes ? `<div class="store-card-row"><span class="lbl">📝</span>${escHtml(s.notes)}</div>` : ''}
-      <div class="store-card-row"><span class="lbl">💸</span>Total spend: ${fmtT(spend)}</div>
-      <div class="store-card-links">
-        ${s.torob_link ? `<a href="${escHtml(s.torob_link)}" target="_blank" rel="noopener">Torob ↗</a>` : ''}
-        ${s.website ? `<a href="${escHtml(s.website)}" target="_blank" rel="noopener">Website ↗</a>` : ''}
-      </div>
-      <div class="store-card-actions">
-        <button onclick="openStoreModal('${s.id}')">✎ Edit</button>
-        <button class="del" onclick="deleteStore('${s.id}')">🗑 Delete</button>
+      ${s.image ? `<div class="part-card-img"><img src="${s.image}"></div>` : ''}
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${avatarColor}">${escHtml(initial)}</div>
+          <div class="store-card-name">${escHtml(s.name)}</div>
+        </div>
+        ${s.address ? `<div class="store-card-row"><span class="lbl">📍</span>${escHtml(s.address)}</div>` : ''}
+        ${s.phone ? `<div class="store-card-row"><span class="lbl">📞</span>${escHtml(s.phone)}</div>` : ''}
+        ${s.notes ? `<div class="store-card-row"><span class="lbl">📝</span>${escHtml(s.notes)}</div>` : ''}
+        <div class="store-card-row"><span class="lbl">💸</span>Total spend: ${fmtT(spend)}</div>
+        <div class="store-card-links">
+          ${s.torob_link ? `<a href="${escHtml(s.torob_link)}" target="_blank" rel="noopener">Torob ↗</a>` : ''}
+          ${s.website ? `<a href="${escHtml(s.website)}" target="_blank" rel="noopener">Website ↗</a>` : ''}
+        </div>
+        <div class="store-card-actions">
+          <button onclick="openStoreModal('${s.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteStore('${s.id}')">🗑 Delete</button>
+        </div>
       </div>`;
     grid.appendChild(el);
   });
@@ -486,6 +704,11 @@ function deleteStore(id){
 function openStoreModal(id){
   document.getElementById('storeModalId').value = id||'';
   document.getElementById('storeModalTitle').textContent = id ? 'Edit Store' : 'Add Store';
+  storeImageData = null;
+  const preview = document.getElementById('storeImgPreview');
+  const removeBtn = document.getElementById('storeImgRemoveBtn');
+  const hintIcon = document.getElementById('storeImgHintIcon');
+  const hintText = document.getElementById('storeImgHintText');
   if(id){
     const s = storeById(id);
     document.getElementById('sfName').value = s.name||'';
@@ -494,8 +717,16 @@ function openStoreModal(id){
     document.getElementById('sfTorob').value = s.torob_link||'';
     document.getElementById('sfWebsite').value = s.website||'';
     document.getElementById('sfNotes').value = s.notes||'';
+    if(s.image){
+      storeImageData = s.image;
+      preview.src = s.image; preview.style.display='block';
+      hintIcon.style.display='none'; hintText.style.display='none'; removeBtn.style.display='flex';
+    } else {
+      preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
+    }
   } else {
     ['sfName','sfAddress','sfPhone','sfTorob','sfWebsite','sfNotes'].forEach(f=>document.getElementById(f).value='');
+    preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
   }
   document.getElementById('storeModalOverlay').classList.add('open');
 }
@@ -511,6 +742,7 @@ async function saveStoreModal(){
     website: document.getElementById('sfWebsite').value.trim(),
     notes: document.getElementById('sfNotes').value.trim(),
   };
+  if(storeImageData !== null) payload.image = storeImageData;
   if(id){ payload.id=id; await postParts('update_store', payload); }
   else { await postParts('add_store', payload); }
   closeStoreModal();

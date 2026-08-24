@@ -10,6 +10,21 @@
 .part-img-remove{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(26,21,16,.6);
   color:#fff;border:none;cursor:pointer;font-size:13px;z-index:2;display:none;align-items:center;justify-content:center;}
 .pmodal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.cm-tagwrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.cm-tag{display:inline-flex;align-items:center;gap:6px;}
+
+/* ─── Image crop modal (drag to pan, slider to zoom) ─── */
+.crop-frame{position:relative;width:100%;aspect-ratio:1/1;max-width:340px;margin:0 auto 14px;overflow:hidden;
+  border-radius:var(--r2);background:var(--ink);cursor:grab;touch-action:none;user-select:none;}
+.crop-frame.dragging{cursor:grabbing;}
+.crop-frame img{position:absolute;left:0;top:0;max-width:none;max-height:none;pointer-events:none;}
+.crop-zoom-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.crop-zoom-row input[type=range]{flex:1;accent-color:var(--coral);}
+.crop-zoom-row .cz-icon{font-size:14px;color:var(--text3);}
+.crop-hint{font-size:11.5px;color:var(--text3);text-align:center;margin:-6px 0 14px;}
+/* This crop tool opens on top of whichever parent modal (Product or Store) triggered it —
+   force it above every .overlay regardless of their order in the HTML, so it's never hidden behind one. */
+#partImgCropOverlay{z-index:99999;}
 </style>
 <div class="overlay" id="productModalOverlay">
   <div class="modal" style="max-width:480px;">
@@ -30,29 +45,34 @@
         <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
       </div>
       <div>
-        <div class="builder-label">Car model</div>
-        <input type="text" class="modal-input" id="pfCarModel" placeholder="e.g. Peugeot 405" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
-      </div>
-    </div>
-    <div class="pmodal-row">
-      <div>
         <div class="builder-label">Brand</div>
         <input type="text" class="modal-input" id="pfBrand" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
       </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label" style="margin-bottom:8px;">Car model <span style="font-weight:400;color:var(--text4);">(tap to select, multiple allowed)</span></div>
+      <input type="hidden" id="pfCarModel"/>
+      <div class="cm-tagwrap" id="pfCarModelTags"></div>
+    </div>
+    <div class="pmodal-row">
       <div>
         <div class="builder-label">Variant / type</div>
         <input type="text" class="modal-input" id="pfVariant" placeholder="e.g. Khari" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
       </div>
-    </div>
-    <div class="pmodal-row">
       <div>
         <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
         <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" style="width:100%;margin:0;"/>
       </div>
+    </div>
+    <div class="pmodal-row">
       <div>
         <div class="builder-label">Category <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
         <input type="text" class="modal-input" id="pfCategory" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" list="pfCategoryList"/>
         <datalist id="pfCategoryList"></datalist>
+      </div>
+      <div>
+        <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:10px;">
@@ -71,11 +91,41 @@
   </div>
 </div>
 
+<!-- Parts Biz: Image crop modal — drag to reposition, slider to zoom,
+     like picking a profile photo. Opens on top of the product modal. -->
+<div class="overlay" id="partImgCropOverlay">
+  <div class="modal" style="max-width:440px;">
+    <h3>🖼️ Position the Photo</h3>
+    <div class="crop-frame" id="cropFrame">
+      <img id="cropImg" draggable="false"/>
+    </div>
+    <div class="crop-hint">Drag to reposition · use the slider to zoom</div>
+    <div class="crop-zoom-row">
+      <span class="cz-icon">🔍</span>
+      <input type="range" id="cropZoomSlider" min="0" max="100" value="0" oninput="onCropZoomInput(this.value)"/>
+      <span class="cz-icon" style="font-size:17px;">🔍</span>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cancelImageCrop()">Cancel</button>
+      <button class="btn-ok" onclick="confirmImageCrop()">Use Photo</button>
+    </div>
+  </div>
+</div>
+
 <!-- Parts Biz: Store modal -->
 <div class="overlay" id="storeModalOverlay">
   <div class="modal" style="max-width:440px;">
     <h3 id="storeModalTitle">Add Store</h3>
     <input type="hidden" id="storeModalId"/>
+
+    <div class="part-img-upload" id="storeImgUploadBox" onclick="document.getElementById('storeImgFileInput').click()">
+      <img id="storeImgPreview" style="display:none;"/>
+      <div class="hint-icon" id="storeImgHintIcon">🏬</div>
+      <div class="hint" id="storeImgHintText">Click to add a photo</div>
+      <button type="button" class="part-img-remove" id="storeImgRemoveBtn" onclick="event.stopPropagation();removeStoreImage()">✕</button>
+    </div>
+    <input type="file" accept="image/*" id="storeImgFileInput" style="display:none;" onchange="onStoreImageSelected(event)"/>
+
     <div style="margin-bottom:10px;">
       <div class="builder-label">Store name</div>
       <input type="text" class="modal-input" id="sfName" placeholder="e.g. Yadaksara Auto Parts" dir="auto" style="width:100%;margin:0;"/>
@@ -105,6 +155,22 @@
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeStoreModal()">Cancel</button>
       <button class="btn-ok" onclick="saveStoreModal()">Save Store</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Car Model modal (managed list, used by the product's multi-select) -->
+<div class="overlay" id="carModelModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="carModelModalTitle">Add Car Model</h3>
+    <input type="hidden" id="carModelModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="cmfName" placeholder="e.g. Peugeot 405" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCarModelModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeCarModelModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveCarModelModal()">Save Car Model</button>
     </div>
   </div>
 </div>

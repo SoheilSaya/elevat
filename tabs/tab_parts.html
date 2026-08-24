@@ -18,7 +18,7 @@
 .parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:24px;}
 .part-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column;animation:fadeUp .3s ease both;}
 .part-card:hover{border-color:var(--warmD);transform:translateY(-2px);}
-.part-card-img{width:100%;height:130px;background:var(--cream2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:34px;color:var(--text4);flex-shrink:0;}
+.part-card-img{width:100%;aspect-ratio:1/1;height:auto;background:var(--cream2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:34px;color:var(--text4);flex-shrink:0;}
 .part-card-img img{width:100%;height:100%;object-fit:cover;}
 .part-card-body{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:3px;}
 .part-card-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;color:var(--ink);line-height:1.25;}
@@ -42,7 +42,8 @@
 .parts-empty .pe-text{font-style:italic;}
 
 .store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;}
-.store-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
+.store-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);box-shadow:var(--shadow);animation:fadeUp .3s ease both;display:flex;flex-direction:column;overflow:hidden;}
+.store-card-body{padding:16px;flex:1;display:flex;flex-direction:column;}
 .store-card-name{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:8px;}
 .store-card-row{font-size:12px;color:var(--text2);margin-bottom:4px;display:flex;gap:6px;align-items:flex-start;}
 .store-card-row .lbl{flex-shrink:0;}
@@ -188,6 +189,7 @@
 
   <div class="parts-subnav">
     <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
+    <button class="parts-subtab" data-sub="carmodels" onclick="showPartsSub('carmodels')">🚗 Car Models</button>
     <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
     <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 New Purchase</button>
     <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
@@ -206,6 +208,15 @@
     </div>
     <div class="parts-grid" id="partsProductGrid"></div>
   </div>
+
+  <!-- ═══ CAR MODELS ═══ -->
+  <div id="partsSub-carmodels" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openCarModelModal()">+ Add Car Model</button>
+    </div>
+    <div class="store-grid" id="partsCarModelGrid"></div>
+  </div>
+
 
   <!-- ═══ STORES ═══ -->
   <div id="partsSub-stores" class="parts-sub" style="display:none;">
@@ -250,7 +261,7 @@
             <input type="number" class="modal-input" id="purchaseItemQty" placeholder="Qty" min="0" step="1" value="1"/>
           </div>
           <div>
-            <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (T)" min="0"/>
+            <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (K T)" min="0"/>
           </div>
           <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ Add</button>
         </div>
@@ -296,7 +307,7 @@
             <input type="number" class="modal-input" id="saleItemQty" placeholder="Qty" min="0" step="1" value="1"/>
           </div>
           <div>
-            <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (T)" min="0"/>
+            <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (K T)" min="0"/>
           </div>
           <button class="tx-additem-btn" onclick="addSaleCartItem()">+ Add</button>
         </div>
@@ -329,8 +340,8 @@
       </div>
       <div class="tx-row">
         <div>
-          <div class="builder-label">Amount (T)</div>
-          <input type="number" class="modal-input" id="cashTxAmount" placeholder="e.g. 10000000" min="0" style="width:100%;margin:0;"/>
+          <div class="builder-label">Amount (K T)</div>
+          <input type="number" class="modal-input" id="cashTxAmount" placeholder="e.g. 10000" min="0" style="width:100%;margin:0;"/>
         </div>
         <div>
           <div class="builder-label">Date</div>
