@@ -34,7 +34,8 @@ JSON_FILES = ["habits.json","budget.json","calendar.json","food.json","people.js
     "car.json",
     "score_config.json",
     "outage.json",
-    "telegram_config.json"]
+    "telegram_config.json",
+    "parts.json"]
 _backup_lock = threading.Lock()
 _last_sizes = {}  # filename → last known size
 
@@ -1838,6 +1839,393 @@ def car_api():
             existing[key] = data[key]
     save_car(existing)
     return jsonify({"ok": True})
+
+
+# ══════════════════════════════════════════════════════
+#  app_parts_backend.py
+#
+#  ADD THESE ROUTES TO app.py — paste them before the
+#  final `if __name__ == "__main__":` block (right after
+#  the CAR API section works fine).
+#
+#  Also add "parts.json" to the JSON_FILES list near the
+#  top of app.py so it gets picked up by the existing
+#  hourly/daily/weekly backup system:
+#
+#  JSON_FILES = ["habits.json", ..., "car.json", "parts.json"]
+# ══════════════════════════════════════════════════════
+
+PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
+
+def load_parts():
+    if not os.path.exists(PARTS_FILE):
+        return {"products": [], "stores": [], "purchases": [], "sales": [], "capital_transactions": [], "low_stock_threshold": 2}
+    try:
+        with open(PARTS_FILE, encoding="utf-8") as f:
+            d = json.load(f)
+        d.setdefault("products", [])
+        d.setdefault("stores", [])
+        d.setdefault("purchases", [])
+        d.setdefault("sales", [])
+        d.setdefault("capital_transactions", [])
+        d.setdefault("low_stock_threshold", 2)
+        return d
+    except (json.JSONDecodeError, ValueError):
+        return {"products": [], "stores": [], "purchases": [], "sales": [], "capital_transactions": [], "low_stock_threshold": 2}
+
+def save_parts(data):
+    with open(PARTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def _new_id():
+    return str(int(datetime.now().timestamp() * 1000000))
+
+# ── FIFO cost-basis engine ───────────────────────────
+# Nothing about cost/COGS/profit is stored — it's always recomputed
+# live from products+stores+purchases+sales. That means editing or
+# deleting an old purchase/sale can never leave stale numbers behind.
+def compute_parts_analytics(data):
+    products = {p["id"]: p for p in data["products"]}
+    stores   = {s["id"]: s for s in data["stores"]}
+
+    events = []
+    for pur in data["purchases"]:
+        for idx, it in enumerate(pur.get("items", [])):
+            events.append({
+                "date": pur.get("order_date") or "0000-00-00", "type": "purchase",
+                "pid": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                "price": float(it.get("unit_price") or 0),
+            })
+    for sale in data["sales"]:
+        for idx, it in enumerate(sale.get("items", [])):
+            events.append({
+                "date": sale.get("date") or "0000-00-00", "type": "sale",
+                "pid": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                "price": float(it.get("unit_price") or 0),
+                "sale_id": sale["id"], "idx": idx,
+            })
+    # Stable sort: purchases were appended before sales, so on a date
+    # tie stock arrives before it's sold that same day.
+    events.sort(key=lambda e: e["date"])
+
+    lots = {}          # product_id -> [[remaining_qty, unit_cost], ...]  oldest first
+    sale_cogs = {}      # (sale_id, idx) -> cost
+
+    # precompute overall avg purchase price per product, used only as a
+    # fallback if a sale outruns every tracked lot (oversold / no purchase logged yet)
+    total_qty, total_cost = {}, {}
+    for pur in data["purchases"]:
+        for it in pur.get("items", []):
+            pid = it.get("product_id")
+            total_qty[pid] = total_qty.get(pid, 0) + float(it.get("qty") or 0)
+            total_cost[pid] = total_cost.get(pid, 0) + float(it.get("qty") or 0) * float(it.get("unit_price") or 0)
+
+    for e in events:
+        pid = e["pid"]
+        if pid not in lots:
+            lots[pid] = []
+        if e["type"] == "purchase":
+            if e["qty"] > 0:
+                lots[pid].append([e["qty"], e["price"]])
+        else:
+            remaining = e["qty"]
+            cost = 0.0
+            queue = lots[pid]
+            while remaining > 1e-9 and queue:
+                lot = queue[0]
+                take = min(lot[0], remaining)
+                cost += take * lot[1]
+                lot[0] -= take
+                remaining -= take
+                if lot[0] <= 1e-9:
+                    queue.pop(0)
+            if remaining > 1e-9:
+                tq = total_qty.get(pid, 0)
+                avg = (total_cost.get(pid, 0) / tq) if tq > 0 else 0
+                cost += remaining * avg
+            sale_cogs[(e["sale_id"], e["idx"])] = cost
+
+    stock, avg_cost_remaining = {}, {}
+    for pid, queue in lots.items():
+        tq = sum(l[0] for l in queue)
+        tc = sum(l[0] * l[1] for l in queue)
+        stock[pid] = round(tq, 3)
+        avg_cost_remaining[pid] = round(tc / tq, 2) if tq > 0 else 0
+    for p in data["products"]:
+        stock.setdefault(p["id"], 0)
+        avg_cost_remaining.setdefault(p["id"], 0)
+
+    # Annotate sales with cogs/profit per item (revenue always = qty*unit_price)
+    sales_out = []
+    total_revenue = total_cogs = total_purchase_spend = 0.0
+    by_product = {}   # pid -> {qty_sold, revenue, cogs, profit, qty_purchased, spend}
+    by_store = {}      # store_id -> {spend, purchases}
+
+    for pur in data["purchases"]:
+        sid = pur.get("store_id")
+        by_store.setdefault(sid, {"spend": 0.0, "purchase_count": 0, "items_count": 0})
+        by_store[sid]["purchase_count"] += 1
+        for it in pur.get("items", []):
+            pid = it.get("product_id")
+            qty = float(it.get("qty") or 0); price = float(it.get("unit_price") or 0)
+            spend = qty * price
+            total_purchase_spend += spend
+            by_store[sid]["spend"] += spend
+            by_store[sid]["items_count"] += 1
+            bp = by_product.setdefault(pid, {"qty_sold": 0, "revenue": 0.0, "cogs": 0.0, "profit": 0.0, "qty_purchased": 0, "spend": 0.0})
+            bp["qty_purchased"] += qty
+            bp["spend"] += spend
+
+    for sale in data["sales"]:
+        s = dict(sale)
+        items_out = []
+        sale_revenue = sale_cogs_total = 0.0
+        for idx, it in enumerate(sale.get("items", [])):
+            pid = it.get("product_id")
+            qty = float(it.get("qty") or 0); price = float(it.get("unit_price") or 0)
+            revenue = qty * price
+            cogs = sale_cogs.get((sale["id"], idx), 0.0)
+            profit = revenue - cogs
+            items_out.append({**it, "revenue": round(revenue, 2), "cogs": round(cogs, 2), "profit": round(profit, 2)})
+            sale_revenue += revenue
+            sale_cogs_total += cogs
+            bp = by_product.setdefault(pid, {"qty_sold": 0, "revenue": 0.0, "cogs": 0.0, "profit": 0.0, "qty_purchased": 0, "spend": 0.0})
+            bp["qty_sold"] += qty
+            bp["revenue"] += revenue
+            bp["cogs"] += cogs
+            bp["profit"] += profit
+        s["items"] = items_out
+        s["revenue"] = round(sale_revenue, 2)
+        s["cogs"] = round(sale_cogs_total, 2)
+        s["profit"] = round(sale_revenue - sale_cogs_total, 2)
+        sales_out.append(s)
+        total_revenue += sale_revenue
+        total_cogs += sale_cogs_total
+
+    low_stock_threshold = data.get("low_stock_threshold", 2)
+    low_stock = [pid for pid, q in stock.items() if pid in products and q <= low_stock_threshold]
+
+    inventory_value = sum(stock[pid] * avg_cost_remaining[pid] for pid in stock)
+
+    # ── Cash / capital ledger ────────────────────────
+    # Cash balance is fully derived, never stored: what the owner put in,
+    # minus what they took out, minus every purchase, plus every sale.
+    total_deposits = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "deposit")
+    total_withdrawals = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "withdrawal")
+    cash_balance = total_deposits - total_withdrawals - total_purchase_spend + total_revenue
+    business_value = cash_balance + inventory_value
+    net_capital = total_deposits - total_withdrawals
+
+    return {
+        "sales": sales_out,
+        "stock": stock,
+        "avg_cost": avg_cost_remaining,
+        "by_product": {pid: {**v, "qty_sold": round(v["qty_sold"], 3), "revenue": round(v["revenue"], 2),
+                              "cogs": round(v["cogs"], 2), "profit": round(v["profit"], 2),
+                              "qty_purchased": round(v["qty_purchased"], 3), "spend": round(v["spend"], 2)}
+                       for pid, v in by_product.items()},
+        "by_store": {sid: {**v, "spend": round(v["spend"], 2)} for sid, v in by_store.items()},
+        "totals": {
+            "revenue": round(total_revenue, 2),
+            "cogs": round(total_cogs, 2),
+            "profit": round(total_revenue - total_cogs, 2),
+            "purchase_spend": round(total_purchase_spend, 2),
+            "inventory_value": round(inventory_value, 2),
+            "inventory_units": round(sum(stock.values()), 3),
+            "product_count": len(products),
+            "low_stock_count": len(low_stock),
+            "total_deposits": round(total_deposits, 2),
+            "total_withdrawals": round(total_withdrawals, 2),
+            "net_capital": round(net_capital, 2),
+            "cash_balance": round(cash_balance, 2),
+            "business_value": round(business_value, 2),
+        },
+        "low_stock": low_stock,
+        "low_stock_threshold": low_stock_threshold,
+    }
+
+@app.route("/api/parts", methods=["GET", "POST"])
+def parts_api():
+    data = load_parts()
+
+    if request.method == "GET":
+        analytics = compute_parts_analytics(data)
+        return jsonify({
+            "products": data["products"],
+            "stores": data["stores"],
+            "purchases": data["purchases"],
+            "sales": analytics["sales"],
+            "capital_transactions": data["capital_transactions"],
+            "stock": analytics["stock"],
+            "avg_cost": analytics["avg_cost"],
+            "by_product": analytics["by_product"],
+            "by_store": analytics["by_store"],
+            "totals": analytics["totals"],
+            "low_stock": analytics["low_stock"],
+            "low_stock_threshold": analytics["low_stock_threshold"],
+        })
+
+    body = request.json or {}
+    action = body.get("action")
+
+    # ── PRODUCTS ─────────────────────────────────────
+    if action == "add_product":
+        data["products"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "car_model": body.get("car_model", "").strip(),
+            "part_type": body.get("part_type", "").strip(),
+            "brand": body.get("brand", "").strip(),
+            "variant": body.get("variant", "").strip(),
+            "oem_code": body.get("oem_code", "").strip(),
+            "category": body.get("category", "").strip(),
+            "notes": body.get("notes", "").strip(),
+            "image": body.get("image", ""),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_product":
+        for p in data["products"]:
+            if p["id"] == body.get("id"):
+                for k in ["name", "car_model", "part_type", "brand", "variant", "oem_code", "category", "notes"]:
+                    if k in body:
+                        p[k] = (body.get(k) or "").strip()
+                if "image" in body:
+                    p["image"] = body.get("image", "")
+                break
+    elif action == "delete_product":
+        pid = body.get("id")
+        data["products"] = [p for p in data["products"] if p["id"] != pid]
+
+    # ── STORES ───────────────────────────────────────
+    elif action == "add_store":
+        data["stores"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "address": body.get("address", "").strip(),
+            "phone": body.get("phone", "").strip(),
+            "torob_link": body.get("torob_link", "").strip(),
+            "website": body.get("website", "").strip(),
+            "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_store":
+        for s in data["stores"]:
+            if s["id"] == body.get("id"):
+                for k in ["name", "address", "phone", "torob_link", "website", "notes"]:
+                    if k in body:
+                        s[k] = (body.get(k) or "").strip()
+                break
+    elif action == "delete_store":
+        sid = body.get("id")
+        data["stores"] = [s for s in data["stores"] if s["id"] != sid]
+
+    # ── PURCHASES (one store visit, many line items) ──
+    elif action == "add_purchase":
+        items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                   "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+        data["purchases"].append({
+            "id": _new_id(),
+            "store_id": body.get("store_id"),
+            "order_date": body.get("order_date"),
+            "receipt_date": body.get("receipt_date") or body.get("order_date"),
+            "same_day": bool(body.get("same_day", True)),
+            "items": items,
+            "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_purchase":
+        for pur in data["purchases"]:
+            if pur["id"] == body.get("id"):
+                if "store_id" in body: pur["store_id"] = body.get("store_id")
+                if "order_date" in body: pur["order_date"] = body.get("order_date")
+                if "receipt_date" in body: pur["receipt_date"] = body.get("receipt_date")
+                if "same_day" in body: pur["same_day"] = bool(body.get("same_day"))
+                if "notes" in body: pur["notes"] = (body.get("notes") or "").strip()
+                if "items" in body:
+                    pur["items"] = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                                       "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+                break
+    elif action == "delete_purchase":
+        pid = body.get("id")
+        data["purchases"] = [p for p in data["purchases"] if p["id"] != pid]
+
+    # ── SALES (one customer/visit, many line items) ──
+    elif action == "add_sale":
+        items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                   "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+        data["sales"].append({
+            "id": _new_id(),
+            "date": body.get("date"),
+            "customer_name": body.get("customer_name", "").strip(),
+            "notes": body.get("notes", "").strip(),
+            "items": items,
+            "created_at": str(date.today()),
+        })
+    elif action == "update_sale":
+        for sale in data["sales"]:
+            if sale["id"] == body.get("id"):
+                if "date" in body: sale["date"] = body.get("date")
+                if "customer_name" in body: sale["customer_name"] = (body.get("customer_name") or "").strip()
+                if "notes" in body: sale["notes"] = (body.get("notes") or "").strip()
+                if "items" in body:
+                    sale["items"] = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                                        "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+                break
+    elif action == "delete_sale":
+        sid = body.get("id")
+        data["sales"] = [s for s in data["sales"] if s["id"] != sid]
+
+    elif action == "set_low_stock_threshold":
+        try:
+            data["low_stock_threshold"] = float(body.get("value", 2))
+        except (TypeError, ValueError):
+            pass
+
+    # ── CASH / CAPITAL LEDGER (deposits & withdrawals) ─
+    elif action == "add_capital_tx":
+        tx_type = body.get("type")
+        if tx_type not in ("deposit", "withdrawal"):
+            return jsonify({"ok": False, "error": "type must be deposit or withdrawal"}), 400
+        data["capital_transactions"].append({
+            "id": _new_id(),
+            "type": tx_type,
+            "amount": float(body.get("amount") or 0),
+            "date": body.get("date"),
+            "note": body.get("note", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_capital_tx":
+        for t in data["capital_transactions"]:
+            if t["id"] == body.get("id"):
+                if "type" in body and body.get("type") in ("deposit", "withdrawal"): t["type"] = body.get("type")
+                if "amount" in body: t["amount"] = float(body.get("amount") or 0)
+                if "date" in body: t["date"] = body.get("date")
+                if "note" in body: t["note"] = (body.get("note") or "").strip()
+                break
+    elif action == "delete_capital_tx":
+        tid = body.get("id")
+        data["capital_transactions"] = [t for t in data["capital_transactions"] if t["id"] != tid]
+
+    else:
+        return jsonify({"ok": False, "error": "unknown action"}), 400
+
+    save_parts(data)
+    analytics = compute_parts_analytics(data)
+    return jsonify({
+        "ok": True,
+        "products": data["products"],
+        "stores": data["stores"],
+        "purchases": data["purchases"],
+        "sales": analytics["sales"],
+        "capital_transactions": data["capital_transactions"],
+        "stock": analytics["stock"],
+        "avg_cost": analytics["avg_cost"],
+        "by_product": analytics["by_product"],
+        "by_store": analytics["by_store"],
+        "totals": analytics["totals"],
+        "low_stock": analytics["low_stock"],
+        "low_stock_threshold": analytics["low_stock_threshold"],
+    })
 
 
 if __name__=="__main__":

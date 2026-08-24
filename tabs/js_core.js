@@ -492,10 +492,10 @@ function showToast(msg,type=''){
 
 // ─── VIEW SWITCHING ────────────────────────────────
 function showView(v){
-  ['today','focus','food','money','sleep','calendar','people','goals','car','stats','history'].forEach(x=>{
+  ['today','focus','food','money','sleep','calendar','people','goals','car','parts','stats','history'].forEach(x=>{
     document.getElementById(x+'-view').style.display=x===v?'block':'none';
   });
-  document.querySelectorAll('.nav-tab').forEach((b,i)=>b.classList.toggle('active',['today','focus','food','money','sleep','calendar','people','goals','car','stats','history'][i]===v));
+  document.querySelectorAll('.nav-tab').forEach((b,i)=>b.classList.toggle('active',['today','focus','food','money','sleep','calendar','people','goals','car','parts','stats','history'][i]===v));
   if(v==='sleep') initSleep();
   if(v==='calendar') initCalendar();
   if(v==='stats') loadStats();
@@ -506,6 +506,7 @@ function showView(v){
   if(v==='people') initPeople();
   if(v==='goals') loadGoals();
   if(v==='car') loadCar();
+  if(v==='parts') initPartsBiz();
 }
 
 // ─── HISTORY ───────────────────────────────────────

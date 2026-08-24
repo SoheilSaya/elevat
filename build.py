@@ -25,8 +25,10 @@ index = (
     r('tab_people.html') +
     r('tab_goals.html') +
     r('tab_car.html') +
+    r('tab_parts.html') +
     '\n</div><!-- /app -->\n' +
     r('modals.html') +
+    r('modals_parts.html') +
     r('js_core.js') +
     r('js_pomo.js') +
     r('js_food.js') +
@@ -35,6 +37,7 @@ index = (
     r('js_sleep.js') +
     r('js_people.js') +
     r('jalali.js') +
+    r('js_parts.js') +
     r('js_goals.js') +
     r('js_car.js') +
     r('js_close.txt')

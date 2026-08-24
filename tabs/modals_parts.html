@@ -1,0 +1,110 @@
+<!-- Parts Biz: Product modal -->
+<style>
+.part-img-upload{width:100%;height:140px;border:2px dashed var(--cream3);border-radius:var(--r2);background:var(--cream2);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;cursor:pointer;margin-bottom:16px;
+  overflow:hidden;position:relative;transition:border-color .2s;}
+.part-img-upload:hover{border-color:var(--coral2);}
+.part-img-upload img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.part-img-upload .hint{font-size:12px;color:var(--text3);font-weight:600;z-index:1;}
+.part-img-upload .hint-icon{font-size:24px;z-index:1;}
+.part-img-remove{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(26,21,16,.6);
+  color:#fff;border:none;cursor:pointer;font-size:13px;z-index:2;display:none;align-items:center;justify-content:center;}
+.pmodal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+</style>
+<div class="overlay" id="productModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <h3 id="productModalTitle">Add Product</h3>
+    <input type="hidden" id="productModalId"/>
+
+    <div class="part-img-upload" id="partImgUploadBox" onclick="document.getElementById('partImgFileInput').click()">
+      <img id="partImgPreview" style="display:none;"/>
+      <div class="hint-icon" id="partImgHintIcon">🖼️</div>
+      <div class="hint" id="partImgHintText">Click to add a photo</div>
+      <button type="button" class="part-img-remove" id="partImgRemoveBtn" onclick="event.stopPropagation();removeProductImage()">✕</button>
+    </div>
+    <input type="file" accept="image/*" id="partImgFileInput" style="display:none;" onchange="onProductImageSelected(event)"/>
+
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Part type</div>
+        <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+      <div>
+        <div class="builder-label">Car model</div>
+        <input type="text" class="modal-input" id="pfCarModel" placeholder="e.g. Peugeot 405" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Brand</div>
+        <input type="text" class="modal-input" id="pfBrand" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+      <div>
+        <div class="builder-label">Variant / type</div>
+        <input type="text" class="modal-input" id="pfVariant" placeholder="e.g. Khari" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" style="width:100%;margin:0;"/>
+      </div>
+      <div>
+        <div class="builder-label">Category <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="pfCategory" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" list="pfCategoryList"/>
+        <datalist id="pfCategoryList"></datalist>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Product name <span style="font-weight:400;color:var(--text4);">(auto-filled, editable)</span></div>
+      <input type="text" class="modal-input" id="pfName" placeholder="Product display name" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="pfNotes" placeholder="Anything else worth remembering" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeProductModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveProductModal()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Store modal -->
+<div class="overlay" id="storeModalOverlay">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="storeModalTitle">Add Store</h3>
+    <input type="hidden" id="storeModalId"/>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Store name</div>
+      <input type="text" class="modal-input" id="sfName" placeholder="e.g. Yadaksara Auto Parts" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Address <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfAddress" placeholder="Store address" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Phone <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="sfPhone" placeholder="09xx xxx xxxx" style="width:100%;margin:0;"/>
+      </div>
+      <div>
+        <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="sfTorob" placeholder="torob.com/shop/..." style="width:100%;margin:0;"/>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Website <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfWebsite" placeholder="https://..." style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfNotes" placeholder="Anything else" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeStoreModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveStoreModal()">Save Store</button>
+    </div>
+  </div>
+</div>

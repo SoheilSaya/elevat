@@ -33,12 +33,14 @@ body::before{content:'';position:fixed;inset:0;
 #app{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:28px 24px 80px;}
 
 /* NAV */
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28px;border-bottom:2px solid var(--warm);margin-bottom:32px;animation:slideDown .5s ease both;}
+nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2px solid var(--warm);margin-bottom:32px;animation:slideDown .5s ease both;}
+.nav-toprow{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:22px;}
 .logo{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:var(--ink);letter-spacing:-.5px;}
 .logo em{color:var(--coral);font-style:italic;}
 .nav-sub{font-size:12px;color:var(--text3);'font-family:\\'JetBrains Mono\\',monospace"';letter-spacing:.05em;text-transform:uppercase;margin-top:2px;}
-.nav-tabs{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);}
-.nav-tab{padding:9px 22px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;}
+.nav-tabs{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);
+  width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin;}
+.nav-tab{padding:9px 18px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
 .nav-tab.active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
 
 /* SCORE AREA */
@@ -630,11 +632,13 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 <body>
 <div id="app">
 <nav>
-  <div>
-    <div class="logo">Elev<em>a</em>te</div>
-    <div class="nav-sub" id="navDate">Loading...</div>
+  <div class="nav-toprow">
+    <div>
+      <div class="logo">Elev<em>a</em>te</div>
+      <div class="nav-sub" id="navDate">Loading...</div>
+    </div>
+    <div class="date-switcher" id="dateSwitcher"></div>
   </div>
-  <div class="date-switcher" id="dateSwitcher"></div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showView('today')">Today</button>
     <button class="nav-tab" onclick="showView('focus')">🍅 Focus</button>
@@ -645,6 +649,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
     <button class="nav-tab" onclick="showView('people')">👥 People</button>
     <button class="nav-tab" onclick="showView('goals')">🎯 Goals</button>
     <button class="nav-tab" onclick="showView('car')">🏎️ Car</button>
+    <button class="nav-tab" onclick="showView('parts')">🔧 Parts</button>
     <button class="nav-tab" onclick="showView('stats')">Analytics</button>
     <button class="nav-tab" onclick="showView('history')">History</button>
   </div>
@@ -1683,8 +1688,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
   </div>
   <div class="hist-list" id="histList"></div>
 </div>
-
-</div><!-- /app --><!-- ══ PEOPLE ══════════════════════════════════════════ -->
+<!-- ══ PEOPLE ══════════════════════════════════════════ -->
 <div id="people-view" style="display:none;padding-top:0;margin-top:0;">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
@@ -3466,6 +3470,351 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
     </div>
   </div>
 </div>
+<!-- PARTS BIZ -->
+<div id="parts-view" style="display:none;">
+<div class="parts-container">
+<style>
+.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
+.parts-subtab{padding:8px 18px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.parts-subtab.active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
+.parts-sub{animation:fadeUp .3s ease both;}
+
+.parts-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);align-items:center;}
+.parts-filter-bar .modal-input{margin:0;width:280px;max-width:100%;}
+.parts-filter-bar .builder-select{margin:0;font-size:13px;width:170px;}
+.parts-add-btn{padding:10px 18px;border-radius:50px;border:none;background:var(--coral);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .2s;margin-left:auto;}
+.parts-add-btn:hover{background:var(--rose);}
+.parts-add-btn.sage{background:var(--sage);}
+.parts-add-btn.sage:hover{background:var(--sage2);}
+
+.parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:24px;}
+.part-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column;animation:fadeUp .3s ease both;}
+.part-card:hover{border-color:var(--warmD);transform:translateY(-2px);}
+.part-card-img{width:100%;height:130px;background:var(--cream2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:34px;color:var(--text4);flex-shrink:0;}
+.part-card-img img{width:100%;height:100%;object-fit:cover;}
+.part-card-body{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:3px;}
+.part-card-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;color:var(--ink);line-height:1.25;}
+.part-card-spec{font-size:11px;color:var(--text3);}
+.part-card-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.part-badge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:50px;background:var(--cream2);color:var(--text2);}
+.part-card-stock{margin-top:7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:50px;width:fit-content;}
+.part-card-stock.ok{color:var(--sage);background:var(--sageL);}
+.part-card-stock.low{color:var(--amber);background:var(--amberL);}
+.part-card-stock.out{color:var(--text3);background:var(--cream2);}
+.part-card-cost{font-size:10.5px;color:var(--text3);margin-top:1px;font-family:'JetBrains Mono',monospace;}
+.part-card-actions{display:flex;gap:6px;padding:10px 14px;border-top:1.5px solid var(--cream2);}
+.part-card-actions button{flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;}
+.part-card-actions button:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
+.part-card-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+.parts-empty{color:var(--text4);font-size:13px;padding:44px 20px;text-align:center;display:flex;flex-direction:column;
+  align-items:center;gap:8px;}
+.parts-grid .parts-empty,.store-grid .parts-empty{grid-column:1/-1;}
+.parts-empty .pe-icon{font-size:32px;opacity:.6;}
+.parts-empty .pe-text{font-style:italic;}
+
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;}
+.store-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
+.store-card-name{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+.store-card-row{font-size:12px;color:var(--text2);margin-bottom:4px;display:flex;gap:6px;align-items:flex-start;}
+.store-card-row .lbl{flex-shrink:0;}
+.store-card-links{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.store-card-links a{flex:1;min-width:70px;text-align:center;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:700;color:var(--sky);text-decoration:none;transition:all .15s;}
+.store-card-links a:hover{background:var(--skyL);border-color:var(--sky);}
+.store-card-actions{display:flex;gap:6px;margin-top:10px;}
+.store-card-actions button{flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);}
+.store-card-actions button:hover{border-color:var(--coral2);color:var(--coral);}
+.store-card-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+
+.tx-form{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:22px;box-shadow:var(--shadow);margin:0 auto 24px;max-width:680px;}
+.tx-form-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;margin-bottom:16px;}
+.tx-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.tx-row.three{grid-template-columns:1fr 1fr 1fr;}
+.tx-samedaywrap{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);margin-bottom:14px;cursor:pointer;user-select:none;}
+.tx-samedaywrap input{width:16px;height:16px;accent-color:var(--sage);cursor:pointer;}
+.tx-item-builder{background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);padding:14px;margin-bottom:14px;}
+.tx-item-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;}
+.tx-item-row .builder-select,.tx-item-row .modal-input{margin:0;width:100%;}
+.tx-additem-btn{padding:10px 16px;border-radius:var(--r2);border:none;background:var(--sage);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;height:41px;}
+.tx-additem-btn:hover{background:var(--sage2);}
+.tx-cart{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.tx-cart-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);}
+.tx-cart-item-info{flex:1;min-width:0;}
+.tx-cart-item-name{font-size:13px;font-weight:600;color:var(--text);}
+.tx-cart-item-detail{font-size:11px;color:var(--text3);margin-top:1px;}
+.tx-cart-item-total{font-family:'Fraunces',serif;font-weight:700;font-size:14px;color:var(--ink);flex-shrink:0;white-space:nowrap;}
+.tx-cart-del{width:24px;height:24px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:16px;border-radius:5px;flex-shrink:0;}
+.tx-cart-del:hover{background:var(--coralL);color:var(--coral);}
+.tx-cart-empty{color:var(--text4);font-size:12px;font-style:italic;padding:10px 2px;}
+.tx-total-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--sageL);border-radius:var(--r2);margin-bottom:16px;}
+.tx-total-row .lbl{font-size:13px;font-weight:600;color:var(--sage);}
+.tx-total-row .val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--sage);}
+.tx-save-btn{width:100%;padding:13px;border-radius:var(--r2);border:none;background:var(--coral);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;}
+.tx-save-btn:hover{background:var(--rose);transform:translateY(-1px);}
+
+.tx-list{display:flex;flex-direction:column;gap:10px;max-width:680px;margin:0 auto;}
+.tx-list-item{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);animation:fadeUp .3s ease both;overflow:hidden;}
+.tx-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;}
+.tx-list-head:hover{background:var(--cream2);}
+.tx-list-title{font-size:13px;font-weight:700;color:var(--text);}
+.tx-list-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.tx-list-amount{font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap;}
+.tx-list-amount.profit-pos{color:var(--sage);}
+.tx-list-amount.profit-neg{color:var(--coral);}
+.tx-list-body{display:none;padding:0 16px 14px;border-top:1.5px solid var(--cream2);}
+.tx-list-body.open{display:block;}
+.tx-list-line{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-bottom:1px solid var(--cream2);}
+.tx-list-line:last-child{border-bottom:none;}
+.tx-list-actions{display:flex;gap:6px;margin-top:10px;}
+.tx-list-actions button{padding:6px 14px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);}
+.tx-list-actions button:hover{border-color:var(--coral2);color:var(--coral);}
+.tx-list-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+
+.parts-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;max-width:900px;}
+.parts-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.parts-range-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.parts-range-chip{padding:7px 16px;border-radius:50px;border:1.5px solid var(--cream3);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;}
+.parts-range-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.parts-table-wrap{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.parts-table-title{font-family:'Fraunces',serif;font-size:15px;font-weight:700;padding:16px 18px 0;}
+.parts-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.parts-table th{background:var(--cream2);padding:9px 16px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;}
+.parts-table td{padding:10px 16px;font-size:13px;border-top:1px solid var(--cream2);}
+.parts-table tr:hover td{background:var(--cream2);}
+.parts-table-empty{padding:18px;color:var(--text4);font-style:italic;font-size:12px;}
+.low-stock-badge{background:var(--coralL);color:var(--coral);}
+
+.parts-container{max-width:1100px;margin:0 auto;}
+.jalali-picker-wrap{margin-top:2px;}
+
+/* ══ HERO BANNER — signature blueprint-grid header ══ */
+.parts-hero{position:relative;background:var(--ink);border-radius:var(--r);padding:26px 28px;margin-bottom:20px;
+  overflow:hidden;display:flex;align-items:center;gap:24px;flex-wrap:wrap;box-shadow:var(--shadow);color:#fff;}
+.parts-hero::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:22px 22px;pointer-events:none;}
+.parts-hero::after{content:'';position:absolute;right:-60px;top:-70px;width:240px;height:240px;
+  background:radial-gradient(circle,rgba(232,93,58,.35),transparent 70%);pointer-events:none;}
+.parts-hero-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--coral),var(--rose));
+  display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0;
+  box-shadow:0 8px 18px rgba(232,93,58,.4);position:relative;z-index:1;}
+.parts-hero-text{flex:1;min-width:180px;position:relative;z-index:1;}
+.parts-hero-title{font-family:'Fraunces',serif;font-size:22px;font-weight:700;letter-spacing:-.3px;}
+.parts-hero-sub{font-size:12.5px;color:rgba(255,255,255,.55);margin-top:4px;}
+.parts-hero-stats{display:flex;gap:26px;position:relative;z-index:1;flex-wrap:wrap;}
+.phs-item{text-align:center;min-width:78px;}
+.phs-val{font-family:'Fraunces',serif;font-size:21px;font-weight:800;color:var(--coral2);}
+.phs-lbl{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+@media(max-width:700px){.parts-hero{flex-direction:column;align-items:flex-start;}.parts-hero-stats{width:100%;justify-content:space-between;gap:10px;}}
+
+.parts-cat-stripe{height:4px;width:100%;flex-shrink:0;}
+.store-avatar{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;}
+.store-card-headrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.store-card-headrow .store-card-name{margin-bottom:0;}
+
+.parts-kpi-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);padding:16px 16px 14px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.parts-kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kpi-color,var(--coral));}
+.parts-kpi-icon{font-size:17px;margin-bottom:7px;}
+.parts-kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;margin-bottom:4px;}
+.parts-kpi-val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--text);}
+
+@media(max-width:900px){.tx-row,.tx-row.three{grid-template-columns:1fr;}.tx-item-row{grid-template-columns:1fr;}.parts-kpis{grid-template-columns:1fr 1fr;}.parts-charts{grid-template-columns:1fr;}}
+</style>
+
+  <div class="parts-hero">
+    <div class="parts-hero-icon">🔧</div>
+    <div class="parts-hero-text">
+      <div class="parts-hero-title">Parts Biz</div>
+      <div class="parts-hero-sub">Buy from Torob, stock the shop, sell alongside every repair.</div>
+    </div>
+    <div class="parts-hero-stats">
+      <div class="phs-item"><div class="phs-val" id="heroStockVal">—</div><div class="phs-lbl">Units in stock</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroValueVal">—</div><div class="phs-lbl">Inventory value</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroProfitVal">—</div><div class="phs-lbl">Profit, 30d</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroLowVal">—</div><div class="phs-lbl">Low stock</div></div>
+    </div>
+  </div>
+
+  <div class="parts-subnav">
+    <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
+    <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
+    <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 New Purchase</button>
+    <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
+    <button class="parts-subtab" data-sub="reports" onclick="showPartsSub('reports')">📊 Reports</button>
+  </div>
+
+  <!-- ═══ PRODUCTS ═══ -->
+  <div id="partsSub-products" class="parts-sub">
+    <div class="parts-filter-bar">
+      <input type="text" class="modal-input" id="partsSearchInput" placeholder="🔍 Search name, car model, brand, code..." dir="auto" oninput="renderPartsProducts()"/>
+      <select class="builder-select" id="partsFilterCarModel" onchange="renderPartsProducts()"><option value="">All car models</option></select>
+      <select class="builder-select" id="partsFilterBrand" onchange="renderPartsProducts()"><option value="">All brands</option></select>
+      <select class="builder-select" id="partsFilterCategory" onchange="renderPartsProducts()"><option value="">All categories</option></select>
+      <button class="parts-add-btn" onclick="openProductModal()">+ Add Product</button>
+    </div>
+    <div class="parts-grid" id="partsProductGrid"></div>
+  </div>
+
+  <!-- ═══ STORES ═══ -->
+  <div id="partsSub-stores" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openStoreModal()">+ Add Store</button>
+    </div>
+    <div class="store-grid" id="partsStoreGrid"></div>
+  </div>
+
+  <!-- ═══ NEW PURCHASE ═══ -->
+  <div id="partsSub-purchase" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">🧾 Record a Purchase</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Store</div>
+          <select class="builder-select" id="purchaseStoreSelect" style="width:100%;"></select>
+        </div>
+        <div>
+          <div class="builder-label">Order date</div>
+          <div class="jalali-picker-wrap" id="purchaseOrderDatePicker"></div>
+          <input type="hidden" id="purchaseOrderDateHidden"/>
+        </div>
+      </div>
+      <label class="tx-samedaywrap">
+        <input type="checkbox" id="purchaseSameDay" checked onchange="togglePurchaseSameDay()"/>
+        Picked up in person (order date = receipt date)
+      </label>
+      <div id="purchaseReceiptDateWrap" style="display:none;margin-bottom:14px;">
+        <div class="builder-label">Received date (from post/courier)</div>
+        <div class="jalali-picker-wrap" id="purchaseReceiptDatePicker"></div>
+        <input type="hidden" id="purchaseReceiptDateHidden"/>
+      </div>
+
+      <div class="tx-item-builder">
+        <div class="builder-label" style="margin-bottom:8px;">Add item to this purchase</div>
+        <div class="tx-item-row">
+          <div>
+            <select class="builder-select" id="purchaseItemProduct"></select>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="purchaseItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (T)" min="0"/>
+          </div>
+          <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ Add</button>
+        </div>
+        <div class="qty-presets" id="purchaseQtyPresets" style="margin-top:8px;"></div>
+        <div style="margin-top:8px;">
+          <button class="preset" onclick="openProductModal(null,'purchase')">+ New product…</button>
+        </div>
+      </div>
+
+      <div class="tx-cart" id="purchaseCart"></div>
+      <div class="tx-total-row"><span class="lbl">Purchase total</span><span class="val" id="purchaseTotalVal">0 T</span></div>
+      <input type="text" class="modal-input" id="purchaseNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+      <button class="tx-save-btn" onclick="savePurchase()">Save Purchase</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Purchase History</div>
+    <div class="tx-list" id="purchaseHistoryList"></div>
+  </div>
+
+  <!-- ═══ SALES ═══ -->
+  <div id="partsSub-sales" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">💵 Record a Sale</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Date</div>
+          <div class="jalali-picker-wrap" id="saleDatePicker"></div>
+          <input type="hidden" id="saleDateHidden"/>
+        </div>
+        <div>
+          <div class="builder-label">Customer name <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+          <input type="text" class="modal-input" id="saleCustomerName" placeholder="e.g. Mr. Ahmadi" dir="auto" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+
+      <div class="tx-item-builder">
+        <div class="builder-label" style="margin-bottom:8px;">Add item to this sale</div>
+        <div class="tx-item-row">
+          <div>
+            <select class="builder-select" id="saleItemProduct" onchange="onSaleProductChange()"></select>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="saleItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (T)" min="0"/>
+          </div>
+          <button class="tx-additem-btn" onclick="addSaleCartItem()">+ Add</button>
+        </div>
+        <div class="qty-presets" id="saleQtyPresets" style="margin-top:8px;"></div>
+        <div id="saleStockHint" style="font-size:11px;color:var(--text3);margin-top:6px;"></div>
+        <div style="margin-top:8px;">
+          <button class="preset" onclick="openProductModal(null,'sale')">+ New product…</button>
+        </div>
+      </div>
+
+      <div class="tx-cart" id="saleCart"></div>
+      <div class="tx-total-row"><span class="lbl">Sale total</span><span class="val" id="saleTotalVal">0 T</span></div>
+      <input type="text" class="modal-input" id="saleNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+      <button class="tx-save-btn" onclick="saveSale()">Save Sale</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Sales Log</div>
+    <div class="tx-list" id="salesHistoryList"></div>
+  </div>
+
+  <!-- ═══ REPORTS ═══ -->
+  <div id="partsSub-reports" class="parts-sub" style="display:none;">
+    <div class="parts-range-chips" id="partsRangeChips"></div>
+
+    <div class="parts-kpis" id="partsKpis"></div>
+
+    <div class="parts-charts">
+      <div class="mchart-card">
+        <div class="mchart-title">Revenue vs Profit</div>
+        <div class="mchart-sub">By month</div>
+        <div class="mchart-wrap"><canvas id="partsRevenueChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Spend by Store</div>
+        <div class="mchart-sub">Total purchase cost, all time filter range</div>
+        <div class="mchart-wrap"><canvas id="partsStoreChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Top Products by Profit</div>
+      <table class="parts-table" id="partsTopProductsTable"><thead><tr>
+        <th>Product</th><th>Units Sold</th><th>Revenue</th><th>COGS</th><th>Profit</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-right:18px;">
+        <div class="parts-table-title">Low Stock</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);">
+          Alert at ≤ <input type="number" class="modal-input" id="lowStockThresholdInput" min="0" step="1" style="width:60px;padding:5px 8px;margin:0;" onchange="saveLowStockThreshold()"/> units
+        </div>
+      </div>
+      <table class="parts-table" id="partsLowStockTable"><thead><tr>
+        <th>Product</th><th>In Stock</th><th>Avg Cost</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Spend by Store</div>
+      <table class="parts-table" id="partsStoreTable"><thead><tr>
+        <th>Store</th><th># Purchases</th><th>Total Spend</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+</div>
+</div>
 
 </div><!-- /app -->
 
@@ -3793,6 +4142,116 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 0 28
 </div>
 
 
+<!-- Parts Biz: Product modal -->
+<style>
+.part-img-upload{width:100%;height:140px;border:2px dashed var(--cream3);border-radius:var(--r2);background:var(--cream2);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;cursor:pointer;margin-bottom:16px;
+  overflow:hidden;position:relative;transition:border-color .2s;}
+.part-img-upload:hover{border-color:var(--coral2);}
+.part-img-upload img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.part-img-upload .hint{font-size:12px;color:var(--text3);font-weight:600;z-index:1;}
+.part-img-upload .hint-icon{font-size:24px;z-index:1;}
+.part-img-remove{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(26,21,16,.6);
+  color:#fff;border:none;cursor:pointer;font-size:13px;z-index:2;display:none;align-items:center;justify-content:center;}
+.pmodal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+</style>
+<div class="overlay" id="productModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <h3 id="productModalTitle">Add Product</h3>
+    <input type="hidden" id="productModalId"/>
+
+    <div class="part-img-upload" id="partImgUploadBox" onclick="document.getElementById('partImgFileInput').click()">
+      <img id="partImgPreview" style="display:none;"/>
+      <div class="hint-icon" id="partImgHintIcon">🖼️</div>
+      <div class="hint" id="partImgHintText">Click to add a photo</div>
+      <button type="button" class="part-img-remove" id="partImgRemoveBtn" onclick="event.stopPropagation();removeProductImage()">✕</button>
+    </div>
+    <input type="file" accept="image/*" id="partImgFileInput" style="display:none;" onchange="onProductImageSelected(event)"/>
+
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Part type</div>
+        <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+      <div>
+        <div class="builder-label">Car model</div>
+        <input type="text" class="modal-input" id="pfCarModel" placeholder="e.g. Peugeot 405" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Brand</div>
+        <input type="text" class="modal-input" id="pfBrand" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+      <div>
+        <div class="builder-label">Variant / type</div>
+        <input type="text" class="modal-input" id="pfVariant" placeholder="e.g. Khari" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+      </div>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" style="width:100%;margin:0;"/>
+      </div>
+      <div>
+        <div class="builder-label">Category <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="pfCategory" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" list="pfCategoryList"/>
+        <datalist id="pfCategoryList"></datalist>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Product name <span style="font-weight:400;color:var(--text4);">(auto-filled, editable)</span></div>
+      <input type="text" class="modal-input" id="pfName" placeholder="Product display name" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="pfNotes" placeholder="Anything else worth remembering" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeProductModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveProductModal()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Store modal -->
+<div class="overlay" id="storeModalOverlay">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="storeModalTitle">Add Store</h3>
+    <input type="hidden" id="storeModalId"/>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Store name</div>
+      <input type="text" class="modal-input" id="sfName" placeholder="e.g. Yadaksara Auto Parts" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Address <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfAddress" placeholder="Store address" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div class="pmodal-row">
+      <div>
+        <div class="builder-label">Phone <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="sfPhone" placeholder="09xx xxx xxxx" style="width:100%;margin:0;"/>
+      </div>
+      <div>
+        <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="sfTorob" placeholder="torob.com/shop/..." style="width:100%;margin:0;"/>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">Website <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfWebsite" placeholder="https://..." style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <input type="text" class="modal-input" id="sfNotes" placeholder="Anything else" dir="auto" style="width:100%;margin:0;"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeStoreModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveStoreModal()">Save Store</button>
+    </div>
+  </div>
+</div>
 <script>
 // ─── STATE ─────────────────────────────────────────
 const state = {
@@ -4287,10 +4746,10 @@ function showToast(msg,type=''){
 
 // ─── VIEW SWITCHING ────────────────────────────────
 function showView(v){
-  ['today','focus','food','money','sleep','calendar','people','goals','car','stats','history'].forEach(x=>{
+  ['today','focus','food','money','sleep','calendar','people','goals','car','parts','stats','history'].forEach(x=>{
     document.getElementById(x+'-view').style.display=x===v?'block':'none';
   });
-  document.querySelectorAll('.nav-tab').forEach((b,i)=>b.classList.toggle('active',['today','focus','food','money','sleep','calendar','people','goals','car','stats','history'][i]===v));
+  document.querySelectorAll('.nav-tab').forEach((b,i)=>b.classList.toggle('active',['today','focus','food','money','sleep','calendar','people','goals','car','parts','stats','history'][i]===v));
   if(v==='sleep') initSleep();
   if(v==='calendar') initCalendar();
   if(v==='stats') loadStats();
@@ -4301,6 +4760,7 @@ function showView(v){
   if(v==='people') initPeople();
   if(v==='goals') loadGoals();
   if(v==='car') loadCar();
+  if(v==='parts') initPartsBiz();
 }
 
 // ─── HISTORY ───────────────────────────────────────
@@ -10792,6 +11252,828 @@ function renderJalaliPicker(containerId, hiddenInputId, isoValue, onChange) {
   const hidden = document.getElementById(hiddenInputId);
   const initIso = isoValue || jalaliToGreg(j.y, j.m, j.d);
   if (hidden) hidden.value = initIso;
+}
+// ══════════════════════════════════════════════════════
+//  PARTS BIZ  —  js_parts.js
+//  Auto-parts resale/accounting module: products, stores,
+//  purchases, sales, and live FIFO-costed reports.
+//  Depends on jalali.js (renderJalaliPicker, gregToJalali)
+//  and the shared helpers/classes in js_core.js + head.html.
+// ══════════════════════════════════════════════════════
+
+const PARTS = {products:[],stores:[],purchases:[],sales:[],stock:{},avg_cost:{},by_product:{},by_store:{},
+  totals:{},low_stock:[],low_stock_threshold:2};
+let partsLoaded = false;
+let partsCurrentSub = 'products';
+let purchaseCartItems = [];
+let saleCartItems = [];
+let editingPurchaseId = null;
+let editingSaleId = null;
+let productModalReturnTo = null; // null | 'purchase' | 'sale'
+let productImageData = null;     // base64 currently staged in the product modal
+let partImgAutoName = '';        // last value we auto-wrote into pfName, so we know if the user overrode it
+let partsReportRange = 'all';
+let partsRevenueChartInstance = null;
+let partsStoreChartInstance = null;
+const QTY_PRESET_VALUES = [1,2,3,4,5,7,10,15,20,30,50];
+
+function fmtT(n){
+  n = Math.round(Number(n)||0);
+  return n.toLocaleString('en-US') + ' T';
+}
+function fmtNum(n){
+  n = Number(n)||0;
+  return (Math.round(n*100)/100).toLocaleString('en-US');
+}
+
+// ─── INIT / LOAD ───────────────────────────────────
+async function initPartsBiz(){
+  if(!partsLoaded){
+    renderQtyPresets('purchaseQtyPresets','purchaseItemQty');
+    renderQtyPresets('saleQtyPresets','saleItemQty');
+    renderJalaliPicker('purchaseOrderDatePicker','purchaseOrderDateHidden',null,()=>{});
+    renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden',null,()=>{});
+    renderJalaliPicker('saleDatePicker','saleDateHidden',null,()=>{});
+    partsLoaded = true;
+  }
+  await fetchParts();
+  showPartsSub(partsCurrentSub);
+}
+
+async function fetchParts(){
+  try{
+    const r = await fetch('/api/parts');
+    const d = await r.json();
+    Object.assign(PARTS, d);
+    renderPartsAll();
+  }catch(e){ console.warn('[Elevate] parts load failed', e); }
+}
+
+async function postParts(action, data){
+  try{
+    const r = await fetch('/api/parts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({action}, data||{}))});
+    const d = await r.json();
+    if(!d.ok){ showToast(d.error || 'Something went wrong','error'); return d; }
+    Object.assign(PARTS, d);
+    renderPartsAll();
+    return d;
+  }catch(e){ console.warn('[Elevate] parts save failed', e); showToast('Save failed — check connection','error'); return {ok:false}; }
+}
+
+function renderPartsAll(){
+  renderPartsFilters();
+  renderPartsProducts();
+  renderStoreGrid();
+  renderStoreSelect();
+  renderProductSelects();
+  renderPurchaseCart();
+  renderSaleCart();
+  renderPurchaseHistory();
+  renderSalesHistory();
+  renderPartsHero();
+  if(document.getElementById('partsSub-reports').style.display !== 'none') renderReports();
+}
+
+const PARTS_PALETTE = ['var(--coral)','var(--sage)','var(--sky)','var(--amber)','var(--plum)','var(--rose)'];
+function hashColor(str){
+  if(!str) return PARTS_PALETTE[0];
+  let h = 0;
+  for(let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+  return PARTS_PALETTE[h % PARTS_PALETTE.length];
+}
+
+function isWithinDays(iso, days){
+  if(!iso) return false;
+  const d = new Date(iso+'T12:00:00');
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-days);
+  return d >= cutoff;
+}
+function renderPartsHero(){
+  const profit30 = PARTS.sales.filter(s=>isWithinDays(s.date,30)).reduce((s,x)=>s+x.profit,0);
+  document.getElementById('heroStockVal').textContent = fmtNum(PARTS.totals.inventory_units||0);
+  document.getElementById('heroValueVal').textContent = fmtT(PARTS.totals.inventory_value||0);
+  document.getElementById('heroProfitVal').textContent = fmtT(profit30);
+  document.getElementById('heroLowVal').textContent = PARTS.totals.low_stock_count||0;
+}
+
+// ─── SUB-NAV ───────────────────────────────────────
+function showPartsSub(name){
+  partsCurrentSub = name;
+  ['products','stores','purchase','sales','reports'].forEach(s=>{
+    document.getElementById('partsSub-'+s).style.display = s===name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.parts-subtab').forEach(b=>b.classList.toggle('active', b.dataset.sub===name));
+  if(name==='reports') renderReports();
+}
+
+// ─── HELPERS ───────────────────────────────────────
+function productById(id){ return PARTS.products.find(p=>p.id===id); }
+function storeById(id){ return PARTS.stores.find(s=>s.id===id); }
+function productLabel(p){
+  if(!p) return '(deleted product)';
+  const parts = [p.part_type, p.car_model, p.brand, p.variant ? '('+p.variant+')' : ''].filter(Boolean);
+  return p.name || parts.join(' — ') || 'Unnamed product';
+}
+function productShortSpec(p){
+  return [p.car_model, p.brand, p.variant].filter(Boolean).join(' · ');
+}
+
+function renderQtyPresets(containerId, targetInputId){
+  const c = document.getElementById(containerId);
+  if(!c) return;
+  c.innerHTML = '';
+  QTY_PRESET_VALUES.forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'preset';
+    b.type = 'button';
+    b.textContent = v;
+    b.onclick = ()=>{ document.getElementById(targetInputId).value = v; };
+    c.appendChild(b);
+  });
+}
+
+// ─── PRODUCTS: filters + grid ──────────────────────
+function renderPartsFilters(){
+  const fill = (id, values)=>{
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">' + sel.options[0].textContent + '</option>';
+    [...new Set(values.filter(Boolean))].sort().forEach(v=>{
+      const o = document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o);
+    });
+    if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+  };
+  fill('partsFilterCarModel', PARTS.products.map(p=>p.car_model));
+  fill('partsFilterBrand', PARTS.products.map(p=>p.brand));
+  fill('partsFilterCategory', PARTS.products.map(p=>p.category));
+  const dl = document.getElementById('pfCategoryList');
+  if(dl){
+    dl.innerHTML = '';
+    [...new Set(PARTS.products.map(p=>p.category).filter(Boolean))].sort().forEach(c=>{
+      const o = document.createElement('option'); o.value=c; dl.appendChild(o);
+    });
+  }
+}
+
+function renderPartsProducts(){
+  const grid = document.getElementById('partsProductGrid');
+  const q = (document.getElementById('partsSearchInput').value||'').trim().toLowerCase();
+  const fCar = document.getElementById('partsFilterCarModel').value;
+  const fBrand = document.getElementById('partsFilterBrand').value;
+  const fCat = document.getElementById('partsFilterCategory').value;
+
+  let list = PARTS.products.filter(p=>{
+    if(fCar && p.car_model !== fCar) return false;
+    if(fBrand && p.brand !== fBrand) return false;
+    if(fCat && p.category !== fCat) return false;
+    if(q){
+      const hay = [p.name,p.car_model,p.brand,p.part_type,p.variant,p.oem_code,p.notes].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  grid.innerHTML = '';
+  if(!list.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🔩</div><div class="pe-text">No products yet — click "+ Add Product" to define your first part.</div></div>';
+    return;
+  }
+  list.forEach(p=>{
+    const stock = PARTS.stock[p.id] || 0;
+    const cost = PARTS.avg_cost[p.id] || 0;
+    const thresh = PARTS.low_stock_threshold;
+    const stockClass = stock<=0 ? 'out' : (stock<=thresh ? 'low' : 'ok');
+    const stockIcon = stock<=0 ? '✕' : (stock<=thresh ? '⚠' : '●');
+    const stockLabel = stock<=0 ? 'Out of stock' : (stock + ' in stock');
+    const stripeColor = hashColor(p.category || p.part_type || p.brand);
+    const el = document.createElement('div');
+    el.className = 'part-card';
+    el.innerHTML = `
+      <div class="parts-cat-stripe" style="background:${stripeColor}"></div>
+      <div class="part-card-img">${p.image ? `<img src="${p.image}">` : '🔩'}</div>
+      <div class="part-card-body">
+        <div class="part-card-title">${escHtml(productLabel(p))}</div>
+        <div class="part-card-spec">${escHtml(productShortSpec(p)) || '&nbsp;'}</div>
+        <div class="part-card-badges">
+          ${p.category ? `<span class="part-badge" style="background:${stripeColor}22;color:${stripeColor}">${escHtml(p.category)}</span>` : ''}
+          ${p.oem_code ? `<span class="part-badge">${escHtml(p.oem_code)}</span>` : ''}
+        </div>
+        <div class="part-card-stock ${stockClass}">${stockIcon} ${stockLabel}</div>
+        ${stock>0 ? `<div class="part-card-cost">avg cost ${fmtT(cost)}</div>` : ''}
+      </div>
+      <div class="part-card-actions">
+        <button onclick="openProductModal('${p.id}')">✎ Edit</button>
+        <button class="del" onclick="deleteProduct('${p.id}')">🗑 Delete</button>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+
+function escHtml(s){
+  if(s==null) return '';
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function deleteProduct(id){
+  postParts('delete_product',{id});
+  showToast('Product deleted','success');
+}
+
+// ─── PRODUCT MODAL ─────────────────────────────────
+function openProductModal(id, returnTo){
+  productModalReturnTo = returnTo || null;
+  document.getElementById('productModalId').value = id || '';
+  document.getElementById('productModalTitle').textContent = id ? 'Edit Product' : 'Add Product';
+  productImageData = null;
+  const preview = document.getElementById('partImgPreview');
+  const removeBtn = document.getElementById('partImgRemoveBtn');
+  const hintIcon = document.getElementById('partImgHintIcon');
+  const hintText = document.getElementById('partImgHintText');
+
+  if(id){
+    const p = productById(id);
+    document.getElementById('pfPartType').value = p.part_type||'';
+    document.getElementById('pfCarModel').value = p.car_model||'';
+    document.getElementById('pfBrand').value = p.brand||'';
+    document.getElementById('pfVariant').value = p.variant||'';
+    document.getElementById('pfOemCode').value = p.oem_code||'';
+    document.getElementById('pfCategory').value = p.category||'';
+    document.getElementById('pfName').value = p.name||'';
+    document.getElementById('pfNotes').value = p.notes||'';
+    partImgAutoName = '';
+    if(p.image){
+      productImageData = p.image;
+      preview.src = p.image; preview.style.display='block';
+      hintIcon.style.display='none'; hintText.style.display='none'; removeBtn.style.display='flex';
+    } else {
+      preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
+    }
+  } else {
+    ['pfPartType','pfCarModel','pfBrand','pfVariant','pfOemCode','pfCategory','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
+    partImgAutoName = '';
+  }
+  document.getElementById('productModalOverlay').classList.add('open');
+}
+function closeProductModal(){
+  document.getElementById('productModalOverlay').classList.remove('open');
+  productModalReturnTo = null;
+}
+function suggestProductName(){
+  const nameField = document.getElementById('pfName');
+  const suggestion = [document.getElementById('pfPartType').value, document.getElementById('pfCarModel').value,
+    document.getElementById('pfBrand').value, document.getElementById('pfVariant').value ? '('+document.getElementById('pfVariant').value+')' : '']
+    .filter(Boolean).join(' — ');
+  if(nameField.value === '' || nameField.value === partImgAutoName){
+    nameField.value = suggestion;
+    partImgAutoName = suggestion;
+  }
+}
+function onProductImageSelected(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxW = 640;
+      const scale = Math.min(1, maxW/img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width*scale);
+      canvas.height = Math.round(img.height*scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg',0.82);
+      productImageData = dataUrl;
+      const preview = document.getElementById('partImgPreview');
+      preview.src = dataUrl; preview.style.display='block';
+      document.getElementById('partImgHintIcon').style.display='none';
+      document.getElementById('partImgHintText').style.display='none';
+      document.getElementById('partImgRemoveBtn').style.display='flex';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function removeProductImage(){
+  productImageData = '';
+  document.getElementById('partImgFileInput').value = '';
+  document.getElementById('partImgPreview').style.display='none';
+  document.getElementById('partImgHintIcon').style.display='block';
+  document.getElementById('partImgHintText').style.display='block';
+  document.getElementById('partImgRemoveBtn').style.display='none';
+}
+async function saveProductModal(){
+  const id = document.getElementById('productModalId').value;
+  const partType = document.getElementById('pfPartType').value.trim();
+  const carModel = document.getElementById('pfCarModel').value.trim();
+  if(!partType && !carModel && !document.getElementById('pfName').value.trim()){
+    showToast('Give the product at least a name or a part type','error'); return;
+  }
+  const payload = {
+    part_type: partType, car_model: carModel,
+    brand: document.getElementById('pfBrand').value.trim(),
+    variant: document.getElementById('pfVariant').value.trim(),
+    oem_code: document.getElementById('pfOemCode').value.trim(),
+    category: document.getElementById('pfCategory').value.trim(),
+    name: document.getElementById('pfName').value.trim(),
+    notes: document.getElementById('pfNotes').value.trim(),
+  };
+  if(productImageData !== null) payload.image = productImageData;
+
+  const prevIds = new Set(PARTS.products.map(p=>p.id));
+  let res;
+  if(id){ payload.id = id; res = await postParts('update_product', payload); }
+  else { res = await postParts('add_product', payload); }
+  if(!res || res.ok===false) return;
+
+  closeProductModal();
+  showToast(id ? 'Product updated' : 'Product added','success');
+
+  if(!id && productModalReturnTo){
+    const newProd = PARTS.products.find(p=>!prevIds.has(p.id));
+    if(newProd){
+      if(productModalReturnTo==='purchase') document.getElementById('purchaseItemProduct').value = newProd.id;
+      if(productModalReturnTo==='sale'){ document.getElementById('saleItemProduct').value = newProd.id; onSaleProductChange(); }
+    }
+  }
+}
+
+// ─── STORES ─────────────────────────────────────────
+function renderStoreGrid(){
+  const grid = document.getElementById('partsStoreGrid');
+  grid.innerHTML = '';
+  if(!PARTS.stores.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🏬</div><div class="pe-text">No stores yet — click "+ Add Store" to add where you buy parts from.</div></div>';
+    return;
+  }
+  PARTS.stores.forEach(s=>{
+    const spend = (PARTS.by_store[s.id]||{}).spend || 0;
+    const avatarColor = hashColor(s.name);
+    const initial = (s.name||'?').trim().charAt(0).toUpperCase();
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-headrow">
+        <div class="store-avatar" style="background:${avatarColor}">${escHtml(initial)}</div>
+        <div class="store-card-name">${escHtml(s.name)}</div>
+      </div>
+      ${s.address ? `<div class="store-card-row"><span class="lbl">📍</span>${escHtml(s.address)}</div>` : ''}
+      ${s.phone ? `<div class="store-card-row"><span class="lbl">📞</span>${escHtml(s.phone)}</div>` : ''}
+      ${s.notes ? `<div class="store-card-row"><span class="lbl">📝</span>${escHtml(s.notes)}</div>` : ''}
+      <div class="store-card-row"><span class="lbl">💸</span>Total spend: ${fmtT(spend)}</div>
+      <div class="store-card-links">
+        ${s.torob_link ? `<a href="${escHtml(s.torob_link)}" target="_blank" rel="noopener">Torob ↗</a>` : ''}
+        ${s.website ? `<a href="${escHtml(s.website)}" target="_blank" rel="noopener">Website ↗</a>` : ''}
+      </div>
+      <div class="store-card-actions">
+        <button onclick="openStoreModal('${s.id}')">✎ Edit</button>
+        <button class="del" onclick="deleteStore('${s.id}')">🗑 Delete</button>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function renderStoreSelect(){
+  const sel = document.getElementById('purchaseStoreSelect');
+  const cur = sel.value;
+  sel.innerHTML = PARTS.stores.length
+    ? PARTS.stores.map(s=>`<option value="${s.id}">${escHtml(s.name)}</option>`).join('')
+    : '<option value="">— add a store first —</option>';
+  if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+}
+function deleteStore(id){
+  postParts('delete_store',{id});
+  showToast('Store deleted','success');
+}
+function openStoreModal(id){
+  document.getElementById('storeModalId').value = id||'';
+  document.getElementById('storeModalTitle').textContent = id ? 'Edit Store' : 'Add Store';
+  if(id){
+    const s = storeById(id);
+    document.getElementById('sfName').value = s.name||'';
+    document.getElementById('sfAddress').value = s.address||'';
+    document.getElementById('sfPhone').value = s.phone||'';
+    document.getElementById('sfTorob').value = s.torob_link||'';
+    document.getElementById('sfWebsite').value = s.website||'';
+    document.getElementById('sfNotes').value = s.notes||'';
+  } else {
+    ['sfName','sfAddress','sfPhone','sfTorob','sfWebsite','sfNotes'].forEach(f=>document.getElementById(f).value='');
+  }
+  document.getElementById('storeModalOverlay').classList.add('open');
+}
+function closeStoreModal(){ document.getElementById('storeModalOverlay').classList.remove('open'); }
+async function saveStoreModal(){
+  const id = document.getElementById('storeModalId').value;
+  const name = document.getElementById('sfName').value.trim();
+  if(!name){ showToast('Store needs a name','error'); return; }
+  const payload = {
+    name, address: document.getElementById('sfAddress').value.trim(),
+    phone: document.getElementById('sfPhone').value.trim(),
+    torob_link: document.getElementById('sfTorob').value.trim(),
+    website: document.getElementById('sfWebsite').value.trim(),
+    notes: document.getElementById('sfNotes').value.trim(),
+  };
+  if(id){ payload.id=id; await postParts('update_store', payload); }
+  else { await postParts('add_store', payload); }
+  closeStoreModal();
+  showToast(id ? 'Store updated' : 'Store added','success');
+}
+
+// ─── PRODUCT SELECTS (shared by purchase + sale forms) ──
+function renderProductSelects(){
+  const opts = PARTS.products.length
+    ? PARTS.products.map(p=>`<option value="${p.id}">${escHtml(productLabel(p))}</option>`).join('')
+    : '<option value="">— add a product first —</option>';
+
+  const pSel = document.getElementById('purchaseItemProduct');
+  const pCur = pSel.value; pSel.innerHTML = opts;
+  if([...pSel.options].some(o=>o.value===pCur)) pSel.value = pCur;
+
+  const sSel = document.getElementById('saleItemProduct');
+  const sCur = sSel.value;
+  sSel.innerHTML = PARTS.products.length
+    ? PARTS.products.map(p=>`<option value="${p.id}">${escHtml(productLabel(p))} — ${PARTS.stock[p.id]||0} in stock</option>`).join('')
+    : '<option value="">— add a product first —</option>';
+  if([...sSel.options].some(o=>o.value===sCur)) sSel.value = sCur;
+  onSaleProductChange();
+}
+
+// ─── PURCHASE FORM ──────────────────────────────────
+function togglePurchaseSameDay(){
+  const same = document.getElementById('purchaseSameDay').checked;
+  document.getElementById('purchaseReceiptDateWrap').style.display = same ? 'none' : 'block';
+}
+function addPurchaseCartItem(){
+  const pid = document.getElementById('purchaseItemProduct').value;
+  const qty = parseFloat(document.getElementById('purchaseItemQty').value);
+  const price = parseFloat(document.getElementById('purchaseItemPrice').value);
+  if(!pid){ showToast('Pick a product first','error'); return; }
+  if(!qty || qty<=0){ showToast('Enter a quantity','error'); return; }
+  if(price==null || isNaN(price) || price<0){ showToast('Enter a unit price','error'); return; }
+  purchaseCartItems.push({product_id:pid, qty, unit_price:price});
+  document.getElementById('purchaseItemQty').value = 1;
+  document.getElementById('purchaseItemPrice').value = '';
+  renderPurchaseCart();
+}
+function removePurchaseCartItem(idx){ purchaseCartItems.splice(idx,1); renderPurchaseCart(); }
+function renderPurchaseCart(){
+  const c = document.getElementById('purchaseCart');
+  c.innerHTML = '';
+  if(!purchaseCartItems.length){
+    c.innerHTML = '<div class="tx-cart-empty">No items added yet.</div>';
+  } else {
+    purchaseCartItems.forEach((it,idx)=>{
+      const p = productById(it.product_id);
+      const el = document.createElement('div');
+      el.className = 'tx-cart-item';
+      el.innerHTML = `<div class="tx-cart-item-info">
+          <div class="tx-cart-item-name">${escHtml(productLabel(p))}</div>
+          <div class="tx-cart-item-detail">${it.qty} × ${fmtT(it.unit_price)}</div>
+        </div>
+        <div class="tx-cart-item-total">${fmtT(it.qty*it.unit_price)}</div>
+        <button class="tx-cart-del" onclick="removePurchaseCartItem(${idx})">✕</button>`;
+      c.appendChild(el);
+    });
+  }
+  const total = purchaseCartItems.reduce((s,it)=>s+it.qty*it.unit_price,0);
+  document.getElementById('purchaseTotalVal').textContent = fmtT(total);
+}
+async function savePurchase(){
+  const storeId = document.getElementById('purchaseStoreSelect').value;
+  if(!storeId){ showToast('Pick a store','error'); return; }
+  if(!purchaseCartItems.length){ showToast('Add at least one item','error'); return; }
+  const sameDay = document.getElementById('purchaseSameDay').checked;
+  const orderDate = document.getElementById('purchaseOrderDateHidden').value;
+  const receiptDate = sameDay ? orderDate : document.getElementById('purchaseReceiptDateHidden').value;
+  const payload = {
+    store_id: storeId, order_date: orderDate, receipt_date: receiptDate, same_day: sameDay,
+    items: purchaseCartItems, notes: document.getElementById('purchaseNotes').value.trim(),
+  };
+  if(editingPurchaseId){ payload.id = editingPurchaseId; await postParts('update_purchase', payload); }
+  else { await postParts('add_purchase', payload); }
+
+  showToast(editingPurchaseId ? 'Purchase updated' : 'Purchase saved','success');
+  cancelEditPurchase();
+  purchaseCartItems = [];
+  document.getElementById('purchaseNotes').value = '';
+  renderPurchaseCart();
+}
+function cancelEditPurchase(){
+  editingPurchaseId = null;
+  const btn = document.querySelector('#partsSub-purchase .tx-save-btn');
+  if(btn) btn.textContent = 'Save Purchase';
+}
+function editPurchase(id){
+  const pur = PARTS.purchases.find(p=>p.id===id);
+  if(!pur) return;
+  editingPurchaseId = id;
+  showPartsSub('purchase');
+  document.getElementById('purchaseStoreSelect').value = pur.store_id;
+  renderJalaliPicker('purchaseOrderDatePicker','purchaseOrderDateHidden', pur.order_date, ()=>{});
+  const sameDay = !!pur.same_day;
+  document.getElementById('purchaseSameDay').checked = sameDay;
+  togglePurchaseSameDay();
+  renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden', pur.receipt_date, ()=>{});
+  purchaseCartItems = pur.items.map(it=>({...it}));
+  document.getElementById('purchaseNotes').value = pur.notes||'';
+  renderPurchaseCart();
+  const btn = document.querySelector('#partsSub-purchase .tx-save-btn');
+  if(btn) btn.textContent = 'Update Purchase';
+  showToast('Editing purchase — change anything and save','success');
+}
+function deletePurchase(id){
+  postParts('delete_purchase',{id});
+  showToast('Purchase deleted','success');
+  if(editingPurchaseId===id) cancelEditPurchase();
+}
+function renderPurchaseHistory(){
+  const list = document.getElementById('purchaseHistoryList');
+  list.innerHTML = '';
+  const sorted = [...PARTS.purchases].sort((a,b)=>(b.order_date||'').localeCompare(a.order_date||''));
+  if(!sorted.length){ list.innerHTML = '<div class="parts-empty"><div class="pe-icon">🧾</div><div class="pe-text">No purchases recorded yet.</div></div>'; return; }
+  sorted.forEach(pur=>{
+    const store = storeById(pur.store_id);
+    const total = pur.items.reduce((s,it)=>s+it.qty*it.unit_price,0);
+    const el = document.createElement('div');
+    el.className = 'tx-list-item';
+    const bodyId = 'purBody-'+pur.id;
+    el.innerHTML = `
+      <div class="tx-list-head" onclick="document.getElementById('${bodyId}').classList.toggle('open')">
+        <div>
+          <div class="tx-list-title">${escHtml(store ? store.name : '(deleted store)')} · ${pur.items.length} item${pur.items.length===1?'':'s'}</div>
+          <div class="tx-list-sub">${jalaliFullLabel(pur.order_date)}${!pur.same_day ? ' → received '+jalaliFullLabel(pur.receipt_date) : ''}</div>
+        </div>
+        <div class="tx-list-amount">${fmtT(total)}</div>
+      </div>
+      <div class="tx-list-body" id="${bodyId}">
+        ${pur.items.map(it=>`<div class="tx-list-line"><span>${escHtml(productLabel(productById(it.product_id)))} × ${it.qty}</span><span>${fmtT(it.qty*it.unit_price)}</span></div>`).join('')}
+        ${pur.notes ? `<div class="tx-list-line"><span>📝 ${escHtml(pur.notes)}</span><span></span></div>` : ''}
+        <div class="tx-list-actions">
+          <button onclick="editPurchase('${pur.id}')">✎ Edit</button>
+          <button class="del" onclick="deletePurchase('${pur.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+// ─── SALE FORM ──────────────────────────────────────
+function onSaleProductChange(){
+  const pid = document.getElementById('saleItemProduct').value;
+  const hint = document.getElementById('saleStockHint');
+  if(!pid){ hint.textContent=''; return; }
+  const inCart = saleCartItems.filter(it=>it.product_id===pid).reduce((s,it)=>s+it.qty,0);
+  const avail = (PARTS.stock[pid]||0) - inCart;
+  const cost = PARTS.avg_cost[pid]||0;
+  hint.textContent = avail>0
+    ? `${avail} available (avg cost ${fmtT(cost)})`
+    : `⚠ No tracked stock left for this part — selling anyway will use an estimated cost.`;
+}
+function addSaleCartItem(){
+  const pid = document.getElementById('saleItemProduct').value;
+  const qty = parseFloat(document.getElementById('saleItemQty').value);
+  const price = parseFloat(document.getElementById('saleItemPrice').value);
+  if(!pid){ showToast('Pick a product first','error'); return; }
+  if(!qty || qty<=0){ showToast('Enter a quantity','error'); return; }
+  if(price==null || isNaN(price) || price<0){ showToast('Enter a sell price','error'); return; }
+  const inCart = saleCartItems.filter(it=>it.product_id===pid).reduce((s,it)=>s+it.qty,0);
+  const avail = (PARTS.stock[pid]||0) - inCart;
+  if(qty > avail){
+    showToast(`Only ${avail} tracked in stock — added anyway with an estimated cost`,'error');
+  }
+  saleCartItems.push({product_id:pid, qty, unit_price:price});
+  document.getElementById('saleItemQty').value = 1;
+  document.getElementById('saleItemPrice').value = '';
+  renderSaleCart();
+  onSaleProductChange();
+}
+function removeSaleCartItem(idx){ saleCartItems.splice(idx,1); renderSaleCart(); onSaleProductChange(); }
+function renderSaleCart(){
+  const c = document.getElementById('saleCart');
+  c.innerHTML = '';
+  if(!saleCartItems.length){
+    c.innerHTML = '<div class="tx-cart-empty">No items added yet.</div>';
+  } else {
+    saleCartItems.forEach((it,idx)=>{
+      const p = productById(it.product_id);
+      const el = document.createElement('div');
+      el.className = 'tx-cart-item';
+      el.innerHTML = `<div class="tx-cart-item-info">
+          <div class="tx-cart-item-name">${escHtml(productLabel(p))}</div>
+          <div class="tx-cart-item-detail">${it.qty} × ${fmtT(it.unit_price)}</div>
+        </div>
+        <div class="tx-cart-item-total">${fmtT(it.qty*it.unit_price)}</div>
+        <button class="tx-cart-del" onclick="removeSaleCartItem(${idx})">✕</button>`;
+      c.appendChild(el);
+    });
+  }
+  const total = saleCartItems.reduce((s,it)=>s+it.qty*it.unit_price,0);
+  document.getElementById('saleTotalVal').textContent = fmtT(total);
+}
+async function saveSale(){
+  if(!saleCartItems.length){ showToast('Add at least one item','error'); return; }
+  const payload = {
+    date: document.getElementById('saleDateHidden').value,
+    customer_name: document.getElementById('saleCustomerName').value.trim(),
+    notes: document.getElementById('saleNotes').value.trim(),
+    items: saleCartItems,
+  };
+  if(editingSaleId){ payload.id = editingSaleId; await postParts('update_sale', payload); }
+  else { await postParts('add_sale', payload); }
+
+  showToast(editingSaleId ? 'Sale updated' : 'Sale saved','success');
+  cancelEditSale();
+  saleCartItems = [];
+  document.getElementById('saleCustomerName').value = '';
+  document.getElementById('saleNotes').value = '';
+  renderSaleCart();
+}
+function cancelEditSale(){
+  editingSaleId = null;
+  const btn = document.querySelector('#partsSub-sales .tx-save-btn');
+  if(btn) btn.textContent = 'Save Sale';
+}
+function editSale(id){
+  const sale = PARTS.sales.find(s=>s.id===id);
+  if(!sale) return;
+  editingSaleId = id;
+  showPartsSub('sales');
+  renderJalaliPicker('saleDatePicker','saleDateHidden', sale.date, ()=>{});
+  document.getElementById('saleCustomerName').value = sale.customer_name||'';
+  document.getElementById('saleNotes').value = sale.notes||'';
+  saleCartItems = sale.items.map(it=>({product_id:it.product_id, qty:it.qty, unit_price:it.unit_price}));
+  renderSaleCart();
+  const btn = document.querySelector('#partsSub-sales .tx-save-btn');
+  if(btn) btn.textContent = 'Update Sale';
+  showToast('Editing sale — change anything and save','success');
+}
+function deleteSale(id){
+  postParts('delete_sale',{id});
+  showToast('Sale deleted','success');
+  if(editingSaleId===id) cancelEditSale();
+}
+function renderSalesHistory(){
+  const list = document.getElementById('salesHistoryList');
+  list.innerHTML = '';
+  const sorted = [...PARTS.sales].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!sorted.length){ list.innerHTML = '<div class="parts-empty"><div class="pe-icon">💵</div><div class="pe-text">No sales recorded yet.</div></div>'; return; }
+  sorted.forEach(sale=>{
+    const el = document.createElement('div');
+    el.className = 'tx-list-item';
+    const bodyId = 'saleBody-'+sale.id;
+    const profitClass = sale.profit>=0 ? 'profit-pos' : 'profit-neg';
+    el.innerHTML = `
+      <div class="tx-list-head" onclick="document.getElementById('${bodyId}').classList.toggle('open')">
+        <div>
+          <div class="tx-list-title">${escHtml(sale.customer_name || 'Walk-in customer')} · ${sale.items.length} item${sale.items.length===1?'':'s'}</div>
+          <div class="tx-list-sub">${jalaliFullLabel(sale.date)}</div>
+        </div>
+        <div>
+          <div class="tx-list-amount">${fmtT(sale.revenue)}</div>
+          <div class="tx-list-amount ${profitClass}" style="font-size:11px;">profit ${fmtT(sale.profit)}</div>
+        </div>
+      </div>
+      <div class="tx-list-body" id="${bodyId}">
+        ${sale.items.map(it=>`<div class="tx-list-line"><span>${escHtml(productLabel(productById(it.product_id)))} × ${it.qty}</span><span>${fmtT(it.revenue)} (profit ${fmtT(it.profit)})</span></div>`).join('')}
+        ${sale.notes ? `<div class="tx-list-line"><span>📝 ${escHtml(sale.notes)}</span><span></span></div>` : ''}
+        <div class="tx-list-actions">
+          <button onclick="editSale('${sale.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteSale('${sale.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+// ─── REPORTS ────────────────────────────────────────
+function renderRangeChips(){
+  const c = document.getElementById('partsRangeChips');
+  const ranges = [['all','All time'],['month','This month'],['30d','Last 30 days']];
+  c.innerHTML = ranges.map(([k,label])=>
+    `<button class="parts-range-chip ${partsReportRange===k?'active':''}" onclick="setPartsRange('${k}')">${label}</button>`).join('');
+}
+function setPartsRange(r){ partsReportRange = r; renderReports(); }
+function inRange(iso){
+  if(!iso) return false;
+  if(partsReportRange==='all') return true;
+  if(partsReportRange==='30d'){
+    const d = new Date(iso+'T12:00:00');
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+    return d >= cutoff;
+  }
+  if(partsReportRange==='month'){
+    const j = gregToJalali(iso);
+    const today = jalaliTodayLocal();
+    return j && today && j.y===today.y && j.m===today.m;
+  }
+  return true;
+}
+function renderReports(){
+  renderRangeChips();
+  document.getElementById('lowStockThresholdInput').value = PARTS.low_stock_threshold;
+
+  const filteredSales = PARTS.sales.filter(s=>inRange(s.date));
+  const filteredPurchases = PARTS.purchases.filter(p=>inRange(p.order_date));
+
+  const revenue = filteredSales.reduce((s,x)=>s+x.revenue,0);
+  const cogs = filteredSales.reduce((s,x)=>s+x.cogs,0);
+  const profit = revenue - cogs;
+  const margin = revenue>0 ? (profit/revenue*100) : 0;
+  const purchaseSpend = filteredPurchases.reduce((s,p)=>s+p.items.reduce((a,it)=>a+it.qty*it.unit_price,0),0);
+
+  const kpis = [
+    ['💰','Revenue', fmtT(revenue), 'var(--sky)'],
+    ['📦','COGS', fmtT(cogs), 'var(--amber)'],
+    ['📈','Gross Profit', fmtT(profit), profit>=0?'var(--sage)':'var(--coral)'],
+    ['🎯','Margin', margin.toFixed(1)+'%', 'var(--plum)'],
+    ['🧾','Purchase Spend', fmtT(purchaseSpend), 'var(--rose)'],
+    ['🏷️','Inventory Value', fmtT(PARTS.totals.inventory_value||0), 'var(--sky)'],
+    ['🔩','Units In Stock', fmtNum(PARTS.totals.inventory_units||0), 'var(--sage)'],
+    ['⚠️','Low Stock Items', PARTS.totals.low_stock_count||0, (PARTS.totals.low_stock_count||0)>0?'var(--coral)':'var(--sage)'],
+  ];
+  const kwrap = document.getElementById('partsKpis');
+  kwrap.innerHTML = kpis.map(([icon,label,val,color])=>`
+    <div class="parts-kpi-card" style="--kpi-color:${color}">
+      <div class="parts-kpi-icon">${icon}</div>
+      <div class="parts-kpi-label">${label}</div>
+      <div class="parts-kpi-val" style="color:${color}">${val}</div>
+    </div>`).join('');
+
+  // top products by profit within range
+  const byProd = {};
+  filteredSales.forEach(sale=>sale.items.forEach(it=>{
+    const b = byProd[it.product_id] || (byProd[it.product_id]={qty:0,revenue:0,cogs:0,profit:0});
+    b.qty += it.qty; b.revenue += it.revenue; b.cogs += it.cogs; b.profit += it.profit;
+  }));
+  const topRows = Object.entries(byProd).sort((a,b)=>b[1].profit-a[1].profit).slice(0,10);
+  const topBody = document.querySelector('#partsTopProductsTable tbody');
+  topBody.innerHTML = topRows.length ? topRows.map(([pid,v])=>`
+    <tr><td>${escHtml(productLabel(productById(pid)))}</td><td>${fmtNum(v.qty)}</td>
+      <td>${fmtT(v.revenue)}</td><td>${fmtT(v.cogs)}</td>
+      <td style="color:${v.profit>=0?'var(--sage)':'var(--coral)'};font-weight:700;">${fmtT(v.profit)}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="parts-table-empty">No sales in this range yet.</td></tr>`;
+
+  // low stock (current, not range-filtered)
+  const lowBody = document.querySelector('#partsLowStockTable tbody');
+  lowBody.innerHTML = PARTS.low_stock.length ? PARTS.low_stock.map(pid=>`
+    <tr><td>${escHtml(productLabel(productById(pid)))}</td>
+      <td><span class="part-badge low-stock-badge">${PARTS.stock[pid]||0}</span></td>
+      <td>${fmtT(PARTS.avg_cost[pid]||0)}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="parts-table-empty">Nothing low on stock right now.</td></tr>`;
+
+  // spend by store within range
+  const byStore = {};
+  filteredPurchases.forEach(pur=>{
+    const b = byStore[pur.store_id] || (byStore[pur.store_id]={count:0,spend:0});
+    b.count += 1; b.spend += pur.items.reduce((a,it)=>a+it.qty*it.unit_price,0);
+  });
+  const storeRows = Object.entries(byStore).sort((a,b)=>b[1].spend-a[1].spend);
+  const storeBody = document.querySelector('#partsStoreTable tbody');
+  storeBody.innerHTML = storeRows.length ? storeRows.map(([sid,v])=>`
+    <tr><td>${escHtml(storeById(sid) ? storeById(sid).name : '(deleted store)')}</td><td>${v.count}</td><td>${fmtT(v.spend)}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="parts-table-empty">No purchases in this range yet.</td></tr>`;
+
+  renderPartsCharts(filteredSales, storeRows);
+}
+async function saveLowStockThreshold(){
+  const v = parseFloat(document.getElementById('lowStockThresholdInput').value);
+  await postParts('set_low_stock_threshold',{value: isNaN(v)?2:v});
+}
+
+function renderPartsCharts(filteredSales, storeRows){
+  // Revenue vs profit by Jalali month
+  const byMonth = {};
+  filteredSales.forEach(sale=>{
+    const j = gregToJalali(sale.date);
+    if(!j) return;
+    const key = j.y+'/'+String(j.m).padStart(2,'0');
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0});
+    b.revenue += sale.revenue; b.profit += sale.profit;
+  });
+  const monthKeys = Object.keys(byMonth).sort();
+  const revCtx = document.getElementById('partsRevenueChart');
+  if(partsRevenueChartInstance) partsRevenueChartInstance.destroy();
+  partsRevenueChartInstance = new Chart(revCtx, {
+    type:'bar',
+    data:{ labels: monthKeys.map(k=>byMonth[k].label),
+      datasets:[
+        {label:'Revenue', data: monthKeys.map(k=>byMonth[k].revenue), backgroundColor:'#2a6a9a'},
+        {label:'Profit', data: monthKeys.map(k=>byMonth[k].profit), backgroundColor:'#3a7a5a'},
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
+  });
+
+  const storeCtx = document.getElementById('partsStoreChart');
+  if(partsStoreChartInstance) partsStoreChartInstance.destroy();
+  const palette = ['#e85d3a','#3a7a5a','#2a6a9a','#d4821a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
+  partsStoreChartInstance = new Chart(storeCtx, {
+    type:'doughnut',
+    data:{ labels: storeRows.map(([sid])=> storeById(sid)? storeById(sid).name : '(deleted store)'),
+      datasets:[{ data: storeRows.map(([,v])=>v.spend), backgroundColor: storeRows.map((_,i)=>palette[i%palette.length]) }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}
+  });
 }
 // ══════════════════════════════════════════════════════
 //  GOALS MODULE  —  js_goals.js

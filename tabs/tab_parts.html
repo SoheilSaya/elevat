@@ -1,0 +1,399 @@
+<!-- PARTS BIZ -->
+<div id="parts-view" style="display:none;">
+<div class="parts-container">
+<style>
+.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
+.parts-subtab{padding:8px 18px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.parts-subtab.active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
+.parts-sub{animation:fadeUp .3s ease both;}
+
+.parts-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);align-items:center;}
+.parts-filter-bar .modal-input{margin:0;width:280px;max-width:100%;}
+.parts-filter-bar .builder-select{margin:0;font-size:13px;width:170px;}
+.parts-add-btn{padding:10px 18px;border-radius:50px;border:none;background:var(--coral);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .2s;margin-left:auto;}
+.parts-add-btn:hover{background:var(--rose);}
+.parts-add-btn.sage{background:var(--sage);}
+.parts-add-btn.sage:hover{background:var(--sage2);}
+
+.parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:24px;}
+.part-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column;animation:fadeUp .3s ease both;}
+.part-card:hover{border-color:var(--warmD);transform:translateY(-2px);}
+.part-card-img{width:100%;height:130px;background:var(--cream2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:34px;color:var(--text4);flex-shrink:0;}
+.part-card-img img{width:100%;height:100%;object-fit:cover;}
+.part-card-body{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:3px;}
+.part-card-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;color:var(--ink);line-height:1.25;}
+.part-card-spec{font-size:11px;color:var(--text3);}
+.part-card-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.part-badge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:50px;background:var(--cream2);color:var(--text2);}
+.part-card-stock{margin-top:7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:50px;width:fit-content;}
+.part-card-stock.ok{color:var(--sage);background:var(--sageL);}
+.part-card-stock.low{color:var(--amber);background:var(--amberL);}
+.part-card-stock.out{color:var(--text3);background:var(--cream2);}
+.part-card-cost{font-size:10.5px;color:var(--text3);margin-top:1px;font-family:'JetBrains Mono',monospace;}
+.part-card-actions{display:flex;gap:6px;padding:10px 14px;border-top:1.5px solid var(--cream2);}
+.part-card-actions button{flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;}
+.part-card-actions button:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
+.part-card-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+.parts-empty{color:var(--text4);font-size:13px;padding:44px 20px;text-align:center;display:flex;flex-direction:column;
+  align-items:center;gap:8px;}
+.parts-grid .parts-empty,.store-grid .parts-empty{grid-column:1/-1;}
+.parts-empty .pe-icon{font-size:32px;opacity:.6;}
+.parts-empty .pe-text{font-style:italic;}
+
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;}
+.store-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
+.store-card-name{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+.store-card-row{font-size:12px;color:var(--text2);margin-bottom:4px;display:flex;gap:6px;align-items:flex-start;}
+.store-card-row .lbl{flex-shrink:0;}
+.store-card-links{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.store-card-links a{flex:1;min-width:70px;text-align:center;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:700;color:var(--sky);text-decoration:none;transition:all .15s;}
+.store-card-links a:hover{background:var(--skyL);border-color:var(--sky);}
+.store-card-actions{display:flex;gap:6px;margin-top:10px;}
+.store-card-actions button{flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);}
+.store-card-actions button:hover{border-color:var(--coral2);color:var(--coral);}
+.store-card-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+
+.tx-form{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:22px;box-shadow:var(--shadow);margin:0 auto 24px;max-width:680px;}
+.tx-form-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;margin-bottom:16px;}
+.tx-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.tx-row.three{grid-template-columns:1fr 1fr 1fr;}
+.tx-samedaywrap{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);margin-bottom:14px;cursor:pointer;user-select:none;}
+.tx-samedaywrap input{width:16px;height:16px;accent-color:var(--sage);cursor:pointer;}
+.tx-item-builder{background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);padding:14px;margin-bottom:14px;}
+.tx-item-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;}
+.tx-item-row .builder-select,.tx-item-row .modal-input{margin:0;width:100%;}
+.tx-additem-btn{padding:10px 16px;border-radius:var(--r2);border:none;background:var(--sage);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;height:41px;}
+.tx-additem-btn:hover{background:var(--sage2);}
+.tx-cart{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.tx-cart-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);}
+.tx-cart-item-info{flex:1;min-width:0;}
+.tx-cart-item-name{font-size:13px;font-weight:600;color:var(--text);}
+.tx-cart-item-detail{font-size:11px;color:var(--text3);margin-top:1px;}
+.tx-cart-item-total{font-family:'Fraunces',serif;font-weight:700;font-size:14px;color:var(--ink);flex-shrink:0;white-space:nowrap;}
+.tx-cart-del{width:24px;height:24px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:16px;border-radius:5px;flex-shrink:0;}
+.tx-cart-del:hover{background:var(--coralL);color:var(--coral);}
+.tx-cart-empty{color:var(--text4);font-size:12px;font-style:italic;padding:10px 2px;}
+.tx-total-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--sageL);border-radius:var(--r2);margin-bottom:16px;}
+.tx-total-row .lbl{font-size:13px;font-weight:600;color:var(--sage);}
+.tx-total-row .val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--sage);}
+.tx-save-btn{width:100%;padding:13px;border-radius:var(--r2);border:none;background:var(--coral);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;}
+.tx-save-btn:hover{background:var(--rose);transform:translateY(-1px);}
+
+.tx-list{display:flex;flex-direction:column;gap:10px;max-width:680px;margin:0 auto;}
+.tx-list-item{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);animation:fadeUp .3s ease both;overflow:hidden;}
+.tx-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;}
+.tx-list-head:hover{background:var(--cream2);}
+.tx-list-title{font-size:13px;font-weight:700;color:var(--text);}
+.tx-list-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.tx-list-amount{font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap;}
+.tx-list-amount.profit-pos{color:var(--sage);}
+.tx-list-amount.profit-neg{color:var(--coral);}
+.tx-list-body{display:none;padding:0 16px 14px;border-top:1.5px solid var(--cream2);}
+.tx-list-body.open{display:block;}
+.tx-list-line{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-bottom:1px solid var(--cream2);}
+.tx-list-line:last-child{border-bottom:none;}
+.tx-list-actions{display:flex;gap:6px;margin-top:10px;}
+.tx-list-actions button{padding:6px 14px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);}
+.tx-list-actions button:hover{border-color:var(--coral2);color:var(--coral);}
+.tx-list-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
+
+.parts-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;max-width:900px;}
+.parts-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.parts-range-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.parts-range-chip{padding:7px 16px;border-radius:50px;border:1.5px solid var(--cream3);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;}
+.parts-range-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.parts-table-wrap{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.parts-table-title{font-family:'Fraunces',serif;font-size:15px;font-weight:700;padding:16px 18px 0;}
+.parts-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.parts-table th{background:var(--cream2);padding:9px 16px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;}
+.parts-table td{padding:10px 16px;font-size:13px;border-top:1px solid var(--cream2);}
+.parts-table tr:hover td{background:var(--cream2);}
+.parts-table-empty{padding:18px;color:var(--text4);font-style:italic;font-size:12px;}
+.low-stock-badge{background:var(--coralL);color:var(--coral);}
+
+.parts-container{max-width:1100px;margin:0 auto;}
+
+.cash-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;max-width:900px;}
+.cash-toggle{display:flex;gap:8px;margin-bottom:14px;}
+.cash-toggle button{flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--cream3);background:var(--cream2);font-weight:700;font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s;}
+.cash-toggle button.active.deposit{background:var(--sageL);border-color:var(--sage);color:var(--sage);}
+.cash-toggle button.active.withdrawal{background:var(--coralL);border-color:var(--coral);color:var(--coral);}
+.cash-ledger{display:flex;flex-direction:column;gap:8px;max-width:680px;margin:0 auto;}
+.cash-ledger-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
+.cash-ledger-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.cash-ledger-icon.deposit{background:var(--sageL);color:var(--sage);}
+.cash-ledger-icon.withdrawal{background:var(--coralL);color:var(--coral);}
+.cash-ledger-info{flex:1;min-width:0;}
+.cash-ledger-note{font-size:13px;font-weight:600;color:var(--text);}
+.cash-ledger-date{font-size:11px;color:var(--text3);margin-top:1px;}
+.cash-ledger-amount{font-family:'Fraunces',serif;font-weight:800;font-size:15px;white-space:nowrap;}
+.cash-ledger-amount.deposit{color:var(--sage);}
+.cash-ledger-amount.withdrawal{color:var(--coral);}
+.cash-ledger-del{width:26px;height:26px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:15px;border-radius:6px;flex-shrink:0;}
+.cash-ledger-del:hover{background:var(--coralL);color:var(--coral);}
+.cash-ledger-edit{width:26px;height:26px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:13px;border-radius:6px;flex-shrink:0;}
+.cash-ledger-edit:hover{background:var(--cream2);color:var(--text2);}
+.jalali-picker-wrap{margin-top:2px;}
+
+/* ══ HERO BANNER — signature blueprint-grid header ══ */
+.parts-hero{position:relative;background:var(--ink);border-radius:var(--r);padding:26px 28px;margin-bottom:20px;
+  overflow:hidden;display:flex;align-items:center;gap:24px;flex-wrap:wrap;box-shadow:var(--shadow);color:#fff;}
+.parts-hero::before{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:22px 22px;pointer-events:none;}
+.parts-hero::after{content:'';position:absolute;right:-60px;top:-70px;width:240px;height:240px;
+  background:radial-gradient(circle,rgba(232,93,58,.35),transparent 70%);pointer-events:none;}
+.parts-hero-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--coral),var(--rose));
+  display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0;
+  box-shadow:0 8px 18px rgba(232,93,58,.4);position:relative;z-index:1;}
+.parts-hero-text{flex:1;min-width:180px;position:relative;z-index:1;}
+.parts-hero-title{font-family:'Fraunces',serif;font-size:22px;font-weight:700;letter-spacing:-.3px;}
+.parts-hero-sub{font-size:12.5px;color:rgba(255,255,255,.55);margin-top:4px;}
+.parts-hero-stats{display:flex;gap:26px;position:relative;z-index:1;flex-wrap:wrap;}
+.phs-item{text-align:center;min-width:78px;}
+.phs-val{font-family:'Fraunces',serif;font-size:21px;font-weight:800;color:var(--coral2);}
+.phs-lbl{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+@media(max-width:700px){.parts-hero{flex-direction:column;align-items:flex-start;}.parts-hero-stats{width:100%;justify-content:space-between;gap:10px;}}
+
+.parts-cat-stripe{height:4px;width:100%;flex-shrink:0;}
+.store-avatar{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;}
+.store-card-headrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.store-card-headrow .store-card-name{margin-bottom:0;}
+
+.parts-kpi-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);padding:16px 16px 14px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.parts-kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--kpi-color,var(--coral));}
+.parts-kpi-icon{font-size:17px;margin-bottom:7px;}
+.parts-kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;margin-bottom:4px;}
+.parts-kpi-val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--text);}
+
+@media(max-width:900px){.tx-row,.tx-row.three{grid-template-columns:1fr;}.tx-item-row{grid-template-columns:1fr;}.parts-kpis{grid-template-columns:1fr 1fr;}.parts-charts{grid-template-columns:1fr;}}
+</style>
+
+  <div class="parts-hero">
+    <div class="parts-hero-icon">🔧</div>
+    <div class="parts-hero-text">
+      <div class="parts-hero-title">Parts Biz</div>
+      <div class="parts-hero-sub">Buy from Torob, stock the shop, sell alongside every repair.</div>
+    </div>
+    <div class="parts-hero-stats">
+      <div class="phs-item"><div class="phs-val" id="heroCashVal">—</div><div class="phs-lbl">Cash balance</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroValueVal">—</div><div class="phs-lbl">Inventory value</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroBizVal">—</div><div class="phs-lbl">Total business value</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroProfitVal">—</div><div class="phs-lbl">Profit, 30d</div></div>
+    </div>
+  </div>
+
+  <div class="parts-subnav">
+    <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
+    <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
+    <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 New Purchase</button>
+    <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
+    <button class="parts-subtab" data-sub="cash" onclick="showPartsSub('cash')">🏦 Cash</button>
+    <button class="parts-subtab" data-sub="reports" onclick="showPartsSub('reports')">📊 Reports</button>
+  </div>
+
+  <!-- ═══ PRODUCTS ═══ -->
+  <div id="partsSub-products" class="parts-sub">
+    <div class="parts-filter-bar">
+      <input type="text" class="modal-input" id="partsSearchInput" placeholder="🔍 Search name, car model, brand, code..." dir="auto" oninput="renderPartsProducts()"/>
+      <select class="builder-select" id="partsFilterCarModel" onchange="renderPartsProducts()"><option value="">All car models</option></select>
+      <select class="builder-select" id="partsFilterBrand" onchange="renderPartsProducts()"><option value="">All brands</option></select>
+      <select class="builder-select" id="partsFilterCategory" onchange="renderPartsProducts()"><option value="">All categories</option></select>
+      <button class="parts-add-btn" onclick="openProductModal()">+ Add Product</button>
+    </div>
+    <div class="parts-grid" id="partsProductGrid"></div>
+  </div>
+
+  <!-- ═══ STORES ═══ -->
+  <div id="partsSub-stores" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openStoreModal()">+ Add Store</button>
+    </div>
+    <div class="store-grid" id="partsStoreGrid"></div>
+  </div>
+
+  <!-- ═══ NEW PURCHASE ═══ -->
+  <div id="partsSub-purchase" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">🧾 Record a Purchase</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Store</div>
+          <select class="builder-select" id="purchaseStoreSelect" style="width:100%;"></select>
+        </div>
+        <div>
+          <div class="builder-label">Order date</div>
+          <div class="jalali-picker-wrap" id="purchaseOrderDatePicker"></div>
+          <input type="hidden" id="purchaseOrderDateHidden"/>
+        </div>
+      </div>
+      <label class="tx-samedaywrap">
+        <input type="checkbox" id="purchaseSameDay" checked onchange="togglePurchaseSameDay()"/>
+        Picked up in person (order date = receipt date)
+      </label>
+      <div id="purchaseReceiptDateWrap" style="display:none;margin-bottom:14px;">
+        <div class="builder-label">Received date (from post/courier)</div>
+        <div class="jalali-picker-wrap" id="purchaseReceiptDatePicker"></div>
+        <input type="hidden" id="purchaseReceiptDateHidden"/>
+      </div>
+
+      <div class="tx-item-builder">
+        <div class="builder-label" style="margin-bottom:8px;">Add item to this purchase</div>
+        <div class="tx-item-row">
+          <div>
+            <select class="builder-select" id="purchaseItemProduct"></select>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="purchaseItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (T)" min="0"/>
+          </div>
+          <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ Add</button>
+        </div>
+        <div class="qty-presets" id="purchaseQtyPresets" style="margin-top:8px;"></div>
+        <div style="margin-top:8px;">
+          <button class="preset" onclick="openProductModal(null,'purchase')">+ New product…</button>
+        </div>
+      </div>
+
+      <div class="tx-cart" id="purchaseCart"></div>
+      <div class="tx-total-row"><span class="lbl">Purchase total</span><span class="val" id="purchaseTotalVal">0 T</span></div>
+      <input type="text" class="modal-input" id="purchaseNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+      <button class="tx-save-btn" onclick="savePurchase()">Save Purchase</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Purchase History</div>
+    <div class="tx-list" id="purchaseHistoryList"></div>
+  </div>
+
+  <!-- ═══ SALES ═══ -->
+  <div id="partsSub-sales" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">💵 Record a Sale</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Date</div>
+          <div class="jalali-picker-wrap" id="saleDatePicker"></div>
+          <input type="hidden" id="saleDateHidden"/>
+        </div>
+        <div>
+          <div class="builder-label">Customer name <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+          <input type="text" class="modal-input" id="saleCustomerName" placeholder="e.g. Mr. Ahmadi" dir="auto" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+
+      <div class="tx-item-builder">
+        <div class="builder-label" style="margin-bottom:8px;">Add item to this sale</div>
+        <div class="tx-item-row">
+          <div>
+            <select class="builder-select" id="saleItemProduct" onchange="onSaleProductChange()"></select>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="saleItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+          </div>
+          <div>
+            <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (T)" min="0"/>
+          </div>
+          <button class="tx-additem-btn" onclick="addSaleCartItem()">+ Add</button>
+        </div>
+        <div class="qty-presets" id="saleQtyPresets" style="margin-top:8px;"></div>
+        <div id="saleStockHint" style="font-size:11px;color:var(--text3);margin-top:6px;"></div>
+        <div style="margin-top:8px;">
+          <button class="preset" onclick="openProductModal(null,'sale')">+ New product…</button>
+        </div>
+      </div>
+
+      <div class="tx-cart" id="saleCart"></div>
+      <div class="tx-total-row"><span class="lbl">Sale total</span><span class="val" id="saleTotalVal">0 T</span></div>
+      <input type="text" class="modal-input" id="saleNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+      <button class="tx-save-btn" onclick="saveSale()">Save Sale</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Sales Log</div>
+    <div class="tx-list" id="salesHistoryList"></div>
+  </div>
+
+  <!-- ═══ CASH / CAPITAL ═══ -->
+  <div id="partsSub-cash" class="parts-sub" style="display:none;">
+    <div class="cash-stats" id="cashStats"></div>
+
+    <div class="tx-form">
+      <div class="tx-form-title">🏦 Deposit or Withdraw</div>
+      <div class="cash-toggle">
+        <button type="button" id="cashTypeDepositBtn" class="active deposit" onclick="setCashTxType('deposit')">💰 Deposit into business</button>
+        <button type="button" id="cashTypeWithdrawBtn" class="withdrawal" onclick="setCashTxType('withdrawal')">🏧 Withdraw from business</button>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Amount (T)</div>
+          <input type="number" class="modal-input" id="cashTxAmount" placeholder="e.g. 10000000" min="0" style="width:100%;margin:0;"/>
+        </div>
+        <div>
+          <div class="builder-label">Date</div>
+          <div class="jalali-picker-wrap" id="cashDatePicker"></div>
+          <input type="hidden" id="cashDateHidden"/>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">Note <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="cashTxNote" placeholder="e.g. Initial capital / personal withdrawal" dir="auto" style="width:100%;margin:0;"/>
+      </div>
+      <button class="tx-save-btn" onclick="saveCashTx()">Save</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Cash Ledger</div>
+    <div class="cash-ledger" id="cashLedgerList"></div>
+  </div>
+
+  <!-- ═══ REPORTS ═══ -->
+  <div id="partsSub-reports" class="parts-sub" style="display:none;">
+    <div class="parts-range-chips" id="partsRangeChips"></div>
+
+    <div class="parts-kpis" id="partsKpis"></div>
+
+    <div class="parts-charts">
+      <div class="mchart-card">
+        <div class="mchart-title">Revenue vs Profit</div>
+        <div class="mchart-sub">By month</div>
+        <div class="mchart-wrap"><canvas id="partsRevenueChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Spend by Store</div>
+        <div class="mchart-sub">Total purchase cost, all time filter range</div>
+        <div class="mchart-wrap"><canvas id="partsStoreChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Top Products by Profit</div>
+      <table class="parts-table" id="partsTopProductsTable"><thead><tr>
+        <th>Product</th><th>Units Sold</th><th>Revenue</th><th>COGS</th><th>Profit</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-right:18px;">
+        <div class="parts-table-title">Low Stock</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);">
+          Alert at ≤ <input type="number" class="modal-input" id="lowStockThresholdInput" min="0" step="1" style="width:60px;padding:5px 8px;margin:0;" onchange="saveLowStockThreshold()"/> units
+        </div>
+      </div>
+      <table class="parts-table" id="partsLowStockTable"><thead><tr>
+        <th>Product</th><th>In Stock</th><th>Avg Cost</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Spend by Store</div>
+      <table class="parts-table" id="partsStoreTable"><thead><tr>
+        <th>Store</th><th># Purchases</th><th>Total Spend</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+</div>
+</div>
