@@ -1,102 +1,176 @@
+<style>
+  .focus-mode-toggle{display:flex;gap:6px;background:var(--cream2,#f0ece4);padding:4px;border-radius:12px;margin-bottom:14px;width:fit-content;}
+  .fmode-btn{border:none;background:transparent;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text3,#8a8478);transition:.15s;}
+  .fmode-btn.active{background:#fff;color:var(--text1,#2a2a2a);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+
+  .simple-card{background:#fff;border-radius:18px;padding:26px 20px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px;}
+  .simple-status{font-size:13px;color:var(--text3,#8a8478);margin-bottom:8px;letter-spacing:.5px;}
+  .simple-time{font-family:'JetBrains Mono',monospace;font-size:56px;font-weight:700;color:var(--text1,#2a2a2a);letter-spacing:1px;margin-bottom:6px;}
+  .simple-today-total{font-size:13px;color:var(--text3,#8a8478);min-height:18px;margin-bottom:18px;}
+  .simple-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+  .simple-btn{border:none;border-radius:12px;padding:13px 22px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;}
+  .simple-btn-start{background:linear-gradient(135deg,#e85d3a,#c44a6a);color:#fff;}
+  .simple-btn-pause{background:linear-gradient(135deg,#3a7a5a,#2a6a9a);color:#fff;}
+  .simple-btn-reset{background:var(--cream2,#f0ece4);color:var(--text2,#5a5448);}
+  .simple-btn-endday{background:var(--text1,#2a2a2a);color:#fff;}
+  .simple-btn:active{transform:scale(.97);}
+  .simple-hint{font-size:12px;color:var(--text4,#b5ae9f);line-height:1.7;}
+
+  .simple-stats-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  .simple-stats-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  .simple-stats-title span:first-child{font-weight:700;font-size:14px;color:var(--text1,#2a2a2a);}
+  .range-btns{display:flex;gap:6px;background:var(--cream2,#f0ece4);padding:3px;border-radius:9px;}
+  .range-btn{border:none;background:transparent;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3,#8a8478);}
+  .range-btn.active{background:#fff;color:var(--text1,#2a2a2a);}
+  #focusChartContainer{overflow-x:auto;width:100%;}
+  #focusChartSummary{font-size:12px;color:var(--text3,#8a8478);margin-top:10px;text-align:center;}
+</style>
+
 <!-- FOCUS -->
 <div id="focus-view">
   <div class="focus-wrap">
 
-    <!-- Settings -->
-    <div class="pomo-settings">
-      <div class="pomo-settings-title">⚙️ Timer Settings</div>
-      <div class="settings-grid">
-        <div class="setting-item">
-          <div class="setting-label">Focus</div>
-          <div class="setting-val" id="set-focus">25 min</div>
-          <div class="setting-btns">
-            <button class="setting-btn" onclick="adjustSetting('focus',-5)" id="focus-dec">−</button>
-            <button class="setting-btn" onclick="adjustSetting('focus',5)" id="focus-inc">+</button>
+    <!-- Mode toggle: simple time-tracker (default) vs Pomodoro -->
+    <div class="focus-mode-toggle">
+      <button class="fmode-btn active" id="fmode-simple" onclick="setFocusUIMode('simple')">⏱️ ساده</button>
+      <button class="fmode-btn" id="fmode-pomo" onclick="setFocusUIMode('pomo')">🍅 پومودورو</button>
+    </div>
+
+    <!-- ══════════ SIMPLE MODE ══════════ -->
+    <div id="simple-mode-content">
+
+      <div class="simple-card">
+        <div class="simple-status" id="simpleStatus">آماده</div>
+        <div class="simple-time" id="simpleTime">00:00</div>
+        <div class="simple-today-total" id="simpleTodayTotal"></div>
+
+        <div class="simple-btns">
+          <button class="simple-btn simple-btn-start" id="simpleToggleBtn" onclick="toggleSimpleTimer()">▶ شروع کار</button>
+          <button class="simple-btn simple-btn-reset" onclick="resetSimpleTimer()">↺ ریست</button>
+          <button class="simple-btn simple-btn-endday" onclick="endDaySimple()">🏁 پایان روز</button>
+        </div>
+
+        <div class="simple-hint">هر وقت پای کار نشستی بزن «شروع»، هر وقت بلند شدی یا حواست پرت شد بزن همون دکمه برای پاز، برگشتی دوباره بزن «ادامه». آخر روز «پایان روز» رو بزن تا زمان مفیدت ذخیره بشه.</div>
+      </div>
+
+      <div class="simple-stats-card">
+        <div class="simple-stats-title">
+          <span>📊 آمار روزهای گذشته</span>
+          <div class="range-btns">
+            <button class="range-btn active" id="range-7" onclick="renderFocusChart('7')">۷ روز</button>
+            <button class="range-btn" id="range-30" onclick="renderFocusChart('30')">۳۰ روز</button>
+            <button class="range-btn" id="range-all" onclick="renderFocusChart('all')">همه</button>
           </div>
         </div>
-        <div class="setting-item">
-          <div class="setting-label">Short Break</div>
-          <div class="setting-val" id="set-short">5 min</div>
-          <div class="setting-btns">
-            <button class="setting-btn" onclick="adjustSetting('short',-1)" id="short-dec">−</button>
-            <button class="setting-btn" onclick="adjustSetting('short',1)" id="short-inc">+</button>
+        <div id="focusChartContainer">
+          <div style="color:var(--text4,#b5ae9f);font-size:13px;font-style:italic;padding:12px;text-align:center;">در حال بارگذاری...</div>
+        </div>
+        <div id="focusChartSummary"></div>
+      </div>
+
+    </div>
+
+    <!-- ══════════ POMODORO MODE (unchanged, hidden by default) ══════════ -->
+    <div id="pomo-mode-content" style="display:none">
+
+      <!-- Settings -->
+      <div class="pomo-settings">
+        <div class="pomo-settings-title">⚙️ Timer Settings</div>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <div class="setting-label">Focus</div>
+            <div class="setting-val" id="set-focus">25 min</div>
+            <div class="setting-btns">
+              <button class="setting-btn" onclick="adjustSetting('focus',-5)" id="focus-dec">−</button>
+              <button class="setting-btn" onclick="adjustSetting('focus',5)" id="focus-inc">+</button>
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-label">Short Break</div>
+            <div class="setting-val" id="set-short">5 min</div>
+            <div class="setting-btns">
+              <button class="setting-btn" onclick="adjustSetting('short',-1)" id="short-dec">−</button>
+              <button class="setting-btn" onclick="adjustSetting('short',1)" id="short-inc">+</button>
+            </div>
+          </div>
+          <div class="setting-item">
+            <div class="setting-label">Long Break</div>
+            <div class="setting-val" id="set-long">15 min</div>
+            <div class="setting-btns">
+              <button class="setting-btn" onclick="adjustSetting('long',-5)" id="long-dec">−</button>
+              <button class="setting-btn" onclick="adjustSetting('long',5)" id="long-inc">+</button>
+            </div>
           </div>
         </div>
-        <div class="setting-item">
-          <div class="setting-label">Long Break</div>
-          <div class="setting-val" id="set-long">15 min</div>
-          <div class="setting-btns">
-            <button class="setting-btn" onclick="adjustSetting('long',-5)" id="long-dec">−</button>
-            <button class="setting-btn" onclick="adjustSetting('long',5)" id="long-inc">+</button>
+      </div>
+
+      <!-- Block list -->
+      <div class="block-list-card">
+        <div class="pomo-settings-title" style="margin-bottom:4px;">🚫 Sites to Block During Focus</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Run <code style="background:var(--cream2);padding:2px 6px;border-radius:4px;">sudo python blocker.py</code> alongside the app to enable real blocking.</div>
+        <div class="block-domains" id="blockDomains"></div>
+        <div class="block-add-row">
+          <input type="text" class="block-add-input" id="blockInput" placeholder="youtube.com" onkeydown="if(event.key==='Enter')addBlockDomain()"/>
+          <button class="block-add-btn" onclick="addBlockDomain()">+ Add</button>
+        </div>
+      </div>
+
+      <!-- Main timer card -->
+      <div class="pomo-card">
+        <div class="pomo-mode-chips">
+          <button class="pomo-mode-chip active" id="chip-focus" onclick="setMode('focus')">🎯 Focus</button>
+          <button class="pomo-mode-chip" id="chip-short" onclick="setMode('short')">☕ Short Break</button>
+          <button class="pomo-mode-chip" id="chip-long" onclick="setMode('long')">🛋️ Long Break</button>
+        </div>
+
+        <div class="pomo-ring-wrap">
+          <svg viewBox="0 0 220 220" width="220" height="220">
+            <defs>
+              <linearGradient id="pomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#e85d3a"/>
+                <stop offset="100%" stop-color="#c44a6a"/>
+              </linearGradient>
+              <linearGradient id="breakGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#3a7a5a"/>
+                <stop offset="100%" stop-color="#2a6a9a"/>
+              </linearGradient>
+            </defs>
+            <circle class="pomo-ring-bg" cx="110" cy="110" r="95"/>
+            <circle class="pomo-ring-fg" id="pomoRing" cx="110" cy="110" r="95" stroke="url(#pomoGrad)"
+              stroke-dasharray="596.903" stroke-dashoffset="0"/>
+          </svg>
+          <div class="pomo-ring-inner">
+            <div class="pomo-time" id="pomoTime">25:00</div>
+            <div class="pomo-phase" id="pomoPhase">READY</div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Block list -->
-    <div class="block-list-card">
-      <div class="pomo-settings-title" style="margin-bottom:4px;">🚫 Sites to Block During Focus</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;">Run <code style="background:var(--cream2);padding:2px 6px;border-radius:4px;">sudo python blocker.py</code> alongside the app to enable real blocking.</div>
-      <div class="block-domains" id="blockDomains"></div>
-      <div class="block-add-row">
-        <input type="text" class="block-add-input" id="blockInput" placeholder="youtube.com" onkeydown="if(event.key==='Enter')addBlockDomain()"/>
-        <button class="block-add-btn" onclick="addBlockDomain()">+ Add</button>
-      </div>
-    </div>
+        <div class="pomo-session-count">Session <strong id="pomoSessionNum">1</strong> of 4 &nbsp;·&nbsp; <span id="pomoCycles">0</span> full cycles today</div>
 
-    <!-- Main timer card -->
-    <div class="pomo-card">
-      <div class="pomo-mode-chips">
-        <button class="pomo-mode-chip active" id="chip-focus" onclick="setMode('focus')">🎯 Focus</button>
-        <button class="pomo-mode-chip" id="chip-short" onclick="setMode('short')">☕ Short Break</button>
-        <button class="pomo-mode-chip" id="chip-long" onclick="setMode('long')">🛋️ Long Break</button>
-      </div>
+        <div class="pomo-btns">
+          <button class="pomo-start" id="pomoStartBtn" onclick="toggleTimer()">▶ Start Focus</button>
+          <button class="pomo-skip" id="pomoSkipBtn" onclick="skipPhase()" disabled>Skip →</button>
+        </div>
 
-      <div class="pomo-ring-wrap">
-        <svg viewBox="0 0 220 220" width="220" height="220">
-          <defs>
-            <linearGradient id="pomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#e85d3a"/>
-              <stop offset="100%" stop-color="#c44a6a"/>
-            </linearGradient>
-            <linearGradient id="breakGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#3a7a5a"/>
-              <stop offset="100%" stop-color="#2a6a9a"/>
-            </linearGradient>
-          </defs>
-          <circle class="pomo-ring-bg" cx="110" cy="110" r="95"/>
-          <circle class="pomo-ring-fg" id="pomoRing" cx="110" cy="110" r="95" stroke="url(#pomoGrad)"
-            stroke-dasharray="596.903" stroke-dashoffset="0"/>
-        </svg>
-        <div class="pomo-ring-inner">
-          <div class="pomo-time" id="pomoTime">25:00</div>
-          <div class="pomo-phase" id="pomoPhase">READY</div>
+        <div class="pomo-blocker-status">
+          <div class="blocker-dot inactive" id="blockerDot"></div>
+          <span id="blockerStatus">Blocker inactive — run blocker.py with sudo to enable</span>
         </div>
       </div>
 
-      <div class="pomo-session-count">Session <strong id="pomoSessionNum">1</strong> of 4 &nbsp;·&nbsp; <span id="pomoCycles">0</span> full cycles today</div>
-
-      <div class="pomo-btns">
-        <button class="pomo-start" id="pomoStartBtn" onclick="toggleTimer()">▶ Start Focus</button>
-        <button class="pomo-skip" id="pomoSkipBtn" onclick="skipPhase()" disabled>Skip →</button>
+      <!-- Session log -->
+      <div class="pomo-log">
+        <div class="pomo-log-title">
+          <span>Today's Sessions</span>
+          <span id="pomTotalFocus" style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace;"></span>
+        </div>
+        <div class="pomo-log-list" id="pomoLogList">
+          <div style="color:var(--text4);font-size:13px;font-style:italic;padding:8px;">No sessions yet — start your first focus block!</div>
+        </div>
       </div>
 
-      <div class="pomo-blocker-status">
-        <div class="blocker-dot inactive" id="blockerDot"></div>
-        <span id="blockerStatus">Blocker inactive — run blocker.py with sudo to enable</span>
-      </div>
     </div>
 
-    <!-- Session log -->
-    <div class="pomo-log">
-      <div class="pomo-log-title">
-        <span>Today's Sessions</span>
-        <span id="pomTotalFocus" style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace;"></span>
-      </div>
-      <div class="pomo-log-list" id="pomoLogList">
-        <div style="color:var(--text4);font-size:13px;font-style:italic;padding:8px;">No sessions yet — start your first focus block!</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -122,4 +196,3 @@
 <div id="food-view" style="display:none">
   <div id="food-app"></div>
 </div>
-

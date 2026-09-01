@@ -290,3 +290,315 @@ function removeBlockDomain(i){
 
 
 
+
+
+// ─── SIMPLE MODE (plain work timer: no pomodoro phases, no blocking) ───
+// Elapsed-time stopwatch. Start when you sit down, pause when you get up
+// or get distracted, resume when you're back. "End Day" saves today's
+// accumulated minutes to focus_stats.json (one directory above the app)
+// and refreshes the history chart.
+// ════════════════════════════════════════════════════════════════════
+
+const SIMPLE = {
+  dateStr: null,
+  elapsedBeforePause: 0,   // seconds accumulated before the current run
+  running: false,
+  startTimestamp: null,    // Date.now() when current run started/resumed
+  interval: null,
+  savedTodayMinutes: 0,    // already saved to backend for today (from prior End Day presses)
+  statsData: {},           // {'YYYY-MM-DD': minutes}
+  currentRange: '7',
+};
+
+function isoDateStr(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function getTodayDateStr(){
+  // Work-day cutoff: before 6:00 AM still counts as "yesterday". This way
+  // staying up past midnight and ending the day at, say, 1am still logs
+  // that time under the day you were actually working, not the next one.
+  const d = new Date();
+  if(d.getHours() < 6){
+    d.setDate(d.getDate() - 1);
+  }
+  return isoDateStr(d);
+}
+
+function getCurrentElapsedSeconds(){
+  return SIMPLE.elapsedBeforePause + (SIMPLE.running ? (Date.now() - SIMPLE.startTimestamp)/1000 : 0);
+}
+
+function formatHMS(totalSeconds){
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = s%60;
+  if(h>0) return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+
+function setFocusUIMode(mode, skipSave){
+  document.getElementById('simple-mode-content').style.display = mode === 'simple' ? '' : 'none';
+  document.getElementById('pomo-mode-content').style.display = mode === 'pomo' ? '' : 'none';
+  document.getElementById('fmode-simple').classList.toggle('active', mode==='simple');
+  document.getElementById('fmode-pomo').classList.toggle('active', mode==='pomo');
+  if(mode === 'pomo' && SIMPLE.running) pauseSimpleTimer();
+  if(!skipSave) localStorage.setItem('elevateFocusUIMode', mode);
+}
+
+function toggleSimpleTimer(){
+  if(SIMPLE.running) pauseSimpleTimer();
+  else resumeSimpleTimer();
+}
+
+function resumeSimpleTimer(){
+  SIMPLE.running = true;
+  SIMPLE.startTimestamp = Date.now();
+  SIMPLE.interval = setInterval(simpleTick, 1000);
+  saveSimpleStateLocal();
+  updateSimpleDisplay();
+}
+
+function pauseSimpleTimer(){
+  if(SIMPLE.running){
+    SIMPLE.elapsedBeforePause += (Date.now() - SIMPLE.startTimestamp)/1000;
+  }
+  SIMPLE.running = false;
+  clearInterval(SIMPLE.interval);
+  SIMPLE.interval = null;
+  saveSimpleStateLocal();
+  updateSimpleDisplay();
+}
+
+function resetSimpleTimer(){
+  clearInterval(SIMPLE.interval);
+  SIMPLE.interval = null;
+  SIMPLE.running = false;
+  SIMPLE.elapsedBeforePause = 0;
+  SIMPLE.startTimestamp = null;
+  saveSimpleStateLocal();
+  updateSimpleDisplay();
+  showToast('تایمر ریست شد.', '');
+}
+
+function simpleTick(){
+  const today = getTodayDateStr();
+  if(today !== SIMPLE.dateStr){
+    handleDateRollover(today);
+  }
+  updateSimpleDisplay();
+  saveSimpleStateLocal();
+}
+
+// If the timer is left running across midnight, auto-finalize the
+// previous day's minutes so nothing is lost.
+function handleDateRollover(newDateStr){
+  const wasRunning = SIMPLE.running;
+  if(wasRunning){
+    SIMPLE.elapsedBeforePause += (Date.now() - SIMPLE.startTimestamp)/1000;
+  }
+  const prevDate = SIMPLE.dateStr;
+  const prevSeconds = SIMPLE.elapsedBeforePause;
+  if(prevSeconds > 0){
+    saveFocusMinutes(prevDate, +(prevSeconds/60).toFixed(2)).then(()=>fetchFocusStats(SIMPLE.currentRange));
+  }
+  SIMPLE.dateStr = newDateStr;
+  SIMPLE.elapsedBeforePause = 0;
+  SIMPLE.startTimestamp = wasRunning ? Date.now() : null;
+  saveSimpleStateLocal();
+}
+
+async function endDaySimple(){
+  if(SIMPLE.running) pauseSimpleTimer();
+  const seconds = SIMPLE.elapsedBeforePause;
+  if(seconds < 1){
+    showToast('هنوز زمانی ثبت نشده.', '');
+    return;
+  }
+  const minutes = +(seconds/60).toFixed(2);
+  const ok = await saveFocusMinutes(SIMPLE.dateStr, minutes);
+  if(ok){
+    showToast('🏁 ثبت شد: ' + Math.round(minutes) + ' دقیقه از امروز', 'success');
+    SIMPLE.elapsedBeforePause = 0;
+    SIMPLE.startTimestamp = null;
+    saveSimpleStateLocal();
+    updateSimpleDisplay();
+    fetchFocusStats(SIMPLE.currentRange);
+  } else {
+    showToast('اتصال به سرور برقرار نشد — آیا app.py در حال اجراست؟', '');
+  }
+}
+
+async function saveFocusMinutes(date, minutes){
+  try{
+    const r = await fetch('/api/focus-stats', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ date, minutes })
+    });
+    const d = await r.json();
+    return !!d.ok;
+  } catch(e){
+    return false;
+  }
+}
+
+function saveSimpleStateLocal(){
+  localStorage.setItem('elevateSimpleTimer', JSON.stringify({
+    dateStr: SIMPLE.dateStr,
+    elapsedBeforePause: SIMPLE.elapsedBeforePause,
+    running: SIMPLE.running,
+    startTimestamp: SIMPLE.startTimestamp
+  }));
+}
+
+function loadSimpleStateLocal(){
+  const today = getTodayDateStr();
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('elevateSimpleTimer')); }catch(e){}
+  if(saved && saved.dateStr === today){
+    SIMPLE.dateStr = saved.dateStr;
+    SIMPLE.elapsedBeforePause = saved.elapsedBeforePause || 0;
+    SIMPLE.running = !!saved.running;
+    SIMPLE.startTimestamp = saved.startTimestamp || null;
+    if(SIMPLE.running){
+      SIMPLE.interval = setInterval(simpleTick, 1000);
+    }
+  } else {
+    SIMPLE.dateStr = today;
+    SIMPLE.elapsedBeforePause = 0;
+    SIMPLE.running = false;
+    SIMPLE.startTimestamp = null;
+  }
+}
+
+function updateSimpleDisplay(){
+  const elapsed = getCurrentElapsedSeconds();
+  const timeEl = document.getElementById('simpleTime');
+  const btn = document.getElementById('simpleToggleBtn');
+  const statusEl = document.getElementById('simpleStatus');
+  const totalEl = document.getElementById('simpleTodayTotal');
+  if(!timeEl || !btn || !statusEl || !totalEl) return;
+
+  timeEl.textContent = formatHMS(elapsed);
+
+  if(SIMPLE.running){
+    btn.textContent = '⏸ پاز (حواسم پرت شد)';
+    btn.className = 'simple-btn simple-btn-pause';
+    statusEl.textContent = '🟢 در حال کار...';
+  } else if(elapsed > 0){
+    btn.textContent = '▶ ادامه';
+    btn.className = 'simple-btn simple-btn-start';
+    statusEl.textContent = '⏸ متوقف';
+  } else {
+    btn.textContent = '▶ شروع کار';
+    btn.className = 'simple-btn simple-btn-start';
+    statusEl.textContent = 'آماده';
+  }
+
+  const todayTotal = (SIMPLE.savedTodayMinutes || 0) + elapsed/60;
+  totalEl.textContent = todayTotal > 0.5 ? 'امروز: ' + Math.round(todayTotal) + ' دقیقه' : '';
+}
+
+// ── Stats / chart ──
+async function fetchFocusStats(range){
+  try{
+    const r = await fetch('/api/focus-stats');
+    const d = await r.json();
+    SIMPLE.statsData = d && typeof d === 'object' ? d : {};
+  } catch(e){
+    SIMPLE.statsData = {};
+  }
+  SIMPLE.savedTodayMinutes = SIMPLE.statsData[getTodayDateStr()] || 0;
+  updateSimpleDisplay();
+  renderFocusChart(range || SIMPLE.currentRange || '7');
+}
+
+// Jalali conversion for chart labels — reuses gregToJalali()/JALALI_MONTHS
+// already defined in jalali.js. Do NOT redeclare them here.
+function isoToJalaliLabel(iso){
+  const j = gregToJalali(iso);
+  return j ? (j.d + ' ' + j.month_name) : iso;
+}
+
+function renderFocusChart(range){
+  SIMPLE.currentRange = range;
+  ['range-7','range-30','range-all'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('active', id === 'range-'+range);
+  });
+
+  const data = SIMPLE.statsData || {};
+  let days;
+  if(range === 'all'){
+    days = Object.keys(data).sort();
+  } else {
+    const n = range === '30' ? 30 : 7;
+    days = [];
+    for(let i=n-1;i>=0;i--){
+      const d = new Date();
+      d.setDate(d.getDate()-i);
+      days.push(isoDateStr(d));
+    }
+  }
+
+  const container = document.getElementById('focusChartContainer');
+  const summaryEl = document.getElementById('focusChartSummary');
+  if(!container) return;
+
+  if(!days.length){
+    container.innerHTML = '<div style="color:var(--text4,#b5ae9f);font-size:13px;font-style:italic;padding:12px;text-align:center;">هنوز داده‌ای ثبت نشده.</div>';
+    if(summaryEl) summaryEl.textContent = '';
+    return;
+  }
+
+  const values = days.map(d => data[d] || 0);
+  const max = Math.max(1, ...values);
+  const dense = days.length > 20;
+  const barW = dense ? 6 : 22;
+  const gap = dense ? 2 : 8;
+  const chartH = 140;
+  const width = days.length * (barW+gap) + gap;
+
+  let bars = '';
+  days.forEach((d,i)=>{
+    const v = values[i];
+    const h = v > 0 ? Math.max(3, (v/max) * (chartH-20)) : 1;
+    const x = gap + i*(barW+gap);
+    const y = chartH - h;
+    const label = isoToJalaliLabel(d) + ' — ' + Math.round(v) + ' دقیقه';
+    bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="3" fill="url(#focusChartGrad)"><title>${label}</title></rect>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${chartH}" width="100%" height="${chartH}" preserveAspectRatio="xMinYMin meet">
+    <defs>
+      <linearGradient id="focusChartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#e85d3a"/>
+        <stop offset="100%" stop-color="#c44a6a"/>
+      </linearGradient>
+    </defs>
+    ${bars}
+  </svg>`;
+
+  const totalMinutes = values.reduce((a,b)=>a+b,0);
+  const activeDays = values.filter(v=>v>0).length;
+  if(summaryEl){
+    summaryEl.textContent = totalMinutes > 0
+      ? `مجموع: ${Math.round(totalMinutes)} دقیقه · میانگین روزهای فعال: ${activeDays ? Math.round(totalMinutes/activeDays) : 0} دقیقه`
+      : '';
+  }
+}
+
+// ── Wire simple mode into the existing view-init flow ──
+const _origInitFocusView = initFocusView;
+initFocusView = function(){
+  _origInitFocusView();
+  loadSimpleStateLocal();
+  updateSimpleDisplay();
+  fetchFocusStats('7');
+  const savedUIMode = localStorage.getItem('elevateFocusUIMode') || 'simple';
+  setFocusUIMode(savedUIMode, true);
+};

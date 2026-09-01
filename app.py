@@ -35,13 +35,22 @@ JSON_FILES = ["habits.json","budget.json","calendar.json","food.json","people.js
     "score_config.json",
     "outage.json",
     "telegram_config.json",
-    "parts.json"]
+    "parts.json",
+    "focus_stats.json"]
 _backup_lock = threading.Lock()
 _last_sizes = {}  # filename → last known size
 
 def _backup_slot_path(fname, slot):
     """Return path like backups/people.json.h1 (hourly) .d1 (daily) .w1 (weekly)"""
     return os.path.join(BACKUP_DIR, f"{fname}.{slot}")
+
+def _backup_src_path(fname):
+    """Most JSON files live next to app.py. focus_stats.json is the one
+    exception — it's stored a directory above (see FOCUS_STATS_FILE) — so
+    route it there instead of BASE_DIR."""
+    if fname == "focus_stats.json":
+        return os.path.join(BASE_DIR, "..", "focus_stats.json")
+    return os.path.join(BASE_DIR, fname)
 
 def _rotate_backups():
     """Called periodically. Writes 3-hour, 3-day, 3-week rotating backups and alerts on shrink."""
@@ -50,7 +59,7 @@ def _rotate_backups():
     shrunk = []
 
     for fname in JSON_FILES:
-        src = os.path.join(BASE_DIR, fname)
+        src = _backup_src_path(fname)
         if not os.path.exists(src):
             continue
         size = os.path.getsize(src)
@@ -75,7 +84,7 @@ def _rotate_backups():
     if not os.path.exists(day_marker) or \
        datetime.fromtimestamp(os.path.getmtime(day_marker)).date() < now.date():
         for fname in JSON_FILES:
-            src = os.path.join(BASE_DIR, fname)
+            src = _backup_src_path(fname)
             if not os.path.exists(src): continue
             for i in range(3, 1, -1):
                 older = _backup_slot_path(fname, f"d{i}")
@@ -94,7 +103,7 @@ def _rotate_backups():
             do_weekly = True
     if do_weekly:
         for fname in JSON_FILES:
-            src = os.path.join(BASE_DIR, fname)
+            src = _backup_src_path(fname)
             if not os.path.exists(src): continue
             for i in range(3, 1, -1):
                 older = _backup_slot_path(fname, f"w{i}")
@@ -617,6 +626,45 @@ def blocker_signal():
 @app.route("/api/status")
 def status():
     return jsonify({"is_admin": _is_admin()})
+
+# ── Simple-mode focus timer: daily productive-minutes log ──
+# Stored one directory above BASE_DIR (i.e. next to the Elevate folder itself).
+FOCUS_STATS_FILE = os.path.join(BASE_DIR, "..", "focus_stats.json")
+
+def _load_focus_stats():
+    if not os.path.exists(FOCUS_STATS_FILE):
+        return {}
+    try:
+        with open(FOCUS_STATS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+
+def _save_focus_stats(data):
+    with open(FOCUS_STATS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+@app.route("/api/focus-stats", methods=["GET"])
+def get_focus_stats():
+    return jsonify(_load_focus_stats())
+
+@app.route("/api/focus-stats", methods=["POST"])
+def post_focus_stats():
+    body = request.json or {}
+    day = body.get("date")
+    minutes = body.get("minutes", 0)
+    if not day:
+        return jsonify({"ok": False, "error": "date required"}), 400
+    try:
+        minutes = float(minutes)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid minutes"}), 400
+    data = _load_focus_stats()
+    # Adds to whatever's already logged for that date, so multiple
+    # "End Day" presses in the same day accumulate instead of overwriting.
+    data[day] = round(data.get(day, 0) + minutes, 2)
+    _save_focus_stats(data)
+    return jsonify({"ok": True, "data": data})
 
 # ══════════════════════════════════════
 # BUDGET / EXPENSES API
