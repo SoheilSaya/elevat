@@ -127,6 +127,29 @@
       </div>
     </div>
 
+    <!-- GERMAN -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--sageL)">🇩🇪</div>
+        <div><div class="card-title">German Learning</div><div class="card-sub">Sprache lernen</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('german_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('german_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('german_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('german_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="german-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('german_mins',this.value)"/>
+          <div><div class="smart-num" id="german-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- STUDY -->
     <div class="card">
       <div class="card-head">
@@ -148,6 +171,29 @@
         <div class="smart-slider-row">
           <input type="range" class="smart-slider" id="uni-slider" min="0" max="480" step="15" value="0" oninput="syncSlider('uni_study_mins',this.value)"/>
           <div><div class="smart-num" id="uni-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERSONAL SITE / BUSINESS -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--coralL)">💻</div>
+        <div><div class="card-title">Personal Site / Business</div><div class="card-sub">daynamo & side projects</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('business_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('business_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('business_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('business_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="business-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('business_mins',this.value)"/>
+          <div><div class="smart-num" id="business-display">0</div><div class="smart-unit">min</div></div>
         </div>
       </div>
     </div>

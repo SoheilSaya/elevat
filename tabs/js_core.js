@@ -3,7 +3,7 @@
 const state = {
   gym:'none', home_exercise:'none', food:'', skincare:'none', socialized:'none', soda:false, fruit_veg:false,
   calories:1500, protein:100, weight:88,
-  uni_study_mins:0, car_courses_mins:0, selfdev_mins:0,
+  german_mins:0, uni_study_mins:0, business_mins:0, car_courses_mins:0, selfdev_mins:0,
   mood:5, pain:3, pills:false,
   teeth_brushed:0, meditated:false
 };
@@ -144,13 +144,14 @@ async function loadToday(){
 function resetForm(){
   // Reset all state to defaults before loading a different day
   Object.assign(state,{gym:'none',home_exercise:'none',food:'',skincare:'none',socialized:'none',soda:false,fruit_veg:false,
-    calories:1500,protein:100,weight:88,uni_study_mins:0,car_courses_mins:0,selfdev_mins:0,mood:5,pain:3,pills:false});
+    calories:1500,protein:100,weight:88,german_mins:0,uni_study_mins:0,business_mins:0,car_courses_mins:0,selfdev_mins:0,mood:5,pain:3,pills:false});
   ['gym-chips','home-exercise-chips','food-chips','skincare-chips','social-chips','soda-chips','fruitveg-chips','teeth-chips'].forEach(id=>{
     const g=document.getElementById(id);
     if(g) g.querySelectorAll('.chip').forEach(b=>b.className='chip');
   });
   [['cal-slider','cal-display',1500],['prot-slider','prot-display',100],['wt-slider','wt-display',88],
-   ['uni-slider','uni-display',0],['car-slider','car-display',0],['dev-slider','dev-display',0]].forEach(([s,d,v])=>{
+   ['german-slider','german-display',0],['uni-slider','uni-display',0],['business-slider','business-display',0],
+   ['car-slider','car-display',0],['dev-slider','dev-display',0]].forEach(([s,d,v])=>{
     const sl=document.getElementById(s); const dp=document.getElementById(d);
     if(sl) sl.value=v; if(dp) dp.textContent=v;
   });
@@ -170,7 +171,8 @@ function fillState(e){
   if(e.soda!==undefined){state.soda=e.soda; pickByVal('soda',e.soda);}
   const nums={calories:{s:'cal-slider',d:'cal-display',min:500,max:5000},
     protein:{s:'prot-slider',d:'prot-display'},weight:{s:'wt-slider',d:'wt-display'},
-    uni_study_mins:{s:'uni-slider',d:'uni-display'},car_courses_mins:{s:'car-slider',d:'car-display'},
+    german_mins:{s:'german-slider',d:'german-display'},uni_study_mins:{s:'uni-slider',d:'uni-display'},
+    business_mins:{s:'business-slider',d:'business-display'},car_courses_mins:{s:'car-slider',d:'car-display'},
     selfdev_mins:{s:'dev-slider',d:'dev-display'}};
   Object.entries(nums).forEach(([k,cfg])=>{
     if(e[k]!=null){
@@ -226,9 +228,11 @@ function pickByVal(field,val){
 function setSmartVal(field,val,btn){
   state[field]=val;
   const slMap={calories:'cal-slider',protein:'prot-slider',weight:'wt-slider',
-    uni_study_mins:'uni-slider',car_courses_mins:'car-slider',selfdev_mins:'dev-slider'};
+    german_mins:'german-slider',uni_study_mins:'uni-slider',business_mins:'business-slider',
+    car_courses_mins:'car-slider',selfdev_mins:'dev-slider'};
   const dpMap={calories:'cal-display',protein:'prot-display',weight:'wt-display',
-    uni_study_mins:'uni-display',car_courses_mins:'car-display',selfdev_mins:'dev-display'};
+    german_mins:'german-display',uni_study_mins:'uni-display',business_mins:'business-display',
+    car_courses_mins:'car-display',selfdev_mins:'dev-display'};
   const sl=document.getElementById(slMap[field]);
   const dp=document.getElementById(dpMap[field]);
   if(sl) sl.value=val;
@@ -244,7 +248,8 @@ function setSmartVal(field,val,btn){
 function syncSlider(field,val){
   state[field]=parseFloat(val);
   const dpMap={calories:'cal-display',protein:'prot-display',weight:'wt-display',
-    uni_study_mins:'uni-display',car_courses_mins:'car-display',selfdev_mins:'dev-display'};
+    german_mins:'german-display',uni_study_mins:'uni-display',business_mins:'business-display',
+    car_courses_mins:'car-display',selfdev_mins:'dev-display'};
   const dp=document.getElementById(dpMap[field]);
   if(dp) dp.textContent=val;
   // deselect presets
@@ -254,7 +259,7 @@ function syncSlider(field,val){
 // ─── METRICS BAR ──────────────────────────────────
 function updateMetrics(){
   const cal=state.calories||0, prot=state.protein||0, wt=state.weight||0;
-  const study=(state.uni_study_mins||0)+(state.car_courses_mins||0)+(state.selfdev_mins||0);
+  const study=(state.german_mins||0)+(state.uni_study_mins||0)+(state.business_mins||0)+(state.car_courses_mins||0)+(state.selfdev_mins||0);
   document.getElementById('mCal').textContent=cal>0?cal+' kcal':'—';
   document.getElementById('mCalBar').style.width=Math.min(100,cal/3000*100)+'%';
   // Deficit calc — pessimistic: real intake is ~15% higher than reported (underreporting bias)
@@ -465,7 +470,8 @@ async function saveAll(){
     gym:state.gym, home_exercise:state.home_exercise, food:state.food, skincare:state.skincare, socialized:state.socialized,
     soda:state.soda, fruit_veg:state.fruit_veg,
     calories:state.calories||0, protein:state.protein||0, weight:state.weight||null,
-    uni_study_mins:state.uni_study_mins||0, car_courses_mins:state.car_courses_mins||0,
+    german_mins:state.german_mins||0, uni_study_mins:state.uni_study_mins||0,
+    business_mins:state.business_mins||0, car_courses_mins:state.car_courses_mins||0,
     selfdev_mins:state.selfdev_mins||0,
     pain:parseInt(document.getElementById('pain').value),
     mood:parseInt(document.getElementById('mood').value),
@@ -621,7 +627,9 @@ function buildDetailGrid(e){
     {label:'Weight',val:e.weight?e.weight+' kg':'Not logged',bar:e.weight?Math.min(100,(e.weight-70)/50*100):0,color:'var(--sky)'},
     {label:'Mood',val:(e.mood||'—')+'/10',bar:e.mood?(e.mood/10*100):0,color:'var(--sage)'},
     {label:'Pain',val:(e.pain||'—')+'/10',bar:e.pain?(e.pain/10*100):0,color:'var(--rose)'},
+    {label:'German',val:fmtTime(e.german_mins),bar:Math.min(100,(e.german_mins||0)/120*100),color:'var(--sage)'},
     {label:'Uni Study',val:fmtTime(e.uni_study_mins),bar:Math.min(100,(e.uni_study_mins||0)/240*100),color:'var(--plum)'},
+    {label:'Personal Site/Business',val:fmtTime(e.business_mins),bar:Math.min(100,(e.business_mins||0)/120*100),color:'var(--coral)'},
     {label:'Car Courses',val:fmtTime(e.car_courses_mins),bar:Math.min(100,(e.car_courses_mins||0)/120*100),color:'var(--amber)'},
     {label:'Self Dev',val:fmtTime(e.selfdev_mins),bar:Math.min(100,(e.selfdev_mins||0)/120*100),color:'var(--sky)'},
     {label:'Skincare',val:({full:'Full routine ✓',half:'Half done',none:'Skipped'}[e.skincare||'none']),bar:({full:100,half:50,none:0}[e.skincare||'none']),color:'var(--rose)'},
@@ -767,7 +775,9 @@ const METRICS={
   calories:{label:'Calories',fn:d=>d.calories,color:'#d4821a',group:'Food',interpolate:true},
   protein:{label:'Protein (g)',fn:d=>d.protein,color:'#2a6a9a',group:'Food',interpolate:true},
   // ── Study ──
+  german_mins:{label:'German (min)',fn:d=>d.german_mins,color:'#3a7a5a',group:'Study',interpolate:true},
   uni_study_mins:{label:'Uni Study (min)',fn:d=>d.uni_study_mins,color:'#7a3a6a',group:'Study',interpolate:true},
+  business_mins:{label:'Personal Site/Business (min)',fn:d=>d.business_mins,color:'#e85d3a',group:'Study',interpolate:true},
   car_courses_mins:{label:'Car Courses (min)',fn:d=>d.car_courses_mins,color:'#d4821a',group:'Study',interpolate:true},
   selfdev_mins:{label:'Self Dev (min)',fn:d=>d.selfdev_mins,color:'#2a6a9a',group:'Study',interpolate:true},
   // ── Habits (binary/categorical — 0 is a real answer, not "no data", so no interpolation) ──
@@ -920,7 +930,7 @@ function addPresetCharts(){
     {type:'line',xField:'date',yFields:['mood','pain'],title:'Mood vs Pain Over Time'},
     {type:'line',xField:'date',yFields:['calories','protein'],title:'Calories & Protein'},
     {type:'line',xField:'date',yFields:['weight'],title:'Weight Trend'},
-    {type:'bar',xField:'date',yFields:['uni_study_mins','car_courses_mins','selfdev_mins'],title:'Study Time Breakdown'},
+    {type:'bar',xField:'date',yFields:['german_mins','uni_study_mins','business_mins','car_courses_mins','selfdev_mins'],title:'Study Time Breakdown'},
     {type:'scatter',xField:'date',yFields:['mood','score'],title:'Mood vs Score (Correlation)'},
     {type:'doughnut',xField:'gym',yFields:['score'],title:'Gym Attendance Split'},
     {type:'doughnut',xField:'food',yFields:['score'],title:'Food Choices Split'},

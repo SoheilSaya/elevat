@@ -218,8 +218,10 @@ SCORE_DEFAULTS = {
     "cal_under_amount": 150, "cal_under_reward": 1,
     "prot_max": 5, "prot_target": 176,
     "weight_logged": 2,
+    "german_max": 10, "german_target_mins": 60,
     "car_max": 8, "car_target_mins": 60,
     "uni_max": 12, "uni_target_mins": 120,
+    "business_max": 10, "business_target_mins": 60,
     "selfdev_max": 8, "selfdev_target_mins": 60,
     "skincare_full": 6, "skincare_half": 3,
     "pills": 8,
@@ -278,9 +280,11 @@ def compute_score(entry, cfg=None):
     if prot>0: score+=min(cfg["prot_max"],(prot/cfg["prot_target"])*cfg["prot_max"])
     # Weight logged
     if entry.get("weight"): score+=cfg["weight_logged"]
-    # Study: car, uni, selfdev
+    # Study: german, car, uni, business, selfdev
+    score+=min(cfg["german_max"],((entry.get("german_mins",0) or 0)/cfg["german_target_mins"])*cfg["german_max"])
     score+=min(cfg["car_max"],((entry.get("car_courses_mins",0) or 0)/cfg["car_target_mins"])*cfg["car_max"])
     score+=min(cfg["uni_max"],((entry.get("uni_study_mins",0) or 0)/cfg["uni_target_mins"])*cfg["uni_max"])
+    score+=min(cfg["business_max"],((entry.get("business_mins",0) or 0)/cfg["business_target_mins"])*cfg["business_max"])
     score+=min(cfg["selfdev_max"],((entry.get("selfdev_mins",0) or 0)/cfg["selfdev_target_mins"])*cfg["selfdev_max"])
     # Skincare
     sk=entry.get("skincare","none")
@@ -400,7 +404,8 @@ def get_stats():
         e=db["entries"][d]
         result.append({"date":d,"score":compute_score(e,cfg),"gym":e.get("gym","none"),"food":e.get("food",""),
             "calories":e.get("calories",0) or 0,"protein":e.get("protein",0) or 0,"weight":e.get("weight",None),
-            "car_courses_mins":e.get("car_courses_mins",0) or 0,"uni_study_mins":e.get("uni_study_mins",0) or 0,
+            "german_mins":e.get("german_mins",0) or 0,"car_courses_mins":e.get("car_courses_mins",0) or 0,
+            "uni_study_mins":e.get("uni_study_mins",0) or 0,"business_mins":e.get("business_mins",0) or 0,
             "selfdev_mins":e.get("selfdev_mins",0) or 0,"skincare":e.get("skincare","none"),
             "pills":1 if e.get("pills") else 0,"mood":e.get("mood",None),"pain":e.get("pain",None),
             "socialized":e.get("socialized","none"),"soda":1 if e.get("soda") else 0,
@@ -502,7 +507,9 @@ def get_full_history():
             "calories":         e.get("calories",0) or 0,
             "protein":          e.get("protein",0) or 0,
             "weight":           e.get("weight",None),
+            "german_mins":      e.get("german_mins",0) or 0,
             "uni_study_mins":   e.get("uni_study_mins",0) or 0,
+            "business_mins":    e.get("business_mins",0) or 0,
             "car_courses_mins": e.get("car_courses_mins",0) or 0,
             "selfdev_mins":     e.get("selfdev_mins",0) or 0,
             "pills":            1 if e.get("pills") else 0,
@@ -596,7 +603,9 @@ def get_full_stats():
             "calories":            e.get("calories",0) or fo.get("food_calories",0) or 0,
             "protein":             e.get("protein",0) or fo.get("food_protein",0) or 0,
             "weight":              e.get("weight",None),
+            "german_mins":         e.get("german_mins",0) or 0,
             "uni_study_mins":      e.get("uni_study_mins",0) or 0,
+            "business_mins":       e.get("business_mins",0) or 0,
             "car_courses_mins":    e.get("car_courses_mins",0) or 0,
             "selfdev_mins":        e.get("selfdev_mins",0) or 0,
             "pills":               1 if e.get("pills") else 0,

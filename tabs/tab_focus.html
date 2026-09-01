@@ -14,7 +14,18 @@
   .simple-btn-reset{background:var(--cream2,#f0ece4);color:var(--text2,#5a5448);}
   .simple-btn-endday{background:var(--text1,#2a2a2a);color:#fff;}
   .simple-btn:active{transform:scale(.97);}
+  .simple-btn-flag{background:linear-gradient(135deg,#d4a017,#b8860b);color:#fff;}
   .simple-hint{font-size:12px;color:var(--text4,#b5ae9f);line-height:1.7;}
+
+  .simple-flags-card{background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px;}
+  .simple-flags-title{font-weight:700;font-size:14px;color:var(--text1,#2a2a2a);margin-bottom:10px;}
+  .flag-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--cream2,#f0ece4);}
+  .flag-item:last-child{border-bottom:none;}
+  .flag-item-range{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text3,#8a8478);white-space:nowrap;}
+  .flag-item-label{flex:1;font-size:13px;color:var(--text1,#2a2a2a);}
+  .flag-cat-select{border:1px solid var(--cream3,#e2ddd1);border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;background:var(--cream2,#f0ece4);color:var(--text1,#2a2a2a);max-width:170px;}
+  .flag-item-del{border:none;background:transparent;color:var(--text4,#b5ae9f);cursor:pointer;font-size:17px;line-height:1;padding:2px 6px;}
+  .flag-item-del:hover{color:#c44a6a;}
 
   .simple-stats-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   .simple-stats-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
@@ -46,11 +57,17 @@
 
         <div class="simple-btns">
           <button class="simple-btn simple-btn-start" id="simpleToggleBtn" onclick="toggleSimpleTimer()">▶ شروع کار</button>
+          <button class="simple-btn simple-btn-flag" id="simpleFlagBtn" onclick="addFlag()">🚩 فلگ</button>
           <button class="simple-btn simple-btn-reset" onclick="resetSimpleTimer()">↺ ریست</button>
           <button class="simple-btn simple-btn-endday" onclick="endDaySimple()">🏁 پایان روز</button>
         </div>
 
-        <div class="simple-hint">هر وقت پای کار نشستی بزن «شروع»، هر وقت بلند شدی یا حواست پرت شد بزن همون دکمه برای پاز، برگشتی دوباره بزن «ادامه». آخر روز «پایان روز» رو بزن تا زمان مفیدت ذخیره بشه.</div>
+        <div class="simple-hint">هر وقت پای کار نشستی بزن «شروع»، هر وقت بلند شدی یا حواست پرت شد بزن همون دکمه برای پاز، برگشتی دوباره بزن «ادامه». هر وقت یه بخش از کار تموم شد بزن «فلگ» (فوری ثبت می‌شه، بدون تایپ) و اگه خواستی بعداً از کنارش مشخص کن مال کدوم دسته بوده. آخر روز «پایان روز» رو بزن تا زمان مفیدت ذخیره بشه.</div>
+      </div>
+
+      <div class="simple-flags-card" id="simpleFlagsCard" style="display:none;">
+        <div class="simple-flags-title">🚩 بخش‌های امروز</div>
+        <div id="simpleFlagsList"></div>
       </div>
 
       <div class="simple-stats-card">

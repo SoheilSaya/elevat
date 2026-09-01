@@ -1308,6 +1308,29 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       </div>
     </div>
 
+    <!-- GERMAN -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--sageL)">🇩🇪</div>
+        <div><div class="card-title">German Learning</div><div class="card-sub">Sprache lernen</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('german_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('german_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('german_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('german_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('german_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="german-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('german_mins',this.value)"/>
+          <div><div class="smart-num" id="german-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- STUDY -->
     <div class="card">
       <div class="card-head">
@@ -1329,6 +1352,29 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
         <div class="smart-slider-row">
           <input type="range" class="smart-slider" id="uni-slider" min="0" max="480" step="15" value="0" oninput="syncSlider('uni_study_mins',this.value)"/>
           <div><div class="smart-num" id="uni-display">0</div><div class="smart-unit">min</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERSONAL SITE / BUSINESS -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--coralL)">💻</div>
+        <div><div class="card-title">Personal Site / Business</div><div class="card-sub">daynamo & side projects</div></div>
+      </div>
+      <div class="smart-input">
+        <div class="smart-presets">
+          <button class="preset" onclick="setSmartVal('business_mins',0,this)">0</button>
+          <button class="preset" onclick="setSmartVal('business_mins',15,this)">15m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',30,this)">30m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',45,this)">45m</button>
+          <button class="preset" onclick="setSmartVal('business_mins',60,this)">1h</button>
+          <button class="preset" onclick="setSmartVal('business_mins',90,this)">1.5h</button>
+          <button class="preset" onclick="setSmartVal('business_mins',120,this)">2h</button>
+        </div>
+        <div class="smart-slider-row">
+          <input type="range" class="smart-slider" id="business-slider" min="0" max="360" step="15" value="0" oninput="syncSlider('business_mins',this.value)"/>
+          <div><div class="smart-num" id="business-display">0</div><div class="smart-unit">min</div></div>
         </div>
       </div>
     </div>
@@ -1473,7 +1519,18 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
   .simple-btn-reset{background:var(--cream2,#f0ece4);color:var(--text2,#5a5448);}
   .simple-btn-endday{background:var(--text1,#2a2a2a);color:#fff;}
   .simple-btn:active{transform:scale(.97);}
+  .simple-btn-flag{background:linear-gradient(135deg,#d4a017,#b8860b);color:#fff;}
   .simple-hint{font-size:12px;color:var(--text4,#b5ae9f);line-height:1.7;}
+
+  .simple-flags-card{background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px;}
+  .simple-flags-title{font-weight:700;font-size:14px;color:var(--text1,#2a2a2a);margin-bottom:10px;}
+  .flag-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--cream2,#f0ece4);}
+  .flag-item:last-child{border-bottom:none;}
+  .flag-item-range{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text3,#8a8478);white-space:nowrap;}
+  .flag-item-label{flex:1;font-size:13px;color:var(--text1,#2a2a2a);}
+  .flag-cat-select{border:1px solid var(--cream3,#e2ddd1);border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;background:var(--cream2,#f0ece4);color:var(--text1,#2a2a2a);max-width:170px;}
+  .flag-item-del{border:none;background:transparent;color:var(--text4,#b5ae9f);cursor:pointer;font-size:17px;line-height:1;padding:2px 6px;}
+  .flag-item-del:hover{color:#c44a6a;}
 
   .simple-stats-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   .simple-stats-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
@@ -1505,11 +1562,17 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 
         <div class="simple-btns">
           <button class="simple-btn simple-btn-start" id="simpleToggleBtn" onclick="toggleSimpleTimer()">▶ شروع کار</button>
+          <button class="simple-btn simple-btn-flag" id="simpleFlagBtn" onclick="addFlag()">🚩 فلگ</button>
           <button class="simple-btn simple-btn-reset" onclick="resetSimpleTimer()">↺ ریست</button>
           <button class="simple-btn simple-btn-endday" onclick="endDaySimple()">🏁 پایان روز</button>
         </div>
 
-        <div class="simple-hint">هر وقت پای کار نشستی بزن «شروع»، هر وقت بلند شدی یا حواست پرت شد بزن همون دکمه برای پاز، برگشتی دوباره بزن «ادامه». آخر روز «پایان روز» رو بزن تا زمان مفیدت ذخیره بشه.</div>
+        <div class="simple-hint">هر وقت پای کار نشستی بزن «شروع»، هر وقت بلند شدی یا حواست پرت شد بزن همون دکمه برای پاز، برگشتی دوباره بزن «ادامه». هر وقت یه بخش از کار تموم شد بزن «فلگ» (فوری ثبت می‌شه، بدون تایپ) و اگه خواستی بعداً از کنارش مشخص کن مال کدوم دسته بوده. آخر روز «پایان روز» رو بزن تا زمان مفیدت ذخیره بشه.</div>
+      </div>
+
+      <div class="simple-flags-card" id="simpleFlagsCard" style="display:none;">
+        <div class="simple-flags-title">🚩 بخش‌های امروز</div>
+        <div id="simpleFlagsList"></div>
       </div>
 
       <div class="simple-stats-card">
@@ -4005,7 +4068,13 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       <div style="background:var(--plumL);border-radius:var(--r2);padding:12px 14px;">
         <div style="font-weight:700;font-size:13px;color:var(--plum);margin-bottom:6px;">📚 Study</div>
         <div class="score-row" style="font-size:12px;color:var(--text2);">
+          German: up to <input class="score-input" type="number" data-key="german_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="german_target_mins" step="5"> min)
+        </div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
           Uni study: up to <input class="score-input" type="number" data-key="uni_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="uni_target_mins" step="5"> min)
+        </div>
+        <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
+          Personal site/business: up to <input class="score-input" type="number" data-key="business_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="business_target_mins" step="5"> min)
         </div>
         <div class="score-row" style="font-size:12px;color:var(--text2);margin-top:6px;">
           Car courses: up to <input class="score-input" type="number" data-key="car_max" step="1"> pts (full at <input class="score-input wide" type="number" data-key="car_target_mins" step="5"> min)
@@ -4461,7 +4530,7 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 const state = {
   gym:'none', home_exercise:'none', food:'', skincare:'none', socialized:'none', soda:false, fruit_veg:false,
   calories:1500, protein:100, weight:88,
-  uni_study_mins:0, car_courses_mins:0, selfdev_mins:0,
+  german_mins:0, uni_study_mins:0, business_mins:0, car_courses_mins:0, selfdev_mins:0,
   mood:5, pain:3, pills:false,
   teeth_brushed:0, meditated:false
 };
@@ -4602,13 +4671,14 @@ async function loadToday(){
 function resetForm(){
   // Reset all state to defaults before loading a different day
   Object.assign(state,{gym:'none',home_exercise:'none',food:'',skincare:'none',socialized:'none',soda:false,fruit_veg:false,
-    calories:1500,protein:100,weight:88,uni_study_mins:0,car_courses_mins:0,selfdev_mins:0,mood:5,pain:3,pills:false});
+    calories:1500,protein:100,weight:88,german_mins:0,uni_study_mins:0,business_mins:0,car_courses_mins:0,selfdev_mins:0,mood:5,pain:3,pills:false});
   ['gym-chips','home-exercise-chips','food-chips','skincare-chips','social-chips','soda-chips','fruitveg-chips','teeth-chips'].forEach(id=>{
     const g=document.getElementById(id);
     if(g) g.querySelectorAll('.chip').forEach(b=>b.className='chip');
   });
   [['cal-slider','cal-display',1500],['prot-slider','prot-display',100],['wt-slider','wt-display',88],
-   ['uni-slider','uni-display',0],['car-slider','car-display',0],['dev-slider','dev-display',0]].forEach(([s,d,v])=>{
+   ['german-slider','german-display',0],['uni-slider','uni-display',0],['business-slider','business-display',0],
+   ['car-slider','car-display',0],['dev-slider','dev-display',0]].forEach(([s,d,v])=>{
     const sl=document.getElementById(s); const dp=document.getElementById(d);
     if(sl) sl.value=v; if(dp) dp.textContent=v;
   });
@@ -4628,7 +4698,8 @@ function fillState(e){
   if(e.soda!==undefined){state.soda=e.soda; pickByVal('soda',e.soda);}
   const nums={calories:{s:'cal-slider',d:'cal-display',min:500,max:5000},
     protein:{s:'prot-slider',d:'prot-display'},weight:{s:'wt-slider',d:'wt-display'},
-    uni_study_mins:{s:'uni-slider',d:'uni-display'},car_courses_mins:{s:'car-slider',d:'car-display'},
+    german_mins:{s:'german-slider',d:'german-display'},uni_study_mins:{s:'uni-slider',d:'uni-display'},
+    business_mins:{s:'business-slider',d:'business-display'},car_courses_mins:{s:'car-slider',d:'car-display'},
     selfdev_mins:{s:'dev-slider',d:'dev-display'}};
   Object.entries(nums).forEach(([k,cfg])=>{
     if(e[k]!=null){
@@ -4684,9 +4755,11 @@ function pickByVal(field,val){
 function setSmartVal(field,val,btn){
   state[field]=val;
   const slMap={calories:'cal-slider',protein:'prot-slider',weight:'wt-slider',
-    uni_study_mins:'uni-slider',car_courses_mins:'car-slider',selfdev_mins:'dev-slider'};
+    german_mins:'german-slider',uni_study_mins:'uni-slider',business_mins:'business-slider',
+    car_courses_mins:'car-slider',selfdev_mins:'dev-slider'};
   const dpMap={calories:'cal-display',protein:'prot-display',weight:'wt-display',
-    uni_study_mins:'uni-display',car_courses_mins:'car-display',selfdev_mins:'dev-display'};
+    german_mins:'german-display',uni_study_mins:'uni-display',business_mins:'business-display',
+    car_courses_mins:'car-display',selfdev_mins:'dev-display'};
   const sl=document.getElementById(slMap[field]);
   const dp=document.getElementById(dpMap[field]);
   if(sl) sl.value=val;
@@ -4702,7 +4775,8 @@ function setSmartVal(field,val,btn){
 function syncSlider(field,val){
   state[field]=parseFloat(val);
   const dpMap={calories:'cal-display',protein:'prot-display',weight:'wt-display',
-    uni_study_mins:'uni-display',car_courses_mins:'car-display',selfdev_mins:'dev-display'};
+    german_mins:'german-display',uni_study_mins:'uni-display',business_mins:'business-display',
+    car_courses_mins:'car-display',selfdev_mins:'dev-display'};
   const dp=document.getElementById(dpMap[field]);
   if(dp) dp.textContent=val;
   // deselect presets
@@ -4712,7 +4786,7 @@ function syncSlider(field,val){
 // ─── METRICS BAR ──────────────────────────────────
 function updateMetrics(){
   const cal=state.calories||0, prot=state.protein||0, wt=state.weight||0;
-  const study=(state.uni_study_mins||0)+(state.car_courses_mins||0)+(state.selfdev_mins||0);
+  const study=(state.german_mins||0)+(state.uni_study_mins||0)+(state.business_mins||0)+(state.car_courses_mins||0)+(state.selfdev_mins||0);
   document.getElementById('mCal').textContent=cal>0?cal+' kcal':'—';
   document.getElementById('mCalBar').style.width=Math.min(100,cal/3000*100)+'%';
   // Deficit calc — pessimistic: real intake is ~15% higher than reported (underreporting bias)
@@ -4923,7 +4997,8 @@ async function saveAll(){
     gym:state.gym, home_exercise:state.home_exercise, food:state.food, skincare:state.skincare, socialized:state.socialized,
     soda:state.soda, fruit_veg:state.fruit_veg,
     calories:state.calories||0, protein:state.protein||0, weight:state.weight||null,
-    uni_study_mins:state.uni_study_mins||0, car_courses_mins:state.car_courses_mins||0,
+    german_mins:state.german_mins||0, uni_study_mins:state.uni_study_mins||0,
+    business_mins:state.business_mins||0, car_courses_mins:state.car_courses_mins||0,
     selfdev_mins:state.selfdev_mins||0,
     pain:parseInt(document.getElementById('pain').value),
     mood:parseInt(document.getElementById('mood').value),
@@ -5079,7 +5154,9 @@ function buildDetailGrid(e){
     {label:'Weight',val:e.weight?e.weight+' kg':'Not logged',bar:e.weight?Math.min(100,(e.weight-70)/50*100):0,color:'var(--sky)'},
     {label:'Mood',val:(e.mood||'—')+'/10',bar:e.mood?(e.mood/10*100):0,color:'var(--sage)'},
     {label:'Pain',val:(e.pain||'—')+'/10',bar:e.pain?(e.pain/10*100):0,color:'var(--rose)'},
+    {label:'German',val:fmtTime(e.german_mins),bar:Math.min(100,(e.german_mins||0)/120*100),color:'var(--sage)'},
     {label:'Uni Study',val:fmtTime(e.uni_study_mins),bar:Math.min(100,(e.uni_study_mins||0)/240*100),color:'var(--plum)'},
+    {label:'Personal Site/Business',val:fmtTime(e.business_mins),bar:Math.min(100,(e.business_mins||0)/120*100),color:'var(--coral)'},
     {label:'Car Courses',val:fmtTime(e.car_courses_mins),bar:Math.min(100,(e.car_courses_mins||0)/120*100),color:'var(--amber)'},
     {label:'Self Dev',val:fmtTime(e.selfdev_mins),bar:Math.min(100,(e.selfdev_mins||0)/120*100),color:'var(--sky)'},
     {label:'Skincare',val:({full:'Full routine ✓',half:'Half done',none:'Skipped'}[e.skincare||'none']),bar:({full:100,half:50,none:0}[e.skincare||'none']),color:'var(--rose)'},
@@ -5225,7 +5302,9 @@ const METRICS={
   calories:{label:'Calories',fn:d=>d.calories,color:'#d4821a',group:'Food',interpolate:true},
   protein:{label:'Protein (g)',fn:d=>d.protein,color:'#2a6a9a',group:'Food',interpolate:true},
   // ── Study ──
+  german_mins:{label:'German (min)',fn:d=>d.german_mins,color:'#3a7a5a',group:'Study',interpolate:true},
   uni_study_mins:{label:'Uni Study (min)',fn:d=>d.uni_study_mins,color:'#7a3a6a',group:'Study',interpolate:true},
+  business_mins:{label:'Personal Site/Business (min)',fn:d=>d.business_mins,color:'#e85d3a',group:'Study',interpolate:true},
   car_courses_mins:{label:'Car Courses (min)',fn:d=>d.car_courses_mins,color:'#d4821a',group:'Study',interpolate:true},
   selfdev_mins:{label:'Self Dev (min)',fn:d=>d.selfdev_mins,color:'#2a6a9a',group:'Study',interpolate:true},
   // ── Habits (binary/categorical — 0 is a real answer, not "no data", so no interpolation) ──
@@ -5378,7 +5457,7 @@ function addPresetCharts(){
     {type:'line',xField:'date',yFields:['mood','pain'],title:'Mood vs Pain Over Time'},
     {type:'line',xField:'date',yFields:['calories','protein'],title:'Calories & Protein'},
     {type:'line',xField:'date',yFields:['weight'],title:'Weight Trend'},
-    {type:'bar',xField:'date',yFields:['uni_study_mins','car_courses_mins','selfdev_mins'],title:'Study Time Breakdown'},
+    {type:'bar',xField:'date',yFields:['german_mins','uni_study_mins','business_mins','car_courses_mins','selfdev_mins'],title:'Study Time Breakdown'},
     {type:'scatter',xField:'date',yFields:['mood','score'],title:'Mood vs Score (Correlation)'},
     {type:'doughnut',xField:'gym',yFields:['score'],title:'Gym Attendance Split'},
     {type:'doughnut',xField:'food',yFields:['score'],title:'Food Choices Split'},
@@ -6072,6 +6151,7 @@ const SIMPLE = {
   savedTodayMinutes: 0,    // already saved to backend for today (from prior End Day presses)
   statsData: {},           // {'YYYY-MM-DD': minutes}
   currentRange: '7',
+  flags: [],               // [{seconds, label, time}] — markers along today's elapsed timer
 };
 
 function isoDateStr(d){
@@ -6118,6 +6198,84 @@ function toggleSimpleTimer(){
   else resumeSimpleTimer();
 }
 
+// ── Flags: mark "from here to here" along today's timer, tag later if wanted ──
+const FLAG_CATEGORIES = [
+  {value:'german',   label:'🇩🇪 German'},
+  {value:'uni',       label:'📚 University Study'},
+  {value:'business',  label:'💻 Personal Site/Business'},
+  {value:'car',        label:'🚗 Car Courses'},
+  {value:'selfdev',   label:'🌱 Self Development'}
+];
+
+function addFlag(){
+  SIMPLE.flags.push({
+    seconds: getCurrentElapsedSeconds(),
+    category: '',
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+  });
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function setFlagCategory(i, value){
+  if(!SIMPLE.flags[i]) return;
+  SIMPLE.flags[i].category = value;
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function removeSimpleFlag(i){
+  SIMPLE.flags.splice(i, 1);
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function flagCategoryOptionsHTML(selected){
+  let html = `<option value=""${selected?'':' selected'}>— دسته —</option>`;
+  FLAG_CATEGORIES.forEach(c=>{
+    html += `<option value="${c.value}"${selected===c.value?' selected':''}>${c.label}</option>`;
+  });
+  return html;
+}
+
+function renderSimpleFlags(){
+  const card = document.getElementById('simpleFlagsCard');
+  const list = document.getElementById('simpleFlagsList');
+  if(!card || !list) return;
+
+  const currentElapsed = getCurrentElapsedSeconds();
+
+  if(!SIMPLE.flags.length && currentElapsed < 1){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  let html = '';
+  let prevSeconds = 0;
+  SIMPLE.flags.forEach((f, i) => {
+    const dur = Math.max(0, f.seconds - prevSeconds);
+    html += `<div class="flag-item">
+      <span class="flag-item-range">${formatHMS(prevSeconds)}–${formatHMS(f.seconds)} (${formatHMS(dur)})</span>
+      <select class="flag-cat-select" onchange="setFlagCategory(${i},this.value)">${flagCategoryOptionsHTML(f.category)}</select>
+      <button class="flag-item-del" onclick="removeSimpleFlag(${i})" title="حذف">×</button>
+    </div>`;
+    prevSeconds = f.seconds;
+  });
+
+  // Ongoing segment since the last flag (or since start, if no flags yet)
+  const remaining = currentElapsed - prevSeconds;
+  if(remaining > 0.5){
+    html += `<div class="flag-item" style="opacity:.55;">
+      <span class="flag-item-range">${formatHMS(prevSeconds)}–${formatHMS(currentElapsed)} (${formatHMS(remaining)})</span>
+      <span class="flag-item-label">در حال انجام...</span>
+      <span style="width:24px;"></span>
+    </div>`;
+  }
+
+  list.innerHTML = html;
+}
+
 function resumeSimpleTimer(){
   SIMPLE.running = true;
   SIMPLE.startTimestamp = Date.now();
@@ -6143,8 +6301,10 @@ function resetSimpleTimer(){
   SIMPLE.running = false;
   SIMPLE.elapsedBeforePause = 0;
   SIMPLE.startTimestamp = null;
+  SIMPLE.flags = [];
   saveSimpleStateLocal();
   updateSimpleDisplay();
+  renderSimpleFlags();
   showToast('تایمر ریست شد.', '');
 }
 
@@ -6154,6 +6314,7 @@ function simpleTick(){
     handleDateRollover(today);
   }
   updateSimpleDisplay();
+  renderSimpleFlags();
   saveSimpleStateLocal();
 }
 
@@ -6172,7 +6333,9 @@ function handleDateRollover(newDateStr){
   SIMPLE.dateStr = newDateStr;
   SIMPLE.elapsedBeforePause = 0;
   SIMPLE.startTimestamp = wasRunning ? Date.now() : null;
+  SIMPLE.flags = [];
   saveSimpleStateLocal();
+  renderSimpleFlags();
 }
 
 async function endDaySimple(){
@@ -6188,8 +6351,10 @@ async function endDaySimple(){
     showToast('🏁 ثبت شد: ' + Math.round(minutes) + ' دقیقه از امروز', 'success');
     SIMPLE.elapsedBeforePause = 0;
     SIMPLE.startTimestamp = null;
+    SIMPLE.flags = [];
     saveSimpleStateLocal();
     updateSimpleDisplay();
+    renderSimpleFlags();
     fetchFocusStats(SIMPLE.currentRange);
   } else {
     showToast('اتصال به سرور برقرار نشد — آیا app.py در حال اجراست؟', '');
@@ -6215,7 +6380,8 @@ function saveSimpleStateLocal(){
     dateStr: SIMPLE.dateStr,
     elapsedBeforePause: SIMPLE.elapsedBeforePause,
     running: SIMPLE.running,
-    startTimestamp: SIMPLE.startTimestamp
+    startTimestamp: SIMPLE.startTimestamp,
+    flags: SIMPLE.flags
   }));
 }
 
@@ -6228,6 +6394,7 @@ function loadSimpleStateLocal(){
     SIMPLE.elapsedBeforePause = saved.elapsedBeforePause || 0;
     SIMPLE.running = !!saved.running;
     SIMPLE.startTimestamp = saved.startTimestamp || null;
+    SIMPLE.flags = Array.isArray(saved.flags) ? saved.flags : [];
     if(SIMPLE.running){
       SIMPLE.interval = setInterval(simpleTick, 1000);
     }
@@ -6236,6 +6403,7 @@ function loadSimpleStateLocal(){
     SIMPLE.elapsedBeforePause = 0;
     SIMPLE.running = false;
     SIMPLE.startTimestamp = null;
+    SIMPLE.flags = [];
   }
 }
 
@@ -6362,6 +6530,7 @@ initFocusView = function(){
   _origInitFocusView();
   loadSimpleStateLocal();
   updateSimpleDisplay();
+  renderSimpleFlags();
   fetchFocusStats('7');
   const savedUIMode = localStorage.getItem('elevateFocusUIMode') || 'simple';
   setFocusUIMode(savedUIMode, true);
@@ -11640,7 +11809,13 @@ function d2g(jdn) {
   const i = Math.floor((j % 1461) / 4) * 5 + 308;
   const gd = Math.floor((i % 153) / 5) + 1;
   const gm = (Math.floor(i / 153) % 12) + 1;
-  const gy = Math.floor(j / 1461) - 100100 + Math.floor((8 - gm) / 6);
+  // NOTE: this used to be `Math.floor((8 - gm) / 6)`, which is wrong for
+  // gm 9–12 (gives -1 instead of 0) — it made every date from Sept 1
+  // through Dec 31 decode one Gregorian year too early, which cascaded
+  // into garbage Jalali months (e.g. month 18) for the rest of the year.
+  // The correct correction is +1 only for Jan/Feb (they belong to the
+  // previous "March-start" internal year used by this algorithm), 0 otherwise.
+  const gy = Math.floor(j / 1461) - 100100 + (gm <= 2 ? 1 : 0);
   return [gy, gm, gd];
 }
 

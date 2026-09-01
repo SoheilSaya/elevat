@@ -308,6 +308,7 @@ const SIMPLE = {
   savedTodayMinutes: 0,    // already saved to backend for today (from prior End Day presses)
   statsData: {},           // {'YYYY-MM-DD': minutes}
   currentRange: '7',
+  flags: [],               // [{seconds, label, time}] — markers along today's elapsed timer
 };
 
 function isoDateStr(d){
@@ -354,6 +355,84 @@ function toggleSimpleTimer(){
   else resumeSimpleTimer();
 }
 
+// ── Flags: mark "from here to here" along today's timer, tag later if wanted ──
+const FLAG_CATEGORIES = [
+  {value:'german',   label:'🇩🇪 German'},
+  {value:'uni',       label:'📚 University Study'},
+  {value:'business',  label:'💻 Personal Site/Business'},
+  {value:'car',        label:'🚗 Car Courses'},
+  {value:'selfdev',   label:'🌱 Self Development'}
+];
+
+function addFlag(){
+  SIMPLE.flags.push({
+    seconds: getCurrentElapsedSeconds(),
+    category: '',
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+  });
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function setFlagCategory(i, value){
+  if(!SIMPLE.flags[i]) return;
+  SIMPLE.flags[i].category = value;
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function removeSimpleFlag(i){
+  SIMPLE.flags.splice(i, 1);
+  saveSimpleStateLocal();
+  renderSimpleFlags();
+}
+
+function flagCategoryOptionsHTML(selected){
+  let html = `<option value=""${selected?'':' selected'}>— دسته —</option>`;
+  FLAG_CATEGORIES.forEach(c=>{
+    html += `<option value="${c.value}"${selected===c.value?' selected':''}>${c.label}</option>`;
+  });
+  return html;
+}
+
+function renderSimpleFlags(){
+  const card = document.getElementById('simpleFlagsCard');
+  const list = document.getElementById('simpleFlagsList');
+  if(!card || !list) return;
+
+  const currentElapsed = getCurrentElapsedSeconds();
+
+  if(!SIMPLE.flags.length && currentElapsed < 1){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  let html = '';
+  let prevSeconds = 0;
+  SIMPLE.flags.forEach((f, i) => {
+    const dur = Math.max(0, f.seconds - prevSeconds);
+    html += `<div class="flag-item">
+      <span class="flag-item-range">${formatHMS(prevSeconds)}–${formatHMS(f.seconds)} (${formatHMS(dur)})</span>
+      <select class="flag-cat-select" onchange="setFlagCategory(${i},this.value)">${flagCategoryOptionsHTML(f.category)}</select>
+      <button class="flag-item-del" onclick="removeSimpleFlag(${i})" title="حذف">×</button>
+    </div>`;
+    prevSeconds = f.seconds;
+  });
+
+  // Ongoing segment since the last flag (or since start, if no flags yet)
+  const remaining = currentElapsed - prevSeconds;
+  if(remaining > 0.5){
+    html += `<div class="flag-item" style="opacity:.55;">
+      <span class="flag-item-range">${formatHMS(prevSeconds)}–${formatHMS(currentElapsed)} (${formatHMS(remaining)})</span>
+      <span class="flag-item-label">در حال انجام...</span>
+      <span style="width:24px;"></span>
+    </div>`;
+  }
+
+  list.innerHTML = html;
+}
+
 function resumeSimpleTimer(){
   SIMPLE.running = true;
   SIMPLE.startTimestamp = Date.now();
@@ -379,8 +458,10 @@ function resetSimpleTimer(){
   SIMPLE.running = false;
   SIMPLE.elapsedBeforePause = 0;
   SIMPLE.startTimestamp = null;
+  SIMPLE.flags = [];
   saveSimpleStateLocal();
   updateSimpleDisplay();
+  renderSimpleFlags();
   showToast('تایمر ریست شد.', '');
 }
 
@@ -390,6 +471,7 @@ function simpleTick(){
     handleDateRollover(today);
   }
   updateSimpleDisplay();
+  renderSimpleFlags();
   saveSimpleStateLocal();
 }
 
@@ -408,7 +490,9 @@ function handleDateRollover(newDateStr){
   SIMPLE.dateStr = newDateStr;
   SIMPLE.elapsedBeforePause = 0;
   SIMPLE.startTimestamp = wasRunning ? Date.now() : null;
+  SIMPLE.flags = [];
   saveSimpleStateLocal();
+  renderSimpleFlags();
 }
 
 async function endDaySimple(){
@@ -424,8 +508,10 @@ async function endDaySimple(){
     showToast('🏁 ثبت شد: ' + Math.round(minutes) + ' دقیقه از امروز', 'success');
     SIMPLE.elapsedBeforePause = 0;
     SIMPLE.startTimestamp = null;
+    SIMPLE.flags = [];
     saveSimpleStateLocal();
     updateSimpleDisplay();
+    renderSimpleFlags();
     fetchFocusStats(SIMPLE.currentRange);
   } else {
     showToast('اتصال به سرور برقرار نشد — آیا app.py در حال اجراست؟', '');
@@ -451,7 +537,8 @@ function saveSimpleStateLocal(){
     dateStr: SIMPLE.dateStr,
     elapsedBeforePause: SIMPLE.elapsedBeforePause,
     running: SIMPLE.running,
-    startTimestamp: SIMPLE.startTimestamp
+    startTimestamp: SIMPLE.startTimestamp,
+    flags: SIMPLE.flags
   }));
 }
 
@@ -464,6 +551,7 @@ function loadSimpleStateLocal(){
     SIMPLE.elapsedBeforePause = saved.elapsedBeforePause || 0;
     SIMPLE.running = !!saved.running;
     SIMPLE.startTimestamp = saved.startTimestamp || null;
+    SIMPLE.flags = Array.isArray(saved.flags) ? saved.flags : [];
     if(SIMPLE.running){
       SIMPLE.interval = setInterval(simpleTick, 1000);
     }
@@ -472,6 +560,7 @@ function loadSimpleStateLocal(){
     SIMPLE.elapsedBeforePause = 0;
     SIMPLE.running = false;
     SIMPLE.startTimestamp = null;
+    SIMPLE.flags = [];
   }
 }
 
@@ -598,6 +687,7 @@ initFocusView = function(){
   _origInitFocusView();
   loadSimpleStateLocal();
   updateSimpleDisplay();
+  renderSimpleFlags();
   fetchFocusStats('7');
   const savedUIMode = localStorage.getItem('elevateFocusUIMode') || 'simple';
   setFocusUIMode(savedUIMode, true);

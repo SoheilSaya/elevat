@@ -78,7 +78,13 @@ function d2g(jdn) {
   const i = Math.floor((j % 1461) / 4) * 5 + 308;
   const gd = Math.floor((i % 153) / 5) + 1;
   const gm = (Math.floor(i / 153) % 12) + 1;
-  const gy = Math.floor(j / 1461) - 100100 + Math.floor((8 - gm) / 6);
+  // NOTE: this used to be `Math.floor((8 - gm) / 6)`, which is wrong for
+  // gm 9–12 (gives -1 instead of 0) — it made every date from Sept 1
+  // through Dec 31 decode one Gregorian year too early, which cascaded
+  // into garbage Jalali months (e.g. month 18) for the rest of the year.
+  // The correct correction is +1 only for Jan/Feb (they belong to the
+  // previous "March-start" internal year used by this algorithm), 0 otherwise.
+  const gy = Math.floor(j / 1461) - 100100 + (gm <= 2 ? 1 : 0);
   return [gy, gm, gd];
 }
 
