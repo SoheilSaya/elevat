@@ -6,7 +6,7 @@
 //  and the shared helpers/classes in js_core.js + head.html.
 // ══════════════════════════════════════════════════════
 
-const PARTS = {products:[],stores:[],car_models:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
+const PARTS = {products:[],stores:[],car_models:[],brands:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
   totals:{},low_stock:[],low_stock_threshold:2};
 let partsLoaded = false;
 let partsCurrentSub = 'products';
@@ -17,8 +17,11 @@ let editingSaleId = null;
 let editingCashTxId = null;
 let cashTxType = 'deposit';
 let productModalReturnTo = null; // null | 'purchase' | 'sale'
+let brandModalReturnTo = null;   // null | 'product' — where to land a newly-created brand
 let productImageData = null;     // base64 currently staged in the product modal
 let storeImageData = null;       // base64 currently staged in the store modal
+let purchaseInvoiceImage = null; // null = unchanged, '' = removed, dataURL = newly staged
+let purchaseReceiptImage = null; // null = unchanged, '' = removed, dataURL = newly staged
 let partImgAutoName = '';        // last value we auto-wrote into pfName, so we know if the user overrode it
 let selectedCarModels = [];      // array of car models currently checked in the open product modal
 let cropTarget = 'product';      // which modal's photo is currently being cropped: 'product' | 'store'
@@ -32,6 +35,8 @@ let cropDrag = null;             // {startX, startY, startOffX, startOffY} while
 let partsReportRange = 'all';
 let partsRevenueChartInstance = null;
 let partsStoreChartInstance = null;
+let partsBrandChartInstance = null;
+let partsCarModelChartInstance = null;
 const QTY_PRESET_VALUES = [1,2,3,4,5,7,10,15,20,30,50];
 
 function fmtT(n){
@@ -83,6 +88,7 @@ function renderPartsAll(){
   renderPartsFilters();
   renderPartsProducts();
   renderCarModelsGrid();
+  renderBrandsGrid();
   renderStoreGrid();
   renderStoreSelect();
   renderProductSelects();
@@ -90,6 +96,8 @@ function renderPartsAll(){
   renderSaleCart();
   renderPurchaseHistory();
   renderSalesHistory();
+  renderPurchaseTabStats();
+  renderSaleTabStats();
   renderCashStats();
   renderCashLedger();
   renderPartsHero();
@@ -208,7 +216,7 @@ function renderCashLedger(){
 // ─── SUB-NAV ───────────────────────────────────────
 function showPartsSub(name){
   partsCurrentSub = name;
-  ['products','carmodels','stores','purchase','sales','cash','reports'].forEach(s=>{
+  ['products','carmodels','brands','stores','purchase','sales','cash','reports'].forEach(s=>{
     document.getElementById('partsSub-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.parts-subtab').forEach(b=>b.classList.toggle('active', b.dataset.sub===name));
@@ -263,7 +271,9 @@ function renderPartsFilters(){
   const managedNames = PARTS.car_models.map(c=>c.name);
   const legacyNames = PARTS.products.flatMap(p=>productCarModels(p));
   fill('partsFilterCarModel', [...managedNames, ...legacyNames]);
-  fill('partsFilterBrand', PARTS.products.map(p=>p.brand));
+  const managedBrandNames = PARTS.brands.map(b=>b.name);
+  const legacyBrandNames = PARTS.products.map(p=>p.brand);
+  fill('partsFilterBrand', [...managedBrandNames, ...legacyBrandNames]);
   fill('partsFilterCategory', PARTS.products.map(p=>p.category));
   const dl = document.getElementById('pfCategoryList');
   if(dl){
@@ -353,7 +363,7 @@ function openProductModal(id, returnTo){
   if(id){
     const p = productById(id);
     document.getElementById('pfPartType').value = p.part_type||'';
-    document.getElementById('pfBrand').value = p.brand||'';
+    renderBrandSelect(p.brand||'');
     document.getElementById('pfVariant').value = p.variant||'';
     document.getElementById('pfOemCode').value = p.oem_code||'';
     document.getElementById('pfCategory').value = p.category||'';
@@ -370,7 +380,8 @@ function openProductModal(id, returnTo){
       preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     }
   } else {
-    ['pfPartType','pfCarModel','pfBrand','pfVariant','pfOemCode','pfCategory','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    ['pfPartType','pfCarModel','pfVariant','pfOemCode','pfCategory','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    renderBrandSelect('');
     preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     partImgAutoName = '';
     renderCarModelTags([]);
@@ -468,6 +479,88 @@ function deleteCarModelEntry(id){
   }
   postParts('delete_car_model',{id});
   showToast('Car model deleted','success');
+}
+
+// ─── BRANDS TAB (add / edit / delete, independent of products) ──
+// Structured brand list, same pattern as Car Models — used by the product
+// modal's Brand select so a business with many brands per part type keeps
+// clean, filterable data instead of free-typed text.
+function renderBrandsGrid(){
+  const grid = document.getElementById('partsBrandGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.brands.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🏷️</div><div class="pe-text">No brands yet — click "+ Add Brand" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.brands].sort((a,b)=>a.name.localeCompare(b.name)).forEach(b=>{
+    const usedBy = PARTS.products.filter(p=>p.brand===b.name).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(b.name)}">🏷️</div>
+          <div class="store-card-name">${escHtml(b.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openBrandModal('${b.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteBrandEntry('${b.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openBrandModal(id, returnTo){
+  brandModalReturnTo = returnTo || null;
+  document.getElementById('brandModalId').value = id||'';
+  document.getElementById('brandModalTitle').textContent = id ? 'Edit Brand' : 'Add Brand';
+  document.getElementById('bfName').value = id ? (PARTS.brands.find(b=>b.id===id)||{}).name||'' : '';
+  document.getElementById('brandModalOverlay').classList.add('open');
+}
+function closeBrandModal(){
+  document.getElementById('brandModalOverlay').classList.remove('open');
+  brandModalReturnTo = null;
+}
+async function saveBrandModal(){
+  const id = document.getElementById('brandModalId').value;
+  const name = document.getElementById('bfName').value.trim();
+  if(!name){ showToast('Give the brand a name','error'); return; }
+  const dupe = PARTS.brands.find(b=>b.name.toLowerCase()===name.toLowerCase() && b.id!==id);
+  if(dupe){ showToast('That brand already exists','error'); return; }
+  const prevIds = new Set(PARTS.brands.map(b=>b.id));
+  const returnTo = brandModalReturnTo;
+  if(id){ await postParts('update_brand', {id, name}); }
+  else { await postParts('add_brand', {name}); }
+  closeBrandModal();
+  showToast(id ? 'Brand updated' : 'Brand added','success');
+  if(!id && returnTo==='product'){
+    const newBrand = PARTS.brands.find(b=>!prevIds.has(b.id));
+    if(newBrand){
+      renderBrandSelect(newBrand.name);
+      suggestProductName();
+    }
+  }
+}
+function deleteBrandEntry(id){
+  const b = PARTS.brands.find(x=>x.id===id);
+  if(b){
+    const usedBy = PARTS.products.filter(p=>p.brand===b.name).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${b.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_brand',{id});
+  showToast('Brand deleted','success');
+}
+function renderBrandSelect(selected){
+  const sel = document.getElementById('pfBrand');
+  if(!sel) return;
+  const names = PARTS.brands.map(b=>b.name);
+  // Keep a legacy brand name selectable even if it isn't in the managed list yet.
+  if(selected && !names.includes(selected)) names.unshift(selected);
+  sel.innerHTML = '<option value="">— no brand —</option>' +
+    names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = selected || '';
 }
 function closeProductModal(){
   document.getElementById('productModalOverlay').classList.remove('open');
@@ -819,42 +912,107 @@ async function savePurchase(){
     store_id: storeId, order_date: orderDate, receipt_date: receiptDate, same_day: sameDay,
     items: purchaseCartItems, notes: document.getElementById('purchaseNotes').value.trim(),
   };
+  if(purchaseInvoiceImage !== null) payload.invoice_image = purchaseInvoiceImage;
+  if(purchaseReceiptImage !== null) payload.receipt_image = purchaseReceiptImage;
   if(editingPurchaseId){ payload.id = editingPurchaseId; await postParts('update_purchase', payload); }
   else { await postParts('add_purchase', payload); }
 
   showToast(editingPurchaseId ? 'Purchase updated' : 'Purchase saved','success');
-  cancelEditPurchase();
+  closePurchaseModal();
   purchaseCartItems = [];
-  document.getElementById('purchaseNotes').value = '';
   renderPurchaseCart();
 }
-function cancelEditPurchase(){
+function openPurchaseModal(id){
+  editingPurchaseId = id || null;
+  document.getElementById('purchaseModalTitle').textContent = id ? 'Edit Purchase' : '🧾 Record a Purchase';
+  purchaseInvoiceImage = null; purchaseReceiptImage = null;
+  if(id){
+    const pur = PARTS.purchases.find(p=>p.id===id);
+    if(!pur) return;
+    document.getElementById('purchaseStoreSelect').value = pur.store_id;
+    renderJalaliPicker('purchaseOrderDatePicker','purchaseOrderDateHidden', pur.order_date, ()=>{});
+    const sameDay = !!pur.same_day;
+    document.getElementById('purchaseSameDay').checked = sameDay;
+    togglePurchaseSameDay();
+    renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden', pur.receipt_date, ()=>{});
+    purchaseCartItems = pur.items.map(it=>({...it}));
+    document.getElementById('purchaseNotes').value = pur.notes||'';
+    setPurchaseDocPreview('invoice', pur.invoice_image||'');
+    setPurchaseDocPreview('receipt', pur.receipt_image||'');
+  } else {
+    renderStoreSelect();
+    renderJalaliPicker('purchaseOrderDatePicker','purchaseOrderDateHidden', null, ()=>{});
+    document.getElementById('purchaseSameDay').checked = true;
+    togglePurchaseSameDay();
+    purchaseCartItems = [];
+    document.getElementById('purchaseNotes').value = '';
+    setPurchaseDocPreview('invoice', '');
+    setPurchaseDocPreview('receipt', '');
+  }
+  renderPurchaseCart();
+  document.getElementById('purchaseModalSaveBtn').textContent = id ? 'Update Purchase' : 'Save Purchase';
+  document.getElementById('purchaseModalOverlay').classList.add('open');
+}
+function closePurchaseModal(){
+  document.getElementById('purchaseModalOverlay').classList.remove('open');
   editingPurchaseId = null;
-  const btn = document.querySelector('#partsSub-purchase .tx-save-btn');
-  if(btn) btn.textContent = 'Save Purchase';
-}
-function editPurchase(id){
-  const pur = PARTS.purchases.find(p=>p.id===id);
-  if(!pur) return;
-  editingPurchaseId = id;
-  showPartsSub('purchase');
-  document.getElementById('purchaseStoreSelect').value = pur.store_id;
-  renderJalaliPicker('purchaseOrderDatePicker','purchaseOrderDateHidden', pur.order_date, ()=>{});
-  const sameDay = !!pur.same_day;
-  document.getElementById('purchaseSameDay').checked = sameDay;
-  togglePurchaseSameDay();
-  renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden', pur.receipt_date, ()=>{});
-  purchaseCartItems = pur.items.map(it=>({...it}));
-  document.getElementById('purchaseNotes').value = pur.notes||'';
-  renderPurchaseCart();
-  const btn = document.querySelector('#partsSub-purchase .tx-save-btn');
-  if(btn) btn.textContent = 'Update Purchase';
-  showToast('Editing purchase — change anything and save','success');
+  purchaseInvoiceImage = null; purchaseReceiptImage = null;
 }
 function deletePurchase(id){
   postParts('delete_purchase',{id});
   showToast('Purchase deleted','success');
-  if(editingPurchaseId===id) cancelEditPurchase();
+  if(editingPurchaseId===id) closePurchaseModal();
+}
+function setPurchaseDocPreview(kind, src){
+  const ids = kind==='invoice'
+    ? {preview:'purInvoicePreview', icon:'purInvoiceHintIcon', text:'purInvoiceHintText', btn:'purInvoiceRemoveBtn'}
+    : {preview:'purReceiptPreview', icon:'purReceiptHintIcon', text:'purReceiptHintText', btn:'purReceiptRemoveBtn'};
+  const preview = document.getElementById(ids.preview);
+  if(src){
+    preview.src = src; preview.style.display='block';
+    document.getElementById(ids.icon).style.display='none';
+    document.getElementById(ids.text).style.display='none';
+    document.getElementById(ids.btn).style.display='flex';
+  } else {
+    preview.style.display='none';
+    document.getElementById(ids.icon).style.display='block';
+    document.getElementById(ids.text).style.display='block';
+    document.getElementById(ids.btn).style.display='none';
+  }
+}
+function onPurchaseDocSelected(ev, kind){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const img = new Image();
+    img.onload = ()=>{
+      // Plain downscale + compress — no crop, since invoices/receipts should keep their real shape.
+      const MAX = 1400;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if(w>MAX || h>MAX){ const s = MAX/Math.max(w,h); w = Math.round(w*s); h = Math.round(h*s); }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      if(kind==='invoice') purchaseInvoiceImage = dataUrl; else purchaseReceiptImage = dataUrl;
+      setPurchaseDocPreview(kind, dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  ev.target.value = '';
+}
+function removePurchaseDoc(kind){
+  if(kind==='invoice') purchaseInvoiceImage = ''; else purchaseReceiptImage = '';
+  setPurchaseDocPreview(kind, '');
+}
+function openDocViewer(src){
+  document.getElementById('docViewerImg').src = src;
+  document.getElementById('docViewerOverlay').classList.add('open');
+}
+function closeDocViewer(){
+  document.getElementById('docViewerOverlay').classList.remove('open');
 }
 function renderPurchaseHistory(){
   const list = document.getElementById('purchaseHistoryList');
@@ -878,8 +1036,12 @@ function renderPurchaseHistory(){
       <div class="tx-list-body" id="${bodyId}">
         ${pur.items.map(it=>`<div class="tx-list-line"><span>${escHtml(productLabel(productById(it.product_id)))} × ${it.qty}</span><span>${fmtT(it.qty*it.unit_price)}</span></div>`).join('')}
         ${pur.notes ? `<div class="tx-list-line"><span>📝 ${escHtml(pur.notes)}</span><span></span></div>` : ''}
+        ${(pur.invoice_image || pur.receipt_image) ? `<div class="tx-list-actions" style="margin-top:6px;">
+          ${pur.invoice_image ? `<button class="doc-chip" onclick="openDocViewer('${pur.invoice_image}')">🧾 Invoice</button>` : ''}
+          ${pur.receipt_image ? `<button class="doc-chip" onclick="openDocViewer('${pur.receipt_image}')">🧾 Receipt</button>` : ''}
+        </div>` : ''}
         <div class="tx-list-actions">
-          <button onclick="editPurchase('${pur.id}')">✎ Edit</button>
+          <button onclick="openPurchaseModal('${pur.id}')">✎ Edit</button>
           <button class="del" onclick="deletePurchase('${pur.id}')">🗑 Delete</button>
         </div>
       </div>`;
@@ -952,35 +1114,39 @@ async function saveSale(){
   else { await postParts('add_sale', payload); }
 
   showToast(editingSaleId ? 'Sale updated' : 'Sale saved','success');
-  cancelEditSale();
+  closeSaleModal();
   saleCartItems = [];
-  document.getElementById('saleCustomerName').value = '';
-  document.getElementById('saleNotes').value = '';
   renderSaleCart();
 }
-function cancelEditSale(){
+function openSaleModal(id){
+  editingSaleId = id || null;
+  document.getElementById('saleModalTitle').textContent = id ? 'Edit Sale' : '💵 Record a Sale';
+  if(id){
+    const sale = PARTS.sales.find(s=>s.id===id);
+    if(!sale) return;
+    renderJalaliPicker('saleDatePicker','saleDateHidden', sale.date, ()=>{});
+    document.getElementById('saleCustomerName').value = sale.customer_name||'';
+    document.getElementById('saleNotes').value = sale.notes||'';
+    saleCartItems = sale.items.map(it=>({product_id:it.product_id, qty:it.qty, unit_price:it.unit_price}));
+  } else {
+    renderJalaliPicker('saleDatePicker','saleDateHidden', null, ()=>{});
+    document.getElementById('saleCustomerName').value = '';
+    document.getElementById('saleNotes').value = '';
+    saleCartItems = [];
+  }
+  renderProductSelects();
+  renderSaleCart();
+  document.getElementById('saleModalSaveBtn').textContent = id ? 'Update Sale' : 'Save Sale';
+  document.getElementById('saleModalOverlay').classList.add('open');
+}
+function closeSaleModal(){
+  document.getElementById('saleModalOverlay').classList.remove('open');
   editingSaleId = null;
-  const btn = document.querySelector('#partsSub-sales .tx-save-btn');
-  if(btn) btn.textContent = 'Save Sale';
-}
-function editSale(id){
-  const sale = PARTS.sales.find(s=>s.id===id);
-  if(!sale) return;
-  editingSaleId = id;
-  showPartsSub('sales');
-  renderJalaliPicker('saleDatePicker','saleDateHidden', sale.date, ()=>{});
-  document.getElementById('saleCustomerName').value = sale.customer_name||'';
-  document.getElementById('saleNotes').value = sale.notes||'';
-  saleCartItems = sale.items.map(it=>({product_id:it.product_id, qty:it.qty, unit_price:it.unit_price}));
-  renderSaleCart();
-  const btn = document.querySelector('#partsSub-sales .tx-save-btn');
-  if(btn) btn.textContent = 'Update Sale';
-  showToast('Editing sale — change anything and save','success');
 }
 function deleteSale(id){
   postParts('delete_sale',{id});
   showToast('Sale deleted','success');
-  if(editingSaleId===id) cancelEditSale();
+  if(editingSaleId===id) closeSaleModal();
 }
 function renderSalesHistory(){
   const list = document.getElementById('salesHistoryList');
@@ -1007,12 +1173,50 @@ function renderSalesHistory(){
         ${sale.items.map(it=>`<div class="tx-list-line"><span>${escHtml(productLabel(productById(it.product_id)))} × ${it.qty}</span><span>${fmtT(it.revenue)} (profit ${fmtT(it.profit)})</span></div>`).join('')}
         ${sale.notes ? `<div class="tx-list-line"><span>📝 ${escHtml(sale.notes)}</span><span></span></div>` : ''}
         <div class="tx-list-actions">
-          <button onclick="editSale('${sale.id}')">✎ Edit</button>
+          <button onclick="openSaleModal('${sale.id}')">✎ Edit</button>
           <button class="del" onclick="deleteSale('${sale.id}')">🗑 Delete</button>
         </div>
       </div>`;
     list.appendChild(el);
   });
+}
+
+// ─── PURCHASE / SALE TAB SUMMARY STATS ──────────────
+function renderPurchaseTabStats(){
+  const wrap = document.getElementById('purchaseTabStats');
+  if(!wrap) return;
+  const spend30 = PARTS.purchases.filter(p=>isWithinDays(p.order_date,30))
+    .reduce((s,p)=>s+p.items.reduce((a,it)=>a+it.qty*it.unit_price,0),0);
+  const totalSpend = PARTS.totals.purchase_spend || 0;
+  const stats = [
+    ['🧾','Purchases', PARTS.purchases.length, 'var(--amber)'],
+    ['💸','Total Spend', fmtT(totalSpend), 'var(--rose)'],
+    ['📆','Spend, 30d', fmtT(spend30), 'var(--sky)'],
+  ];
+  wrap.innerHTML = stats.map(([icon,label,val,color])=>`
+    <div class="parts-kpi-card" style="--kpi-color:${color}">
+      <div class="parts-kpi-icon">${icon}</div>
+      <div class="parts-kpi-label">${label}</div>
+      <div class="parts-kpi-val" style="color:${color}">${val}</div>
+    </div>`).join('');
+}
+function renderSaleTabStats(){
+  const wrap = document.getElementById('saleTabStats');
+  if(!wrap) return;
+  const revenue30 = PARTS.sales.filter(s=>isWithinDays(s.date,30)).reduce((s,x)=>s+x.revenue,0);
+  const profit30 = PARTS.sales.filter(s=>isWithinDays(s.date,30)).reduce((s,x)=>s+x.profit,0);
+  const stats = [
+    ['💵','Sales', PARTS.sales.length, 'var(--sky)'],
+    ['💰','Total Revenue', fmtT(PARTS.totals.revenue||0), 'var(--sage)'],
+    ['📈','Profit, 30d', fmtT(profit30), profit30>=0?'var(--sage)':'var(--coral)'],
+    ['📆','Revenue, 30d', fmtT(revenue30), 'var(--sky)'],
+  ];
+  wrap.innerHTML = stats.map(([icon,label,val,color])=>`
+    <div class="parts-kpi-card" style="--kpi-color:${color}">
+      <div class="parts-kpi-icon">${icon}</div>
+      <div class="parts-kpi-label">${label}</div>
+      <div class="parts-kpi-val" style="color:${color}">${val}</div>
+    </div>`).join('');
 }
 
 // ─── REPORTS ────────────────────────────────────────
@@ -1060,6 +1264,8 @@ function renderReports(){
     ['🏷️','Inventory Value', fmtT(PARTS.totals.inventory_value||0), 'var(--sky)'],
     ['🔩','Units In Stock', fmtNum(PARTS.totals.inventory_units||0), 'var(--sage)'],
     ['⚠️','Low Stock Items', PARTS.totals.low_stock_count||0, (PARTS.totals.low_stock_count||0)>0?'var(--coral)':'var(--sage)'],
+    ['💵','Sales Count', filteredSales.length, 'var(--sky)'],
+    ['🧾','Purchases Count', filteredPurchases.length, 'var(--amber)'],
   ];
   const kwrap = document.getElementById('partsKpis');
   kwrap.innerHTML = kpis.map(([icon,label,val,color])=>`
@@ -1103,22 +1309,32 @@ function renderReports(){
     <tr><td>${escHtml(storeById(sid) ? storeById(sid).name : '(deleted store)')}</td><td>${v.count}</td><td>${fmtT(v.spend)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="parts-table-empty">No purchases in this range yet.</td></tr>`;
 
-  renderPartsCharts(filteredSales, storeRows);
+  renderPartsCharts(filteredSales, filteredPurchases, storeRows);
 }
 async function saveLowStockThreshold(){
   const v = parseFloat(document.getElementById('lowStockThresholdInput').value);
   await postParts('set_low_stock_threshold',{value: isNaN(v)?2:v});
 }
 
-function renderPartsCharts(filteredSales, storeRows){
-  // Revenue vs profit by Jalali month
+function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
+  const palette = ['#e85d3a','#3a7a5a','#2a6a9a','#d4821a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
+
+  // Revenue / purchase spend / profit by Jalali month — the full money-in vs
+  // money-out picture, not just sales, so losses show up as clearly as gains.
   const byMonth = {};
   filteredSales.forEach(sale=>{
     const j = gregToJalali(sale.date);
     if(!j) return;
     const key = j.y+'/'+String(j.m).padStart(2,'0');
-    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0});
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0, spend:0});
     b.revenue += sale.revenue; b.profit += sale.profit;
+  });
+  filteredPurchases.forEach(pur=>{
+    const j = gregToJalali(pur.order_date);
+    if(!j) return;
+    const key = j.y+'/'+String(j.m).padStart(2,'0');
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name ? j.month_name+' '+j.y : key, revenue:0, profit:0, spend:0});
+    b.spend += pur.items.reduce((a,it)=>a+it.qty*it.unit_price,0);
   });
   const monthKeys = Object.keys(byMonth).sort();
   const revCtx = document.getElementById('partsRevenueChart');
@@ -1128,6 +1344,7 @@ function renderPartsCharts(filteredSales, storeRows){
     data:{ labels: monthKeys.map(k=>byMonth[k].label),
       datasets:[
         {label:'Revenue', data: monthKeys.map(k=>byMonth[k].revenue), backgroundColor:'#2a6a9a'},
+        {label:'Purchase Spend', data: monthKeys.map(k=>byMonth[k].spend), backgroundColor:'#d4821a'},
         {label:'Profit', data: monthKeys.map(k=>byMonth[k].profit), backgroundColor:'#3a7a5a'},
       ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
@@ -1136,11 +1353,62 @@ function renderPartsCharts(filteredSales, storeRows){
 
   const storeCtx = document.getElementById('partsStoreChart');
   if(partsStoreChartInstance) partsStoreChartInstance.destroy();
-  const palette = ['#e85d3a','#3a7a5a','#2a6a9a','#d4821a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
   partsStoreChartInstance = new Chart(storeCtx, {
     type:'doughnut',
     data:{ labels: storeRows.map(([sid])=> storeById(sid)? storeById(sid).name : '(deleted store)'),
       datasets:[{ data: storeRows.map(([,v])=>v.spend), backgroundColor: storeRows.map((_,i)=>palette[i%palette.length]) }]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}
   });
+
+  // Profit by brand — structured brand data, grouped from actual sale items.
+  const byBrand = {};
+  filteredSales.forEach(sale=>sale.items.forEach(it=>{
+    const p = productById(it.product_id);
+    const brand = (p && p.brand) ? p.brand : '(no brand)';
+    const b = byBrand[brand] || (byBrand[brand]={qty:0,revenue:0,profit:0});
+    b.qty += it.qty; b.revenue += it.revenue; b.profit += it.profit;
+  }));
+  const brandRows = Object.entries(byBrand).sort((a,b)=>b[1].profit-a[1].profit);
+  const brandCtx = document.getElementById('partsBrandChart');
+  if(partsBrandChartInstance) partsBrandChartInstance.destroy();
+  partsBrandChartInstance = new Chart(brandCtx, {
+    type:'bar',
+    data:{ labels: brandRows.map(([name])=>name),
+      datasets:[{ label:'Profit', data: brandRows.map(([,v])=>v.profit),
+        backgroundColor: brandRows.map(([,v])=> v.profit>=0 ? '#3a7a5a' : '#c44a3a') }]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:11}}}}}
+  });
+  const brandBody = document.querySelector('#partsBrandTable tbody');
+  brandBody.innerHTML = brandRows.length ? brandRows.map(([name,v])=>`
+    <tr><td>${escHtml(name)}</td><td>${fmtNum(v.qty)}</td><td>${fmtT(v.revenue)}</td>
+      <td style="color:${v.profit>=0?'var(--sage)':'var(--coral)'};font-weight:700;">${fmtT(v.profit)}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="parts-table-empty">No sales in this range yet.</td></tr>`;
+
+  // Units sold by car model — a product can carry several car-model tags, so
+  // each tag gets full credit for that line item (a part fitting 3 cars will
+  // show up once under each of them).
+  const byCarModel = {};
+  filteredSales.forEach(sale=>sale.items.forEach(it=>{
+    const p = productById(it.product_id);
+    const models = p ? productCarModels(p) : [];
+    const list = models.length ? models : ['(no car model)'];
+    list.forEach(m=>{
+      const b = byCarModel[m] || (byCarModel[m]={qty:0,revenue:0});
+      b.qty += it.qty; b.revenue += it.revenue;
+    });
+  }));
+  const cmRows = Object.entries(byCarModel).sort((a,b)=>b[1].qty-a[1].qty);
+  const cmCtx = document.getElementById('partsCarModelChart');
+  if(partsCarModelChartInstance) partsCarModelChartInstance.destroy();
+  partsCarModelChartInstance = new Chart(cmCtx, {
+    type:'doughnut',
+    data:{ labels: cmRows.map(([name])=>name),
+      datasets:[{ data: cmRows.map(([,v])=>v.qty), backgroundColor: cmRows.map((_,i)=>palette[i%palette.length]) }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}
+  });
+  const cmBody = document.querySelector('#partsCarModelTable tbody');
+  cmBody.innerHTML = cmRows.length ? cmRows.map(([name,v])=>`
+    <tr><td>${escHtml(name)}</td><td>${fmtNum(v.qty)}</td><td>${fmtT(v.revenue)}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="parts-table-empty">No sales in this range yet.</td></tr>`;
 }

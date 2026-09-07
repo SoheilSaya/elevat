@@ -100,6 +100,10 @@
 .tx-list-actions button.del:hover{border-color:var(--coral);background:var(--coralL);color:var(--coral);}
 
 .parts-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;max-width:900px;}
+.parts-tab-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;}
+.parts-tab-header .parts-kpis.compact{flex:1;margin-bottom:0;max-width:none;}
+.parts-tab-header .parts-add-btn{margin-left:0;flex-shrink:0;margin-top:2px;}
+@media(max-width:700px){.parts-tab-header{flex-direction:column;}.parts-tab-header .parts-add-btn{width:100%;}}
 .parts-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
 .parts-range-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
 .parts-range-chip{padding:7px 16px;border-radius:50px;border:1.5px solid var(--cream3);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;}
@@ -190,8 +194,9 @@
   <div class="parts-subnav">
     <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
     <button class="parts-subtab" data-sub="carmodels" onclick="showPartsSub('carmodels')">🚗 Car Models</button>
+    <button class="parts-subtab" data-sub="brands" onclick="showPartsSub('brands')">🏷️ Brands</button>
     <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
-    <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 New Purchase</button>
+    <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 Purchases</button>
     <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
     <button class="parts-subtab" data-sub="cash" onclick="showPartsSub('cash')">🏦 Cash</button>
     <button class="parts-subtab" data-sub="reports" onclick="showPartsSub('reports')">📊 Reports</button>
@@ -218,6 +223,14 @@
   </div>
 
 
+  <!-- ═══ BRANDS ═══ -->
+  <div id="partsSub-brands" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openBrandModal()">+ Add Brand</button>
+    </div>
+    <div class="store-grid" id="partsBrandGrid"></div>
+  </div>
+
   <!-- ═══ STORES ═══ -->
   <div id="partsSub-stores" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
@@ -226,55 +239,11 @@
     <div class="store-grid" id="partsStoreGrid"></div>
   </div>
 
-  <!-- ═══ NEW PURCHASE ═══ -->
+  <!-- ═══ PURCHASES ═══ -->
   <div id="partsSub-purchase" class="parts-sub" style="display:none;">
-    <div class="tx-form">
-      <div class="tx-form-title">🧾 Record a Purchase</div>
-      <div class="tx-row">
-        <div>
-          <div class="builder-label">Store</div>
-          <select class="builder-select" id="purchaseStoreSelect" style="width:100%;"></select>
-        </div>
-        <div>
-          <div class="builder-label">Order date</div>
-          <div class="jalali-picker-wrap" id="purchaseOrderDatePicker"></div>
-          <input type="hidden" id="purchaseOrderDateHidden"/>
-        </div>
-      </div>
-      <label class="tx-samedaywrap">
-        <input type="checkbox" id="purchaseSameDay" checked onchange="togglePurchaseSameDay()"/>
-        Picked up in person (order date = receipt date)
-      </label>
-      <div id="purchaseReceiptDateWrap" style="display:none;margin-bottom:14px;">
-        <div class="builder-label">Received date (from post/courier)</div>
-        <div class="jalali-picker-wrap" id="purchaseReceiptDatePicker"></div>
-        <input type="hidden" id="purchaseReceiptDateHidden"/>
-      </div>
-
-      <div class="tx-item-builder">
-        <div class="builder-label" style="margin-bottom:8px;">Add item to this purchase</div>
-        <div class="tx-item-row">
-          <div>
-            <select class="builder-select" id="purchaseItemProduct"></select>
-          </div>
-          <div>
-            <input type="number" class="modal-input" id="purchaseItemQty" placeholder="Qty" min="0" step="1" value="1"/>
-          </div>
-          <div>
-            <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (K T)" min="0"/>
-          </div>
-          <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ Add</button>
-        </div>
-        <div class="qty-presets" id="purchaseQtyPresets" style="margin-top:8px;"></div>
-        <div style="margin-top:8px;">
-          <button class="preset" onclick="openProductModal(null,'purchase')">+ New product…</button>
-        </div>
-      </div>
-
-      <div class="tx-cart" id="purchaseCart"></div>
-      <div class="tx-total-row"><span class="lbl">Purchase total</span><span class="val" id="purchaseTotalVal">0 T</span></div>
-      <input type="text" class="modal-input" id="purchaseNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
-      <button class="tx-save-btn" onclick="savePurchase()">Save Purchase</button>
+    <div class="parts-tab-header">
+      <div class="parts-kpis compact" id="purchaseTabStats"></div>
+      <button class="parts-add-btn" onclick="openPurchaseModal()">+ New Purchase</button>
     </div>
 
     <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Purchase History</div>
@@ -283,45 +252,9 @@
 
   <!-- ═══ SALES ═══ -->
   <div id="partsSub-sales" class="parts-sub" style="display:none;">
-    <div class="tx-form">
-      <div class="tx-form-title">💵 Record a Sale</div>
-      <div class="tx-row">
-        <div>
-          <div class="builder-label">Date</div>
-          <div class="jalali-picker-wrap" id="saleDatePicker"></div>
-          <input type="hidden" id="saleDateHidden"/>
-        </div>
-        <div>
-          <div class="builder-label">Customer name <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-          <input type="text" class="modal-input" id="saleCustomerName" placeholder="e.g. Mr. Ahmadi" dir="auto" style="width:100%;margin:0;"/>
-        </div>
-      </div>
-
-      <div class="tx-item-builder">
-        <div class="builder-label" style="margin-bottom:8px;">Add item to this sale</div>
-        <div class="tx-item-row">
-          <div>
-            <select class="builder-select" id="saleItemProduct" onchange="onSaleProductChange()"></select>
-          </div>
-          <div>
-            <input type="number" class="modal-input" id="saleItemQty" placeholder="Qty" min="0" step="1" value="1"/>
-          </div>
-          <div>
-            <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (K T)" min="0"/>
-          </div>
-          <button class="tx-additem-btn" onclick="addSaleCartItem()">+ Add</button>
-        </div>
-        <div class="qty-presets" id="saleQtyPresets" style="margin-top:8px;"></div>
-        <div id="saleStockHint" style="font-size:11px;color:var(--text3);margin-top:6px;"></div>
-        <div style="margin-top:8px;">
-          <button class="preset" onclick="openProductModal(null,'sale')">+ New product…</button>
-        </div>
-      </div>
-
-      <div class="tx-cart" id="saleCart"></div>
-      <div class="tx-total-row"><span class="lbl">Sale total</span><span class="val" id="saleTotalVal">0 T</span></div>
-      <input type="text" class="modal-input" id="saleNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
-      <button class="tx-save-btn" onclick="saveSale()">Save Sale</button>
+    <div class="parts-tab-header">
+      <div class="parts-kpis compact" id="saleTabStats"></div>
+      <button class="parts-add-btn" onclick="openSaleModal()">+ New Sale</button>
     </div>
 
     <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Sales Log</div>
@@ -360,7 +293,7 @@
     <div class="cash-ledger" id="cashLedgerList"></div>
   </div>
 
-  <!-- ═══ REPORTS ═══ -->
+  <!-- ═══ REPORTS / BUSINESS DASHBOARD ═══ -->
   <div id="partsSub-reports" class="parts-sub" style="display:none;">
     <div class="parts-range-chips" id="partsRangeChips"></div>
 
@@ -368,14 +301,24 @@
 
     <div class="parts-charts">
       <div class="mchart-card">
-        <div class="mchart-title">Revenue vs Profit</div>
-        <div class="mchart-sub">By month</div>
+        <div class="mchart-title">Revenue · Purchase Spend · Profit</div>
+        <div class="mchart-sub">By month, within the selected range</div>
         <div class="mchart-wrap"><canvas id="partsRevenueChart"></canvas></div>
       </div>
       <div class="mchart-card">
         <div class="mchart-title">Spend by Store</div>
-        <div class="mchart-sub">Total purchase cost, all time filter range</div>
+        <div class="mchart-sub">Total purchase cost, within the selected range</div>
         <div class="mchart-wrap"><canvas id="partsStoreChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Profit by Brand</div>
+        <div class="mchart-sub">Within the selected range</div>
+        <div class="mchart-wrap"><canvas id="partsBrandChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Units Sold by Car Model</div>
+        <div class="mchart-sub">Within the selected range</div>
+        <div class="mchart-wrap"><canvas id="partsCarModelChart"></canvas></div>
       </div>
     </div>
 
@@ -383,6 +326,20 @@
       <div class="parts-table-title">Top Products by Profit</div>
       <table class="parts-table" id="partsTopProductsTable"><thead><tr>
         <th>Product</th><th>Units Sold</th><th>Revenue</th><th>COGS</th><th>Profit</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Profit by Brand</div>
+      <table class="parts-table" id="partsBrandTable"><thead><tr>
+        <th>Brand</th><th>Units Sold</th><th>Revenue</th><th>Profit</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">Sales by Car Model</div>
+      <table class="parts-table" id="partsCarModelTable"><thead><tr>
+        <th>Car Model</th><th>Units Sold</th><th>Revenue</th>
       </tr></thead><tbody></tbody></table>
     </div>
 

@@ -22,9 +22,18 @@
 .crop-zoom-row input[type=range]{flex:1;accent-color:var(--coral);}
 .crop-zoom-row .cz-icon{font-size:14px;color:var(--text3);}
 .crop-hint{font-size:11.5px;color:var(--text3);text-align:center;margin:-6px 0 14px;}
-/* This crop tool opens on top of whichever parent modal (Product or Store) triggered it —
-   force it above every .overlay regardless of their order in the HTML, so it's never hidden behind one. */
+/* Modal stacking: Purchase/Sale sit at the base; Product/Store can open on top of
+   them (e.g. "+ New product…" from inside a purchase); Car Model/Brand can open on
+   top of Product; the crop tool and doc viewer always win, regardless of HTML order. */
+#purchaseModalOverlay,#saleModalOverlay{z-index:9000;}
+#productModalOverlay,#storeModalOverlay{z-index:9500;}
+#carModelModalOverlay,#brandModalOverlay{z-index:9800;}
 #partImgCropOverlay{z-index:99999;}
+#docViewerOverlay{z-index:99997;}
+
+.doc-chip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--cream3);
+  background:var(--cream2);color:var(--text2);cursor:pointer;transition:all .15s;}
+.doc-chip:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
 </style>
 <div class="overlay" id="productModalOverlay">
   <div class="modal" style="max-width:480px;">
@@ -45,8 +54,11 @@
         <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
       </div>
       <div>
-        <div class="builder-label">Brand</div>
-        <input type="text" class="modal-input" id="pfBrand" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+        <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Brand</span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openBrandModal(null,'product')">+ New</button>
+        </div>
+        <select class="builder-select" id="pfBrand" style="width:100%;margin:0;" onchange="suggestProductName()"></select>
       </div>
     </div>
     <div style="margin-bottom:10px;">
@@ -171,6 +183,158 @@
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeCarModelModal()">Cancel</button>
       <button class="btn-ok" onclick="saveCarModelModal()">Save Car Model</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Brand modal (managed list, used by the product's brand picker) -->
+<div class="overlay" id="brandModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="brandModalTitle">Add Brand</h3>
+    <input type="hidden" id="brandModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="bfName" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveBrandModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeBrandModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveBrandModal()">Save Brand</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: document viewer (invoice/receipt full-size preview) -->
+<div class="overlay" id="docViewerOverlay" style="z-index:99997;">
+  <div class="modal" style="max-width:520px;padding:16px;">
+    <img id="docViewerImg" style="width:100%;max-height:70vh;object-fit:contain;border-radius:var(--r2);display:block;background:var(--cream2);"/>
+    <div class="modal-btns" style="margin-top:14px;">
+      <button class="btn-cancel" onclick="closeDocViewer()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: New/Edit Purchase modal -->
+<div class="overlay" id="purchaseModalOverlay" style="z-index:9000;">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="purchaseModalTitle">🧾 Record a Purchase</h3>
+    <div class="tx-row">
+      <div>
+        <div class="builder-label">Store</div>
+        <select class="builder-select" id="purchaseStoreSelect" style="width:100%;"></select>
+      </div>
+      <div>
+        <div class="builder-label">Order date</div>
+        <div class="jalali-picker-wrap" id="purchaseOrderDatePicker"></div>
+        <input type="hidden" id="purchaseOrderDateHidden"/>
+      </div>
+    </div>
+    <label class="tx-samedaywrap">
+      <input type="checkbox" id="purchaseSameDay" checked onchange="togglePurchaseSameDay()"/>
+      Picked up in person (order date = receipt date)
+    </label>
+    <div id="purchaseReceiptDateWrap" style="display:none;margin-bottom:14px;">
+      <div class="builder-label">Received date (from post/courier)</div>
+      <div class="jalali-picker-wrap" id="purchaseReceiptDatePicker"></div>
+      <input type="hidden" id="purchaseReceiptDateHidden"/>
+    </div>
+
+    <div class="pmodal-row" style="margin-bottom:4px;">
+      <div>
+        <div class="builder-label">🧾 Invoice photo <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="part-img-upload" id="purInvoiceUploadBox" style="height:110px;margin-bottom:0;" onclick="document.getElementById('purInvoiceFileInput').click()">
+          <img id="purInvoicePreview" style="display:none;"/>
+          <div class="hint-icon" id="purInvoiceHintIcon" style="font-size:20px;">🧾</div>
+          <div class="hint" id="purInvoiceHintText">Add invoice photo</div>
+          <button type="button" class="part-img-remove" id="purInvoiceRemoveBtn" onclick="event.stopPropagation();removePurchaseDoc('invoice')">✕</button>
+        </div>
+        <input type="file" accept="image/*" id="purInvoiceFileInput" style="display:none;" onchange="onPurchaseDocSelected(event,'invoice')"/>
+      </div>
+      <div>
+        <div class="builder-label">🧾 Receipt photo <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="part-img-upload" id="purReceiptUploadBox" style="height:110px;margin-bottom:0;" onclick="document.getElementById('purReceiptFileInput').click()">
+          <img id="purReceiptPreview" style="display:none;"/>
+          <div class="hint-icon" id="purReceiptHintIcon" style="font-size:20px;">🧾</div>
+          <div class="hint" id="purReceiptHintText">Add receipt photo</div>
+          <button type="button" class="part-img-remove" id="purReceiptRemoveBtn" onclick="event.stopPropagation();removePurchaseDoc('receipt')">✕</button>
+        </div>
+        <input type="file" accept="image/*" id="purReceiptFileInput" style="display:none;" onchange="onPurchaseDocSelected(event,'receipt')"/>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;"></div>
+
+    <div class="tx-item-builder">
+      <div class="builder-label" style="margin-bottom:8px;">Add item to this purchase</div>
+      <div class="tx-item-row">
+        <div>
+          <select class="builder-select" id="purchaseItemProduct"></select>
+        </div>
+        <div>
+          <input type="number" class="modal-input" id="purchaseItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+        </div>
+        <div>
+          <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="Unit price (K T)" min="0"/>
+        </div>
+        <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ Add</button>
+      </div>
+      <div class="qty-presets" id="purchaseQtyPresets" style="margin-top:8px;"></div>
+      <div style="margin-top:8px;">
+        <button class="preset" onclick="openProductModal(null,'purchase')">+ New product…</button>
+      </div>
+    </div>
+
+    <div class="tx-cart" id="purchaseCart"></div>
+    <div class="tx-total-row"><span class="lbl">Purchase total</span><span class="val" id="purchaseTotalVal">0 T</span></div>
+    <input type="text" class="modal-input" id="purchaseNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePurchaseModal()">Cancel</button>
+      <button class="btn-ok" id="purchaseModalSaveBtn" onclick="savePurchase()">Save Purchase</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: New/Edit Sale modal -->
+<div class="overlay" id="saleModalOverlay" style="z-index:9000;">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="saleModalTitle">💵 Record a Sale</h3>
+    <div class="tx-row">
+      <div>
+        <div class="builder-label">Date</div>
+        <div class="jalali-picker-wrap" id="saleDatePicker"></div>
+        <input type="hidden" id="saleDateHidden"/>
+      </div>
+      <div>
+        <div class="builder-label">Customer name <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="saleCustomerName" placeholder="e.g. Mr. Ahmadi" dir="auto" style="width:100%;margin:0;"/>
+      </div>
+    </div>
+
+    <div class="tx-item-builder">
+      <div class="builder-label" style="margin-bottom:8px;">Add item to this sale</div>
+      <div class="tx-item-row">
+        <div>
+          <select class="builder-select" id="saleItemProduct" onchange="onSaleProductChange()"></select>
+        </div>
+        <div>
+          <input type="number" class="modal-input" id="saleItemQty" placeholder="Qty" min="0" step="1" value="1"/>
+        </div>
+        <div>
+          <input type="number" class="modal-input" id="saleItemPrice" placeholder="Sell price (K T)" min="0"/>
+        </div>
+        <button class="tx-additem-btn" onclick="addSaleCartItem()">+ Add</button>
+      </div>
+      <div class="qty-presets" id="saleQtyPresets" style="margin-top:8px;"></div>
+      <div id="saleStockHint" style="font-size:11px;color:var(--text3);margin-top:6px;"></div>
+      <div style="margin-top:8px;">
+        <button class="preset" onclick="openProductModal(null,'sale')">+ New product…</button>
+      </div>
+    </div>
+
+    <div class="tx-cart" id="saleCart"></div>
+    <div class="tx-total-row"><span class="lbl">Sale total</span><span class="val" id="saleTotalVal">0 T</span></div>
+    <input type="text" class="modal-input" id="saleNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeSaleModal()">Cancel</button>
+      <button class="btn-ok" id="saleModalSaveBtn" onclick="saveSale()">Save Sale</button>
     </div>
   </div>
 </div>

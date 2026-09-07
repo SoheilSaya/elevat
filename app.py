@@ -1917,7 +1917,7 @@ def car_api():
 PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
 
 def _parts_defaults():
-    return {"products": [], "stores": [], "car_models": [], "purchases": [], "sales": [], "capital_transactions": [],
+    return {"products": [], "stores": [], "car_models": [], "brands": [], "purchases": [], "sales": [], "capital_transactions": [],
             "low_stock_threshold": 2, "unit_migrated_v1": True}
 
 def load_parts():
@@ -1929,6 +1929,7 @@ def load_parts():
         d.setdefault("products", [])
         d.setdefault("stores", [])
         d.setdefault("car_models", [])
+        d.setdefault("brands", [])
         d.setdefault("purchases", [])
         d.setdefault("sales", [])
         d.setdefault("capital_transactions", [])
@@ -1951,6 +1952,21 @@ def load_parts():
                 if "amount" in tx and tx["amount"] is not None:
                     tx["amount"] = tx["amount"] / 1000
             d["unit_migrated_v1"] = True
+            save_parts(d)
+
+        # ── One-time migration: brands used to be free-typed text on each
+        # product. Backfill a managed "brands" list from whatever distinct
+        # brand names already exist, so the new structured picker isn't
+        # empty for existing data. Guarded so it only ever runs once.
+        if not d.get("brands_migrated_v1"):
+            existing_names = {b.get("name", "").strip().lower() for b in d["brands"]}
+            seen = set()
+            for p in d["products"]:
+                name = (p.get("brand") or "").strip()
+                if name and name.lower() not in existing_names and name.lower() not in seen:
+                    seen.add(name.lower())
+                    d["brands"].append({"id": _new_id(), "name": name, "created_at": str(date.today())})
+            d["brands_migrated_v1"] = True
             save_parts(d)
         return d
     except (json.JSONDecodeError, ValueError):
@@ -2137,6 +2153,7 @@ def parts_api():
             "products": data["products"],
             "stores": data["stores"],
             "car_models": data["car_models"],
+            "brands": data["brands"],
             "purchases": data["purchases"],
             "sales": analytics["sales"],
             "capital_transactions": data["capital_transactions"],
@@ -2224,6 +2241,23 @@ def parts_api():
         cmid = body.get("id")
         data["car_models"] = [cm for cm in data["car_models"] if cm["id"] != cmid]
 
+    # ── BRANDS (managed list, used by the product's brand picker) ──
+    elif action == "add_brand":
+        data["brands"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_brand":
+        for b in data["brands"]:
+            if b["id"] == body.get("id"):
+                if "name" in body:
+                    b["name"] = (body.get("name") or "").strip()
+                break
+    elif action == "delete_brand":
+        bid = body.get("id")
+        data["brands"] = [b for b in data["brands"] if b["id"] != bid]
+
     # ── PURCHASES (one store visit, many line items) ──
     elif action == "add_purchase":
         items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
@@ -2236,6 +2270,8 @@ def parts_api():
             "same_day": bool(body.get("same_day", True)),
             "items": items,
             "notes": body.get("notes", "").strip(),
+            "invoice_image": body.get("invoice_image", ""),
+            "receipt_image": body.get("receipt_image", ""),
             "created_at": str(date.today()),
         })
     elif action == "update_purchase":
@@ -2249,6 +2285,8 @@ def parts_api():
                 if "items" in body:
                     pur["items"] = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
                                        "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+                if "invoice_image" in body: pur["invoice_image"] = body.get("invoice_image", "")
+                if "receipt_image" in body: pur["receipt_image"] = body.get("receipt_image", "")
                 break
     elif action == "delete_purchase":
         pid = body.get("id")
@@ -2321,6 +2359,7 @@ def parts_api():
         "products": data["products"],
         "stores": data["stores"],
         "car_models": data["car_models"],
+        "brands": data["brands"],
         "purchases": data["purchases"],
         "sales": analytics["sales"],
         "capital_transactions": data["capital_transactions"],
