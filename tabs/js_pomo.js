@@ -308,6 +308,7 @@ const SIMPLE = {
   savedTodayMinutes: 0,    // already saved to backend for today (from prior End Day presses)
   statsData: {},           // {'YYYY-MM-DD': minutes}
   currentRange: '7',
+  chartType: 'bar',        // 'bar' | 'line' | 'heat'
   flags: [],               // [{seconds, label, time}] — markers along today's elapsed timer
 };
 
@@ -317,6 +318,53 @@ function isoDateStr(d){
   const day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
+function getYesterdayDateStr(){
+  const t = getTodayDateStr();
+  const d = new Date(t + 'T12:00:00'); // noon avoids any DST/timezone edge cases
+  d.setDate(d.getDate() - 1);
+  return isoDateStr(d);
+}
+
+let manualAddDay = 'today';
+let manualOp = 'add';
+function setManualDay(day){
+  manualAddDay = day;
+  const tBtn = document.getElementById('mday-today');
+  const yBtn = document.getElementById('mday-yesterday');
+  if(tBtn) tBtn.classList.toggle('active', day === 'today');
+  if(yBtn) yBtn.classList.toggle('active', day === 'yesterday');
+}
+function setManualOp(op){
+  manualOp = op;
+  const aBtn = document.getElementById('mop-add');
+  const sBtn = document.getElementById('mop-sub');
+  if(aBtn) aBtn.classList.toggle('active', op === 'add');
+  if(sBtn) sBtn.classList.toggle('active', op === 'sub');
+}
+
+async function addManualTime(minutes){
+  const day = manualAddDay === 'yesterday' ? getYesterdayDateStr() : getTodayDateStr();
+  const dayLabel = manualAddDay === 'yesterday' ? 'دیروز' : 'امروز';
+  const signedMinutes = manualOp === 'sub' ? -minutes : minutes;
+  try{
+    const r = await fetch('/api/focus-stats', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({date: day, minutes: signedMinutes})
+    });
+    const j = await r.json();
+    if(j.ok){
+      const verb = manualOp === 'sub' ? 'کم شد از' : 'اضافه شد به';
+      showToast('' + minutes + ' دقیقه ' + verb + ' ' + dayLabel, 'success');
+      fetchFocusStats(SIMPLE.currentRange);
+    } else {
+      showToast('❌ ثبت نشد', 'error');
+    }
+  }catch(e){
+    showToast('❌ خطا در ارتباط با سرور', 'error');
+  }
+}
+
 function getTodayDateStr(){
   // Work-day cutoff: before 6:00 AM still counts as "yesterday". This way
   // staying up past midnight and ending the day at, say, 1am still logs
@@ -613,9 +661,208 @@ function isoToJalaliLabel(iso){
   return j ? (j.d + ' ' + j.month_name) : iso;
 }
 
+function formatMinutesShort(mins){
+  mins = Math.round(mins);
+  if(mins < 60) return mins + 'm';
+  const h = Math.floor(mins/60), m = mins%60;
+  return m ? `${h}h${m}m` : `${h}h`;
+}
+
+function computeCurrentStreak(){
+  const data = SIMPLE.statsData || {};
+  let streak = 0;
+  const d = new Date();
+  for(let i=0;i<3650;i++){
+    const iso = isoDateStr(d);
+    if((data[iso]||0) > 0){ streak++; d.setDate(d.getDate()-1); }
+    else break;
+  }
+  return streak;
+}
+
+function setChartType(type){
+  SIMPLE.chartType = type;
+  ['bar','line','heat'].forEach(t=>{
+    const el = document.getElementById('ctype-'+t);
+    if(el) el.classList.toggle('active', t === type);
+  });
+  renderFocusChart(SIMPLE.currentRange);
+}
+
+let focusChartInstance = null;
+
+function drawFocusChartJS(days, values, type){
+  const canvasWrap = document.getElementById('focusChartCanvasWrap');
+  const heatWrap = document.getElementById('focusHeatmapWrap');
+  if(canvasWrap){
+    canvasWrap.style.display = '';
+    if(!document.getElementById('focusChartCanvas')){
+      canvasWrap.innerHTML = '<canvas id="focusChartCanvas"></canvas>';
+    }
+  }
+  if(heatWrap) heatWrap.style.display = 'none';
+
+  const canvas = document.getElementById('focusChartCanvas');
+  if(!canvas) return;
+  if(focusChartInstance){ focusChartInstance.destroy(); focusChartInstance = null; }
+
+  const labels = days.map(d => isoToJalaliLabel(d));
+  const gridColor = 'rgba(26,21,16,0.05)';
+  const tickColor = '#a8967c';
+  const dense = days.length > 20;
+
+  const dataset = type === 'line'
+    ? {
+        label: 'دقیقه فوکوس',
+        data: values,
+        borderColor: '#c44a6a',
+        backgroundColor: 'rgba(232,93,58,0.18)',
+        borderWidth: 2.5,
+        pointRadius: dense ? 0 : 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#c44a6a',
+        tension: 0.3,
+        fill: true,
+      }
+    : {
+        label: 'دقیقه فوکوس',
+        data: values,
+        backgroundColor: '#e85d3acc',
+        hoverBackgroundColor: '#c44a6a',
+        borderRadius: 4,
+        maxBarThickness: 26,
+      };
+
+  focusChartInstance = new Chart(canvas.getContext('2d'), {
+    type: type === 'line' ? 'line' : 'bar',
+    data: { labels, datasets: [dataset] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => Math.round(ctx.parsed.y) + ' دقیقه',
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, maxTicksLimit: dense ? 8 : 14, autoSkip: true } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function showHeatmapInfo(iso, value){
+  const el = document.getElementById('focusHeatmapInfo');
+  if(!el) return;
+  const dt = new Date(iso + 'T12:00:00');
+  el.textContent = `${DOW[dt.getDay()]} · ${isoToJalaliLabel(iso)} — ${value > 0 ? formatMinutesShort(value) : 'بدون فوکوس'}`;
+}
+
+function drawFocusHeatmap(days, values){
+  const canvasWrap = document.getElementById('focusChartCanvasWrap');
+  const heatWrap = document.getElementById('focusHeatmapWrap');
+  if(canvasWrap) canvasWrap.style.display = 'none';
+  if(heatWrap) heatWrap.style.display = '';
+  if(focusChartInstance){ focusChartInstance.destroy(); focusChartInstance = null; }
+
+  const grid = document.getElementById('focusHeatmapGrid');
+  const info = document.getElementById('focusHeatmapInfo');
+  if(!grid) return;
+
+  const cell = 15, gap = 3;
+  const first = new Date(days[0] + 'T12:00:00');
+  const startOffset = first.getDay();
+  const padded = [];
+  for(let i=0;i<startOffset;i++) padded.push(null);
+  days.forEach((d,i)=> padded.push({date:d, value: values[i]}));
+  while(padded.length % 7 !== 0) padded.push(null);
+
+  const weeks = padded.length/7;
+  const max = Math.max(1, ...values);
+  const width = weeks*(cell+gap)+gap;
+  const height = 7*(cell+gap)+gap;
+
+  function colorFor(v){
+    if(v<=0) return '#f0ece4';
+    const ratio = Math.min(1, v/max);
+    const l = 88 - ratio*48;
+    return `hsl(9,65%,${l}%)`;
+  }
+
+  let cells = '';
+  for(let w=0; w<weeks; w++){
+    for(let dow=0; dow<7; dow++){
+      const item = padded[w*7+dow];
+      const x = gap + w*(cell+gap);
+      const y = gap + dow*(cell+gap);
+      if(!item){
+        cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="transparent"/>`;
+      } else {
+        cells += `<rect class="heatmap-cell" x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="${colorFor(item.value)}" onclick="showHeatmapInfo('${item.date}',${item.value})"/>`;
+      }
+    }
+  }
+
+  grid.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${Math.min(170,height)}" preserveAspectRatio="xMinYMin meet">${cells}</svg>`;
+
+  // default info: most recent day with data, or the last day in range
+  if(info){
+    let lastIdx = days.length - 1;
+    for(let i=days.length-1;i>=0;i--){ if(values[i]>0){ lastIdx = i; break; } }
+    showHeatmapInfo(days[lastIdx], values[lastIdx]);
+  }
+}
+
+function renderFocusStatsGrid(days, values){
+  const grid = document.getElementById('focusStatsGrid');
+  if(!grid) return;
+  const total = values.reduce((a,b)=>a+b,0);
+  const activeDays = values.filter(v=>v>0).length;
+  const avgActive = activeDays ? total/activeDays : 0;
+  const avgAll = days.length ? total/days.length : 0;
+  let bestIdx = 0;
+  values.forEach((v,i)=>{ if(v > values[bestIdx]) bestIdx = i; });
+  const bestVal = values[bestIdx] || 0;
+  const bestDate = bestVal > 0 ? isoToJalaliLabel(days[bestIdx]) : '—';
+  const streak = computeCurrentStreak();
+
+  grid.innerHTML = `
+    <div class="fstat-box"><div class="fstat-val">${formatMinutesShort(total)}</div><div class="fstat-lbl">مجموع</div></div>
+    <div class="fstat-box"><div class="fstat-val">${formatMinutesShort(avgAll)}</div><div class="fstat-lbl">میانگین کل روزها</div></div>
+    <div class="fstat-box"><div class="fstat-val">${formatMinutesShort(avgActive)}</div><div class="fstat-lbl">میانگین روزهای فعال</div></div>
+    <div class="fstat-box"><div class="fstat-val">${activeDays}/${days.length}</div><div class="fstat-lbl">روزهای فعال</div></div>
+    <div class="fstat-box"><div class="fstat-val">${formatMinutesShort(bestVal)}</div><div class="fstat-lbl">بهترین روز (${bestDate})</div></div>
+    <div class="fstat-box"><div class="fstat-val">${streak} 🔥</div><div class="fstat-lbl">استریک فعلی</div></div>
+  `;
+}
+
+function renderFocusDayList(days, values){
+  const el = document.getElementById('focusDayList');
+  if(!el) return;
+  const max = Math.max(1, ...values);
+  let html = '';
+  for(let i=days.length-1; i>=0; i--){
+    const v = values[i];
+    const dt = new Date(days[i] + 'T12:00:00');
+    const pct = Math.round((v/max)*100);
+    html += `<div class="fday-row">
+      <span class="fday-date">${DOW[dt.getDay()]} · ${isoToJalaliLabel(days[i])}</span>
+      <span class="fday-bar-track"><span class="fday-bar-fill" style="width:${v>0?Math.max(3,pct):0}%"></span></span>
+      <span class="fday-min">${v>0?formatMinutesShort(v):'—'}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
 function renderFocusChart(range){
   SIMPLE.currentRange = range;
-  ['range-7','range-30','range-all'].forEach(id=>{
+  ['range-7','range-30','range-90','range-all'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.classList.toggle('active', id === 'range-'+range);
   });
@@ -624,8 +871,9 @@ function renderFocusChart(range){
   let days;
   if(range === 'all'){
     days = Object.keys(data).sort();
+    if(!days.length) days = [getTodayDateStr()];
   } else {
-    const n = range === '30' ? 30 : 7;
+    const n = range === '90' ? 90 : (range === '30' ? 30 : 7);
     days = [];
     for(let i=n-1;i>=0;i--){
       const d = new Date();
@@ -635,50 +883,29 @@ function renderFocusChart(range){
   }
 
   const container = document.getElementById('focusChartContainer');
-  const summaryEl = document.getElementById('focusChartSummary');
+  const statsGrid = document.getElementById('focusStatsGrid');
+  const dayListEl = document.getElementById('focusDayList');
   if(!container) return;
 
-  if(!days.length){
-    container.innerHTML = '<div style="color:var(--text4,#b5ae9f);font-size:13px;font-style:italic;padding:12px;text-align:center;">هنوز داده‌ای ثبت نشده.</div>';
-    if(summaryEl) summaryEl.textContent = '';
+  const values = days.map(d => data[d] || 0);
+
+  if(!values.some(v => v > 0)){
+    if(focusChartInstance){ focusChartInstance.destroy(); focusChartInstance = null; }
+    const canvasWrap = document.getElementById('focusChartCanvasWrap');
+    const heatWrap = document.getElementById('focusHeatmapWrap');
+    if(canvasWrap){ canvasWrap.style.display = ''; canvasWrap.innerHTML = '<div style="color:var(--text4,#b5ae9f);font-size:13px;font-style:italic;padding:12px;text-align:center;">هنوز داده‌ای ثبت نشده.</div>'; }
+    if(heatWrap) heatWrap.style.display = 'none';
+    if(statsGrid) statsGrid.innerHTML = '';
+    if(dayListEl) dayListEl.innerHTML = '';
     return;
   }
 
-  const values = days.map(d => data[d] || 0);
-  const max = Math.max(1, ...values);
-  const dense = days.length > 20;
-  const barW = dense ? 6 : 22;
-  const gap = dense ? 2 : 8;
-  const chartH = 140;
-  const width = days.length * (barW+gap) + gap;
+  const type = SIMPLE.chartType || 'bar';
+  if(type === 'heat') drawFocusHeatmap(days, values);
+  else drawFocusChartJS(days, values, type);
 
-  let bars = '';
-  days.forEach((d,i)=>{
-    const v = values[i];
-    const h = v > 0 ? Math.max(3, (v/max) * (chartH-20)) : 1;
-    const x = gap + i*(barW+gap);
-    const y = chartH - h;
-    const label = isoToJalaliLabel(d) + ' — ' + Math.round(v) + ' دقیقه';
-    bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="3" fill="url(#focusChartGrad)"><title>${label}</title></rect>`;
-  });
-
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${chartH}" width="100%" height="${chartH}" preserveAspectRatio="xMinYMin meet">
-    <defs>
-      <linearGradient id="focusChartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#e85d3a"/>
-        <stop offset="100%" stop-color="#c44a6a"/>
-      </linearGradient>
-    </defs>
-    ${bars}
-  </svg>`;
-
-  const totalMinutes = values.reduce((a,b)=>a+b,0);
-  const activeDays = values.filter(v=>v>0).length;
-  if(summaryEl){
-    summaryEl.textContent = totalMinutes > 0
-      ? `مجموع: ${Math.round(totalMinutes)} دقیقه · میانگین روزهای فعال: ${activeDays ? Math.round(totalMinutes/activeDays) : 0} دقیقه`
-      : '';
-  }
+  renderFocusStatsGrid(days, values);
+  renderFocusDayList(days, values);
 }
 
 // ── Wire simple mode into the existing view-init flow ──

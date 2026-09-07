@@ -671,7 +671,9 @@ def post_focus_stats():
     data = _load_focus_stats()
     # Adds to whatever's already logged for that date, so multiple
     # "End Day" presses in the same day accumulate instead of overwriting.
-    data[day] = round(data.get(day, 0) + minutes, 2)
+    # `minutes` may be negative (manual "subtract" from the Focus tab) —
+    # clamp at 0 so a day's total never goes negative.
+    data[day] = max(0, round(data.get(day, 0) + minutes, 2))
     _save_focus_stats(data)
     return jsonify({"ok": True, "data": data})
 

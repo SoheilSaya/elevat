@@ -27,14 +27,45 @@
   .flag-item-del{border:none;background:transparent;color:var(--text4,#b5ae9f);cursor:pointer;font-size:17px;line-height:1;padding:2px 6px;}
   .flag-item-del:hover{color:#c44a6a;}
 
+  .manual-add-card{background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px;}
+  .manual-add-title{font-weight:700;font-size:14px;color:var(--text1,#2a2a2a);margin-bottom:10px;}
+  .manual-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .manual-day-toggle{display:flex;gap:6px;background:var(--cream2,#f0ece4);padding:4px;border-radius:10px;width:fit-content;}
+  .mday-btn{border:none;background:transparent;padding:6px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text3,#8a8478);}
+  .mday-btn.active{background:#fff;color:var(--text1,#2a2a2a);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .manual-presets{display:flex;gap:6px;flex-wrap:wrap;}
+  .manual-preset{border:1px solid var(--cream3,#e2ddd1);background:var(--cream2,#f0ece4);color:var(--text1,#2a2a2a);border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .manual-preset:active{transform:scale(.96);}
+
   .simple-stats-card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   .simple-stats-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
   .simple-stats-title span:first-child{font-weight:700;font-size:14px;color:var(--text1,#2a2a2a);}
   .range-btns{display:flex;gap:6px;background:var(--cream2,#f0ece4);padding:3px;border-radius:9px;}
   .range-btn{border:none;background:transparent;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3,#8a8478);}
   .range-btn.active{background:#fff;color:var(--text1,#2a2a2a);}
-  #focusChartContainer{overflow-x:auto;width:100%;}
-  #focusChartSummary{font-size:12px;color:var(--text3,#8a8478);margin-top:10px;text-align:center;}
+  .chart-type-toggle{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .ctype-btn{border:1px solid var(--cream3,#e2ddd1);background:var(--cream2,#f0ece4);color:var(--text3,#8a8478);padding:6px 13px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;}
+  .ctype-btn.active{background:var(--text1,#2a2a2a);color:#fff;border-color:var(--text1,#2a2a2a);}
+  #focusChartContainer{width:100%;}
+  .focus-chart-canvas-wrap{position:relative;height:200px;width:100%;}
+  .focus-heatmap-wrap{overflow-x:auto;}
+  .heatmap-cell{cursor:pointer;}
+  .heatmap-cell:active{opacity:.7;}
+  .focus-heatmap-info{margin-top:10px;font-size:12.5px;color:var(--text2,#5a5448);background:var(--cream2,#f0ece4);border-radius:10px;padding:10px 12px;text-align:center;transition:.15s;}
+
+  .focus-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:16px 0;}
+  .fstat-box{background:var(--cream2,#f0ece4);border-radius:12px;padding:12px 10px;text-align:center;}
+  .fstat-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--text1,#2a2a2a);}
+  .fstat-lbl{font-size:11px;color:var(--text3,#8a8478);margin-top:3px;}
+
+  .focus-daylist-title{font-weight:700;font-size:13px;color:var(--text1,#2a2a2a);margin:18px 0 8px;}
+  .focus-daylist{max-height:280px;overflow-y:auto;}
+  .fday-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--cream2,#f0ece4);}
+  .fday-row:last-child{border-bottom:none;}
+  .fday-date{font-size:12px;color:var(--text2,#5a5448);white-space:nowrap;min-width:108px;}
+  .fday-bar-track{flex:1;background:var(--cream2,#f0ece4);border-radius:6px;height:10px;overflow:hidden;}
+  .fday-bar-fill{height:100%;background:linear-gradient(90deg,#e85d3a,#c44a6a);border-radius:6px;}
+  .fday-min{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text3,#8a8478);min-width:60px;text-align:left;}
 </style>
 
 <!-- FOCUS -->
@@ -70,19 +101,61 @@
         <div id="simpleFlagsList"></div>
       </div>
 
+      <div class="manual-add-card">
+        <div class="manual-add-title">➕➖ افزودن / کم کردن زمان</div>
+        <div class="manual-row">
+          <div class="manual-day-toggle">
+            <button class="mday-btn active" id="mday-today" onclick="setManualDay('today')">امروز</button>
+            <button class="mday-btn" id="mday-yesterday" onclick="setManualDay('yesterday')">دیروز</button>
+          </div>
+          <div class="manual-day-toggle">
+            <button class="mday-btn active" id="mop-add" onclick="setManualOp('add')">➕ افزودن</button>
+            <button class="mday-btn" id="mop-sub" onclick="setManualOp('sub')">➖ کم کردن</button>
+          </div>
+        </div>
+        <div class="manual-presets">
+          <button class="manual-preset" onclick="addManualTime(15)">15m</button>
+          <button class="manual-preset" onclick="addManualTime(30)">30m</button>
+          <button class="manual-preset" onclick="addManualTime(45)">45m</button>
+          <button class="manual-preset" onclick="addManualTime(60)">1h</button>
+          <button class="manual-preset" onclick="addManualTime(90)">1.5h</button>
+          <button class="manual-preset" onclick="addManualTime(120)">2h</button>
+          <button class="manual-preset" onclick="addManualTime(180)">3h</button>
+          <button class="manual-preset" onclick="addManualTime(240)">4h</button>
+        </div>
+      </div>
+
       <div class="simple-stats-card">
         <div class="simple-stats-title">
-          <span>📊 آمار روزهای گذشته</span>
+          <span>📊 تاریخچه‌ی فوکوس</span>
           <div class="range-btns">
             <button class="range-btn active" id="range-7" onclick="renderFocusChart('7')">۷ روز</button>
             <button class="range-btn" id="range-30" onclick="renderFocusChart('30')">۳۰ روز</button>
+            <button class="range-btn" id="range-90" onclick="renderFocusChart('90')">۹۰ روز</button>
             <button class="range-btn" id="range-all" onclick="renderFocusChart('all')">همه</button>
           </div>
         </div>
-        <div id="focusChartContainer">
-          <div style="color:var(--text4,#b5ae9f);font-size:13px;font-style:italic;padding:12px;text-align:center;">در حال بارگذاری...</div>
+
+        <div class="chart-type-toggle">
+          <button class="ctype-btn active" id="ctype-bar" onclick="setChartType('bar')">📊 میله‌ای</button>
+          <button class="ctype-btn" id="ctype-line" onclick="setChartType('line')">📈 روند خطی</button>
+          <button class="ctype-btn" id="ctype-heat" onclick="setChartType('heat')">🔥 تقویمی</button>
         </div>
-        <div id="focusChartSummary"></div>
+
+        <div id="focusChartContainer">
+          <div class="focus-chart-canvas-wrap" id="focusChartCanvasWrap">
+            <canvas id="focusChartCanvas"></canvas>
+          </div>
+          <div class="focus-heatmap-wrap" id="focusHeatmapWrap" style="display:none;">
+            <div id="focusHeatmapGrid"></div>
+            <div class="focus-heatmap-info" id="focusHeatmapInfo">روی یه روز بزن تا جزئیاتش رو ببینی 👆</div>
+          </div>
+        </div>
+
+        <div class="focus-stats-grid" id="focusStatsGrid"></div>
+
+        <div class="focus-daylist-title">📅 روز به روز</div>
+        <div class="focus-daylist" id="focusDayList"></div>
       </div>
 
     </div>
