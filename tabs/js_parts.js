@@ -6,7 +6,7 @@
 //  and the shared helpers/classes in js_core.js + head.html.
 // ══════════════════════════════════════════════════════
 
-const PARTS = {products:[],stores:[],car_models:[],brands:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
+const PARTS = {products:[],stores:[],car_models:[],brands:[],part_types:[],categories:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
   totals:{},low_stock:[],low_stock_threshold:2};
 let partsLoaded = false;
 let partsCurrentSub = 'products';
@@ -18,6 +18,9 @@ let editingCashTxId = null;
 let cashTxType = 'deposit';
 let productModalReturnTo = null; // null | 'purchase' | 'sale'
 let brandModalReturnTo = null;   // null | 'product' — where to land a newly-created brand
+let partTypeModalReturnTo = null;// null | 'product'
+let categoryModalReturnTo = null;// null | 'product'
+let carModelTagFilter = '';      // live search filter typed above the car-model tag cloud
 let productImageData = null;     // base64 currently staged in the product modal
 let storeImageData = null;       // base64 currently staged in the store modal
 let purchaseInvoiceImage = null; // null = unchanged, '' = removed, dataURL = newly staged
@@ -37,6 +40,9 @@ let partsRevenueChartInstance = null;
 let partsStoreChartInstance = null;
 let partsBrandChartInstance = null;
 let partsCarModelChartInstance = null;
+let partsCumulativeChartInstance = null;
+let partsUnitsChartInstance = null;
+let partsTopUnitsChartInstance = null;
 const QTY_PRESET_VALUES = [1,2,3,4,5,7,10,15,20,30,50];
 
 function fmtT(n){
@@ -57,10 +63,96 @@ async function initPartsBiz(){
     renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden',null,()=>{});
     renderJalaliPicker('saleDatePicker','saleDateHidden',null,()=>{});
     renderJalaliPicker('cashDatePicker','cashDateHidden',null,()=>{});
+    // Every dropdown that can realistically grow past a handful of items gets
+    // turned into a searchable combobox — see enhanceSearchSelect() below.
+    ['partsFilterCarModel','partsFilterBrand','partsFilterPartType','partsFilterCategory',
+     'pfPartType','pfBrand','pfCategory','purchaseStoreSelect','purchaseItemProduct','saleItemProduct']
+      .forEach(id=>enhanceSearchSelect(id));
     partsLoaded = true;
   }
   await fetchParts();
   showPartsSub(partsCurrentSub);
+}
+
+// ─── SEARCHABLE SELECT (fixes native <select> RTL rendering too) ──
+// Wraps an existing, already-populated <select> with a text-input-driven
+// combobox. The original <select> stays in the DOM (visually hidden) as the
+// single source of truth, so every existing call site that reads or writes
+// `.value`, or listens for a `change` event, keeps working untouched — we
+// intercept `.value =` so the visible search box stays in sync automatically.
+function enhanceSearchSelect(selectId){
+  const select = document.getElementById(selectId);
+  if(!select || select._ssEnabled) return;
+  select._ssEnabled = true;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ss-wrap';
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(select);
+  select.classList.add('ss-native');
+  select.tabIndex = -1;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'ss-input builder-select';
+  input.setAttribute('dir','rtl');
+  input.autocomplete = 'off';
+  wrap.appendChild(input);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'ss-dropdown';
+  wrap.appendChild(dropdown);
+
+  const nativeDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  function currentLabel(){
+    const opt = select.options[select.selectedIndex];
+    return opt ? opt.textContent : '';
+  }
+  function sync(){ input.value = currentLabel(); }
+  Object.defineProperty(select, 'value', {
+    get(){ return nativeDesc.get.call(select); },
+    set(v){ nativeDesc.set.call(select, v); sync(); },
+    configurable: true,
+  });
+  select._ssSync = sync;
+
+  function buildList(filter){
+    const f = (filter||'').trim().toLowerCase();
+    const items = Array.from(select.options).filter(o=> !f || o.textContent.toLowerCase().includes(f));
+    dropdown.innerHTML = items.length
+      ? items.map(o=>`<div class="ss-option${o.value===select.value?' sel':''}" data-value="${escHtml(o.value)}">${escHtml(o.textContent)}</div>`).join('')
+      : '<div class="ss-empty">موردی پیدا نشد</div>';
+  }
+  function openDropdown(){
+    buildList(input.value===currentLabel() ? '' : input.value);
+    dropdown.classList.add('open');
+  }
+  function closeDropdown(){ dropdown.classList.remove('open'); }
+  function pick(v){
+    select.value = v; // goes through the defineProperty setter above → syncs input + fires below
+    closeDropdown();
+    select.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  input.addEventListener('focus', ()=>{ input.select(); openDropdown(); });
+  input.addEventListener('input', ()=>{ buildList(input.value); dropdown.classList.add('open'); });
+  input.addEventListener('blur', ()=> setTimeout(()=>{ closeDropdown(); sync(); }, 150));
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){ closeDropdown(); sync(); input.blur(); }
+    else if(e.key==='Enter'){
+      e.preventDefault();
+      const first = dropdown.querySelector('.ss-option');
+      if(first) pick(first.dataset.value);
+    }
+  });
+  dropdown.addEventListener('mousedown', e=>{
+    const item = e.target.closest('.ss-option');
+    if(item) { e.preventDefault(); pick(item.dataset.value); }
+  });
+  sync();
+}
+function ssSync(id){
+  const el = document.getElementById(id);
+  if(el && el._ssSync) el._ssSync();
 }
 
 async function fetchParts(){
@@ -89,6 +181,8 @@ function renderPartsAll(){
   renderPartsProducts();
   renderCarModelsGrid();
   renderBrandsGrid();
+  renderPartTypesGrid();
+  renderCategoriesGrid();
   renderStoreGrid();
   renderStoreSelect();
   renderProductSelects();
@@ -99,7 +193,9 @@ function renderPartsAll(){
   renderPurchaseTabStats();
   renderSaleTabStats();
   renderCashStats();
+  renderCashBreakdown();
   renderCashLedger();
+  renderMoneyMovements();
   renderPartsHero();
   if(document.getElementById('partsSub-reports').style.display !== 'none') renderReports();
 }
@@ -148,6 +244,61 @@ function renderCashStats(){
       <div class="parts-kpi-label">${label}</div>
       <div class="parts-kpi-val" style="color:${color}">${val}</div>
     </div>`).join('');
+}
+// Spells out exactly why Cash Balance is what it is — every sale's revenue
+// (which already carries its profit inside it) flows straight into this
+// number the moment it's recorded, same as every purchase flows straight out.
+function renderCashBreakdown(){
+  const wrap = document.getElementById('cashBreakdownRows');
+  if(!wrap) return;
+  const t = PARTS.totals;
+  const rows = [
+    ['💰','Capital deposited', t.total_deposits||0, 'pos'],
+    ['🏧','Capital withdrawn', -(t.total_withdrawals||0), 'neg'],
+    ['💵','Sales revenue (all time)', t.revenue||0, 'pos'],
+    ['🧾','Purchase spend (all time)', -(t.purchase_spend||0), 'neg'],
+  ];
+  wrap.innerHTML = rows.map(([icon,label,amt])=>`
+    <div class="cashbrk-row">
+      <div class="cashbrk-label">${icon} ${label}</div>
+      <div class="cashbrk-amt ${amt>=0?'pos':'neg'}">${amt>=0?'+':'−'}${fmtT(Math.abs(amt))}</div>
+    </div>`).join('') + `
+    <div class="cashbrk-row total">
+      <div class="cashbrk-label">🏦 = Cash Balance</div>
+      <div class="cashbrk-amt ${(t.cash_balance||0)>=0?'pos':'neg'}">${fmtT(t.cash_balance||0)}</div>
+    </div>`;
+}
+// A single chronological timeline of every deposit, withdrawal, purchase and
+// sale — the full "what happened to my money" picture in one place.
+function renderMoneyMovements(){
+  const wrap = document.getElementById('moneyMovementsList');
+  if(!wrap) return;
+  const events = [];
+  PARTS.capital_transactions.forEach(t=>{
+    events.push({date:t.date, dir: t.type==='deposit'?'in':'out', amount: Number(t.amount)||0,
+      label: t.type==='deposit' ? '💰 Capital deposit' : '🏧 Capital withdrawal', sub: t.note||''});
+  });
+  PARTS.purchases.forEach(p=>{
+    const total = p.items.reduce((s,it)=>s+it.qty*it.unit_price,0);
+    const store = storeById(p.store_id);
+    events.push({date:p.order_date, dir:'out', amount: total,
+      label: '🧾 Purchase — '+(store?store.name:'(deleted store)'),
+      sub: p.items.length+' item'+(p.items.length===1?'':'s')});
+  });
+  PARTS.sales.forEach(s=>{
+    events.push({date:s.date, dir:'in', amount: s.revenue,
+      label: '💵 Sale'+(s.customer_name?' — '+s.customer_name:''),
+      sub: 'profit '+fmtT(s.profit)});
+  });
+  events.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  wrap.innerHTML = events.length ? events.slice(0,80).map(e=>`
+    <div class="money-row ${e.dir}">
+      <div class="money-row-main">
+        <div class="money-row-label">${escHtml(e.label)}</div>
+        <div class="money-row-sub">${jalaliFullLabel(e.date)}${e.sub?' · '+escHtml(e.sub):''}</div>
+      </div>
+      <div class="money-row-amt">${e.dir==='in'?'+':'−'}${fmtT(e.amount)}</div>
+    </div>`).join('') : '<div class="parts-empty"><div class="pe-icon">🏦</div><div class="pe-text">No money movements yet.</div></div>';
 }
 async function saveCashTx(){
   const amount = parseFloat(document.getElementById('cashTxAmount').value);
@@ -216,7 +367,7 @@ function renderCashLedger(){
 // ─── SUB-NAV ───────────────────────────────────────
 function showPartsSub(name){
   partsCurrentSub = name;
-  ['products','carmodels','brands','stores','purchase','sales','cash','reports'].forEach(s=>{
+  ['products','carmodels','brands','parttypes','categories','stores','purchase','sales','cash','reports'].forEach(s=>{
     document.getElementById('partsSub-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.parts-subtab').forEach(b=>b.classList.toggle('active', b.dataset.sub===name));
@@ -265,23 +416,23 @@ function renderPartsFilters(){
       const o = document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o);
     });
     if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    ssSync(id);
   };
-  // Car model filter is sourced from the managed list (Car Models tab), plus any
-  // legacy values still sitting on old products that were saved before that tab existed.
+  // Car model / brand / part type / category filters are sourced from their
+  // managed lists (their own tabs), plus any legacy free-text values still
+  // sitting on old products saved before those tabs existed.
   const managedNames = PARTS.car_models.map(c=>c.name);
   const legacyNames = PARTS.products.flatMap(p=>productCarModels(p));
   fill('partsFilterCarModel', [...managedNames, ...legacyNames]);
   const managedBrandNames = PARTS.brands.map(b=>b.name);
   const legacyBrandNames = PARTS.products.map(p=>p.brand);
   fill('partsFilterBrand', [...managedBrandNames, ...legacyBrandNames]);
-  fill('partsFilterCategory', PARTS.products.map(p=>p.category));
-  const dl = document.getElementById('pfCategoryList');
-  if(dl){
-    dl.innerHTML = '';
-    [...new Set(PARTS.products.map(p=>p.category).filter(Boolean))].sort().forEach(c=>{
-      const o = document.createElement('option'); o.value=c; dl.appendChild(o);
-    });
-  }
+  const managedPartTypeNames = PARTS.part_types.map(t=>t.name);
+  const legacyPartTypeNames = PARTS.products.map(p=>p.part_type);
+  fill('partsFilterPartType', [...managedPartTypeNames, ...legacyPartTypeNames]);
+  const managedCatNames = PARTS.categories.map(c=>c.name);
+  const legacyCatNames = PARTS.products.map(p=>p.category);
+  fill('partsFilterCategory', [...managedCatNames, ...legacyCatNames]);
 }
 
 function renderPartsProducts(){
@@ -289,11 +440,16 @@ function renderPartsProducts(){
   const q = (document.getElementById('partsSearchInput').value||'').trim().toLowerCase();
   const fCar = document.getElementById('partsFilterCarModel').value;
   const fBrand = document.getElementById('partsFilterBrand').value;
+  const fPartType = document.getElementById('partsFilterPartType').value;
   const fCat = document.getElementById('partsFilterCategory').value;
+
+  const clearBtn = document.getElementById('ptClearFiltersBtn');
+  if(clearBtn) clearBtn.style.display = (q||fCar||fBrand||fPartType||fCat) ? 'inline-block' : 'none';
 
   let list = PARTS.products.filter(p=>{
     if(fCar && !productCarModels(p).includes(fCar)) return false;
     if(fBrand && p.brand !== fBrand) return false;
+    if(fPartType && p.part_type !== fPartType) return false;
     if(fCat && p.category !== fCat) return false;
     if(q){
       const hay = [p.name,productCarModels(p).join(' '),p.brand,p.part_type,p.variant,p.oem_code,p.notes].join(' ').toLowerCase();
@@ -338,6 +494,14 @@ function renderPartsProducts(){
     grid.appendChild(el);
   });
 }
+function clearPartsFilters(){
+  document.getElementById('partsSearchInput').value = '';
+  document.getElementById('partsFilterCarModel').value = '';
+  document.getElementById('partsFilterBrand').value = '';
+  document.getElementById('partsFilterPartType').value = '';
+  document.getElementById('partsFilterCategory').value = '';
+  renderPartsProducts();
+}
 
 function escHtml(s){
   if(s==null) return '';
@@ -362,11 +526,11 @@ function openProductModal(id, returnTo){
 
   if(id){
     const p = productById(id);
-    document.getElementById('pfPartType').value = p.part_type||'';
+    renderPartTypeSelect(p.part_type||'');
     renderBrandSelect(p.brand||'');
     document.getElementById('pfVariant').value = p.variant||'';
     document.getElementById('pfOemCode').value = p.oem_code||'';
-    document.getElementById('pfCategory').value = p.category||'';
+    renderCategorySelect(p.category||'');
     document.getElementById('pfTorob').value = p.torob_link||'';
     document.getElementById('pfName').value = p.name||'';
     document.getElementById('pfNotes').value = p.notes||'';
@@ -380,12 +544,16 @@ function openProductModal(id, returnTo){
       preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     }
   } else {
-    ['pfPartType','pfCarModel','pfVariant','pfOemCode','pfCategory','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    ['pfCarModel','pfVariant','pfOemCode','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    renderPartTypeSelect('');
     renderBrandSelect('');
+    renderCategorySelect('');
     preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     partImgAutoName = '';
     renderCarModelTags([]);
   }
+  document.getElementById('pfCarModelSearch').value = '';
+  filterCarModelTags('');
   document.getElementById('productModalOverlay').classList.add('open');
 }
 
@@ -402,7 +570,13 @@ function renderCarModelTags(selected){
     wrap.innerHTML = '<div style="font-size:12px;color:var(--text4);font-style:italic;">No car models yet — add some in the Car Models tab first.</div>';
     return;
   }
-  PARTS.car_models.forEach(cm=>{
+  const f = (carModelTagFilter||'').trim().toLowerCase();
+  const visible = PARTS.car_models.filter(cm=>!f || cm.name.toLowerCase().includes(f));
+  if(!visible.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text4);font-style:italic;">No car models match your search.</div>';
+    return;
+  }
+  visible.forEach(cm=>{
     const active = selectedCarModels.includes(cm.name);
     const b = document.createElement('button');
     b.type = 'button';
@@ -412,6 +586,10 @@ function renderCarModelTags(selected){
     wrap.appendChild(b);
   });
   syncCarModelHidden();
+}
+function filterCarModelTags(v){
+  carModelTagFilter = v||'';
+  renderCarModelTags(selectedCarModels);
 }
 function toggleCarModel(m){
   const i = selectedCarModels.indexOf(m);
@@ -561,6 +739,163 @@ function renderBrandSelect(selected){
   sel.innerHTML = '<option value="">— no brand —</option>' +
     names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   sel.value = selected || '';
+  ssSync('pfBrand');
+}
+
+// ─── PART TYPES TAB (add / edit / delete, independent of products) ──
+// Same structured-list pattern as Brands / Car Models.
+function renderPartTypesGrid(){
+  const grid = document.getElementById('partsPartTypeGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.part_types.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🔧</div><div class="pe-text">No part types yet — click "+ Add Part Type" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.part_types].sort((a,b)=>a.name.localeCompare(b.name)).forEach(t=>{
+    const usedBy = PARTS.products.filter(p=>p.part_type===t.name).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(t.name)}">🔧</div>
+          <div class="store-card-name">${escHtml(t.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openPartTypeModal('${t.id}')">✎ Edit</button>
+          <button class="del" onclick="deletePartTypeEntry('${t.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openPartTypeModal(id, returnTo){
+  partTypeModalReturnTo = returnTo || null;
+  document.getElementById('partTypeModalId').value = id||'';
+  document.getElementById('partTypeModalTitle').textContent = id ? 'Edit Part Type' : 'Add Part Type';
+  document.getElementById('ptfName').value = id ? (PARTS.part_types.find(t=>t.id===id)||{}).name||'' : '';
+  document.getElementById('partTypeModalOverlay').classList.add('open');
+}
+function closePartTypeModal(){
+  document.getElementById('partTypeModalOverlay').classList.remove('open');
+  partTypeModalReturnTo = null;
+}
+async function savePartTypeModal(){
+  const id = document.getElementById('partTypeModalId').value;
+  const name = document.getElementById('ptfName').value.trim();
+  if(!name){ showToast('Give the part type a name','error'); return; }
+  const dupe = PARTS.part_types.find(t=>t.name.toLowerCase()===name.toLowerCase() && t.id!==id);
+  if(dupe){ showToast('That part type already exists','error'); return; }
+  const prevIds = new Set(PARTS.part_types.map(t=>t.id));
+  const returnTo = partTypeModalReturnTo;
+  if(id){ await postParts('update_part_type', {id, name}); }
+  else { await postParts('add_part_type', {name}); }
+  closePartTypeModal();
+  showToast(id ? 'Part type updated' : 'Part type added','success');
+  if(!id && returnTo==='product'){
+    const newType = PARTS.part_types.find(t=>!prevIds.has(t.id));
+    if(newType){
+      renderPartTypeSelect(newType.name);
+      suggestProductName();
+    }
+  }
+}
+function deletePartTypeEntry(id){
+  const t = PARTS.part_types.find(x=>x.id===id);
+  if(t){
+    const usedBy = PARTS.products.filter(p=>p.part_type===t.name).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${t.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_part_type',{id});
+  showToast('Part type deleted','success');
+}
+function renderPartTypeSelect(selected){
+  const sel = document.getElementById('pfPartType');
+  if(!sel) return;
+  const names = PARTS.part_types.map(t=>t.name);
+  if(selected && !names.includes(selected)) names.unshift(selected);
+  sel.innerHTML = '<option value="">— no part type —</option>' +
+    names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = selected || '';
+  ssSync('pfPartType');
+}
+
+// ─── CATEGORIES TAB (add / edit / delete, independent of products) ──
+function renderCategoriesGrid(){
+  const grid = document.getElementById('partsCategoryGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.categories.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🗂️</div><div class="pe-text">No categories yet — click "+ Add Category" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.categories].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
+    const usedBy = PARTS.products.filter(p=>p.category===c.name).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(c.name)}">🗂️</div>
+          <div class="store-card-name">${escHtml(c.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openCategoryModal('${c.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteCategoryEntry('${c.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openCategoryModal(id, returnTo){
+  categoryModalReturnTo = returnTo || null;
+  document.getElementById('categoryModalId').value = id||'';
+  document.getElementById('categoryModalTitle').textContent = id ? 'Edit Category' : 'Add Category';
+  document.getElementById('ctfName').value = id ? (PARTS.categories.find(c=>c.id===id)||{}).name||'' : '';
+  document.getElementById('categoryModalOverlay').classList.add('open');
+}
+function closeCategoryModal(){
+  document.getElementById('categoryModalOverlay').classList.remove('open');
+  categoryModalReturnTo = null;
+}
+async function saveCategoryModal(){
+  const id = document.getElementById('categoryModalId').value;
+  const name = document.getElementById('ctfName').value.trim();
+  if(!name){ showToast('Give the category a name','error'); return; }
+  const dupe = PARTS.categories.find(c=>c.name.toLowerCase()===name.toLowerCase() && c.id!==id);
+  if(dupe){ showToast('That category already exists','error'); return; }
+  const prevIds = new Set(PARTS.categories.map(c=>c.id));
+  const returnTo = categoryModalReturnTo;
+  if(id){ await postParts('update_category', {id, name}); }
+  else { await postParts('add_category', {name}); }
+  closeCategoryModal();
+  showToast(id ? 'Category updated' : 'Category added','success');
+  if(!id && returnTo==='product'){
+    const newCat = PARTS.categories.find(c=>!prevIds.has(c.id));
+    if(newCat){ renderCategorySelect(newCat.name); }
+  }
+}
+function deleteCategoryEntry(id){
+  const c = PARTS.categories.find(x=>x.id===id);
+  if(c){
+    const usedBy = PARTS.products.filter(p=>p.category===c.name).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${c.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_category',{id});
+  showToast('Category deleted','success');
+}
+function renderCategorySelect(selected){
+  const sel = document.getElementById('pfCategory');
+  if(!sel) return;
+  const names = PARTS.categories.map(c=>c.name);
+  if(selected && !names.includes(selected)) names.unshift(selected);
+  sel.innerHTML = '<option value="">— no category —</option>' +
+    names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = selected || '';
+  ssSync('pfCategory');
 }
 function closeProductModal(){
   document.getElementById('productModalOverlay').classList.remove('open');
@@ -789,6 +1124,7 @@ function renderStoreSelect(){
     ? PARTS.stores.map(s=>`<option value="${s.id}">${escHtml(s.name)}</option>`).join('')
     : '<option value="">— add a store first —</option>';
   if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+  ssSync('purchaseStoreSelect');
 }
 function deleteStore(id){
   postParts('delete_store',{id});
@@ -851,6 +1187,7 @@ function renderProductSelects(){
   const pSel = document.getElementById('purchaseItemProduct');
   const pCur = pSel.value; pSel.innerHTML = opts;
   if([...pSel.options].some(o=>o.value===pCur)) pSel.value = pCur;
+  ssSync('purchaseItemProduct');
 
   const sSel = document.getElementById('saleItemProduct');
   const sCur = sSel.value;
@@ -858,6 +1195,7 @@ function renderProductSelects(){
     ? PARTS.products.map(p=>`<option value="${p.id}">${escHtml(productLabel(p))} — ${PARTS.stock[p.id]||0} in stock</option>`).join('')
     : '<option value="">— add a product first —</option>';
   if([...sSel.options].some(o=>o.value===sCur)) sSel.value = sCur;
+  ssSync('saleItemProduct');
   onSaleProductChange();
 }
 
@@ -1309,14 +1647,14 @@ function renderReports(){
     <tr><td>${escHtml(storeById(sid) ? storeById(sid).name : '(deleted store)')}</td><td>${v.count}</td><td>${fmtT(v.spend)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="parts-table-empty">No purchases in this range yet.</td></tr>`;
 
-  renderPartsCharts(filteredSales, filteredPurchases, storeRows);
+  renderPartsCharts(filteredSales, filteredPurchases, storeRows, byProd);
 }
 async function saveLowStockThreshold(){
   const v = parseFloat(document.getElementById('lowStockThresholdInput').value);
   await postParts('set_low_stock_threshold',{value: isNaN(v)?2:v});
 }
 
-function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
+function renderPartsCharts(filteredSales, filteredPurchases, storeRows, byProd){
   const palette = ['#e85d3a','#3a7a5a','#2a6a9a','#d4821a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
 
   // Revenue / purchase spend / profit by Jalali month — the full money-in vs
@@ -1326,14 +1664,15 @@ function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
     const j = gregToJalali(sale.date);
     if(!j) return;
     const key = j.y+'/'+String(j.m).padStart(2,'0');
-    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0, spend:0});
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0, spend:0, units:0});
     b.revenue += sale.revenue; b.profit += sale.profit;
+    b.units += sale.items.reduce((s,it)=>s+it.qty, 0);
   });
   filteredPurchases.forEach(pur=>{
     const j = gregToJalali(pur.order_date);
     if(!j) return;
     const key = j.y+'/'+String(j.m).padStart(2,'0');
-    const b = byMonth[key] || (byMonth[key]={label:j.month_name ? j.month_name+' '+j.y : key, revenue:0, profit:0, spend:0});
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name ? j.month_name+' '+j.y : key, revenue:0, profit:0, spend:0, units:0});
     b.spend += pur.items.reduce((a,it)=>a+it.qty*it.unit_price,0);
   });
   const monthKeys = Object.keys(byMonth).sort();
@@ -1411,4 +1750,45 @@ function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
   cmBody.innerHTML = cmRows.length ? cmRows.map(([name,v])=>`
     <tr><td>${escHtml(name)}</td><td>${fmtNum(v.qty)}</td><td>${fmtT(v.revenue)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="parts-table-empty">No sales in this range yet.</td></tr>`;
+
+  // Cumulative profit — a running total across the months in range, so the
+  // overall growth trajectory of the business is visible at a glance.
+  let running = 0;
+  const cumulativeData = monthKeys.map(k=>{ running += byMonth[k].profit; return running; });
+  const cumCtx = document.getElementById('partsCumulativeChart');
+  if(partsCumulativeChartInstance) partsCumulativeChartInstance.destroy();
+  partsCumulativeChartInstance = new Chart(cumCtx, {
+    type:'line',
+    data:{ labels: monthKeys.map(k=>byMonth[k].label),
+      datasets:[{ label:'Cumulative Profit', data: cumulativeData, borderColor:'#3a7a5a',
+        backgroundColor:'rgba(58,122,90,0.12)', fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:'#3a7a5a' }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Units sold per month — sales volume as a distinct metric from revenue,
+  // since a month can move a lot of cheap parts or a few expensive ones.
+  const unitsCtx = document.getElementById('partsUnitsChart');
+  if(partsUnitsChartInstance) partsUnitsChartInstance.destroy();
+  partsUnitsChartInstance = new Chart(unitsCtx, {
+    type:'bar',
+    data:{ labels: monthKeys.map(k=>byMonth[k].label),
+      datasets:[{ label:'Units Sold', data: monthKeys.map(k=>byMonth[k].units), backgroundColor:'#2a6a9a' }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}},beginAtZero:true},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Top 5 products by units sold — complements the "Top Products by Profit"
+  // table with a volume-based view (highest movers aren't always the most profitable).
+  const topUnitsRows = Object.entries(byProd||{}).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5);
+  const topUnitsCtx = document.getElementById('partsTopUnitsChart');
+  if(partsTopUnitsChartInstance) partsTopUnitsChartInstance.destroy();
+  partsTopUnitsChartInstance = new Chart(topUnitsCtx, {
+    type:'bar',
+    data:{ labels: topUnitsRows.map(([pid])=>productLabel(productById(pid))),
+      datasets:[{ label:'Units Sold', data: topUnitsRows.map(([,v])=>v.qty),
+        backgroundColor: topUnitsRows.map((_,i)=>palette[i%palette.length]) }]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:10}},beginAtZero:true},y:{ticks:{font:{size:10}}}}}
+  });
 }

@@ -3683,14 +3683,32 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 <div id="parts-view" style="display:none;">
 <div class="parts-container">
 <style>
-.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
-.parts-subtab{padding:8px 18px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);
+  margin-bottom:20px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%;}
+.parts-subnav::-webkit-scrollbar{display:none;}
+.parts-subtab{padding:8px 15px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
 .parts-subtab.active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
 .parts-sub{animation:fadeUp .3s ease both;}
 
-.parts-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);align-items:center;}
-.parts-filter-bar .modal-input{margin:0;width:280px;max-width:100%;}
-.parts-filter-bar .builder-select{margin:0;font-size:13px;width:170px;}
+.parts-toolbar{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:18px 20px 16px;box-shadow:var(--shadow);margin-bottom:20px;}
+.parts-toolbar-top{display:flex;gap:12px;align-items:center;margin-bottom:16px;}
+.parts-toolbar-top .modal-input{flex:1;min-width:0;height:46px;box-sizing:border-box;font-size:14px;margin:0;width:auto;}
+.parts-toolbar-top .parts-add-btn{height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;flex-shrink:0;margin-left:0;}
+.parts-toolbar-filters{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;}
+.pt-filter{display:flex;flex-direction:column;gap:5px;}
+.pt-filter-label{font-size:11px;font-weight:700;color:var(--text3);padding:0 2px;}
+.pt-filter .builder-select{width:160px;}
+.pt-filter .ss-wrap{height:40px;width:160px;}
+.pt-filter .ss-wrap .ss-input{height:100%;box-sizing:border-box;}
+.pt-clear-filters{font-size:12px;font-weight:600;color:var(--coral);background:none;border:none;cursor:pointer;
+  padding:8px 4px;margin-right:auto;margin-left:0;text-decoration:underline;text-underline-offset:2px;}
+.pt-clear-filters:hover{color:var(--rose);}
+@media(max-width:760px){
+  .parts-toolbar-top{flex-direction:column;align-items:stretch;}
+  .parts-toolbar-top .parts-add-btn{width:100%;}
+  .pt-filter{flex:1 1 140px;}
+  .pt-filter .builder-select,.pt-filter .ss-wrap{width:100%;}
+}
 .parts-add-btn{padding:10px 18px;border-radius:50px;border:none;background:var(--coral);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .2s;margin-left:auto;}
 .parts-add-btn:hover{background:var(--rose);}
 .parts-add-btn.sage{background:var(--sage);}
@@ -3820,6 +3838,33 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 .cash-ledger-del:hover{background:var(--coralL);color:var(--coral);}
 .cash-ledger-edit{width:26px;height:26px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:13px;border-radius:6px;flex-shrink:0;}
 .cash-ledger-edit:hover{background:var(--cream2);color:var(--text2);}
+
+.cashbrk-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:18px 20px;box-shadow:var(--shadow);margin:0 auto 24px;max-width:680px;}
+.cashbrk-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--cream2);font-size:13px;}
+.cashbrk-row:last-child{border-bottom:none;}
+.cashbrk-row.total{margin-top:4px;padding-top:12px;border-top:2px solid var(--cream3);border-bottom:none;font-weight:800;}
+.cashbrk-label{color:var(--text2);}
+.cashbrk-row.total .cashbrk-label{color:var(--ink);font-family:'Fraunces',serif;font-size:15px;}
+.cashbrk-amt{font-family:'JetBrains Mono',monospace;font-weight:700;}
+.cashbrk-amt.pos{color:var(--sage);}
+.cashbrk-amt.neg{color:var(--coral);}
+.cashbrk-row.total .cashbrk-amt{font-family:'Fraunces',serif;font-size:17px;}
+
+.money-ledger{display:flex;flex-direction:column;gap:6px;max-width:680px;margin:0 auto 24px;}
+.money-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 16px;background:#fff;
+  border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
+.money-row-main{min-width:0;}
+.money-row-label{font-size:13px;font-weight:600;color:var(--text);}
+.money-row-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.money-row-amt{font-family:'Fraunces',serif;font-weight:800;font-size:14px;white-space:nowrap;flex-shrink:0;}
+.money-row.in .money-row-amt{color:var(--sage);}
+.money-row.out .money-row-amt{color:var(--coral);}
+
+.parts-glossary{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);margin-top:24px;}
+.parts-glossary-title{font-family:'Fraunces',serif;font-size:16px;font-weight:700;margin-bottom:14px;}
+.parts-glossary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px 20px;}
+.parts-glossary-item dt{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.parts-glossary-item dd{font-size:12.5px;color:var(--text2);margin:0;line-height:1.6;direction:rtl;text-align:right;}
 .jalali-picker-wrap{margin-top:2px;}
 
 /* ══ HERO BANNER — signature blueprint-grid header ══ */
@@ -3876,6 +3921,8 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
     <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
     <button class="parts-subtab" data-sub="carmodels" onclick="showPartsSub('carmodels')">🚗 Car Models</button>
     <button class="parts-subtab" data-sub="brands" onclick="showPartsSub('brands')">🏷️ Brands</button>
+    <button class="parts-subtab" data-sub="parttypes" onclick="showPartsSub('parttypes')">🔧 Part Types</button>
+    <button class="parts-subtab" data-sub="categories" onclick="showPartsSub('categories')">🗂️ Categories</button>
     <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
     <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 Purchases</button>
     <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
@@ -3885,12 +3932,30 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 
   <!-- ═══ PRODUCTS ═══ -->
   <div id="partsSub-products" class="parts-sub">
-    <div class="parts-filter-bar">
-      <input type="text" class="modal-input" id="partsSearchInput" placeholder="🔍 Search name, car model, brand, code..." dir="auto" oninput="renderPartsProducts()"/>
-      <select class="builder-select" id="partsFilterCarModel" onchange="renderPartsProducts()"><option value="">All car models</option></select>
-      <select class="builder-select" id="partsFilterBrand" onchange="renderPartsProducts()"><option value="">All brands</option></select>
-      <select class="builder-select" id="partsFilterCategory" onchange="renderPartsProducts()"><option value="">All categories</option></select>
-      <button class="parts-add-btn" onclick="openProductModal()">+ Add Product</button>
+    <div class="parts-toolbar">
+      <div class="parts-toolbar-top">
+        <input type="text" class="modal-input" id="partsSearchInput" placeholder="🔍 جستجو: اسم، مدل ماشین، برند، کد..." dir="auto" oninput="renderPartsProducts()"/>
+        <button class="parts-add-btn" onclick="openProductModal()">+ افزودن محصول</button>
+      </div>
+      <div class="parts-toolbar-filters">
+        <div class="pt-filter">
+          <div class="pt-filter-label">مدل ماشین</div>
+          <select class="builder-select" id="partsFilterCarModel" onchange="renderPartsProducts()"><option value="">همه مدل‌ها</option></select>
+        </div>
+        <div class="pt-filter">
+          <div class="pt-filter-label">برند</div>
+          <select class="builder-select" id="partsFilterBrand" onchange="renderPartsProducts()"><option value="">همه برندها</option></select>
+        </div>
+        <div class="pt-filter">
+          <div class="pt-filter-label">نوع قطعه</div>
+          <select class="builder-select" id="partsFilterPartType" onchange="renderPartsProducts()"><option value="">همه نوع قطعه‌ها</option></select>
+        </div>
+        <div class="pt-filter">
+          <div class="pt-filter-label">دسته‌بندی</div>
+          <select class="builder-select" id="partsFilterCategory" onchange="renderPartsProducts()"><option value="">همه دسته‌ها</option></select>
+        </div>
+        <button class="pt-clear-filters" id="ptClearFiltersBtn" onclick="clearPartsFilters()" style="display:none;">✕ پاک کردن فیلترها</button>
+      </div>
     </div>
     <div class="parts-grid" id="partsProductGrid"></div>
   </div>
@@ -3910,6 +3975,22 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       <button class="parts-add-btn sage" onclick="openBrandModal()">+ Add Brand</button>
     </div>
     <div class="store-grid" id="partsBrandGrid"></div>
+  </div>
+
+  <!-- ═══ PART TYPES ═══ -->
+  <div id="partsSub-parttypes" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openPartTypeModal()">+ Add Part Type</button>
+    </div>
+    <div class="store-grid" id="partsPartTypeGrid"></div>
+  </div>
+
+  <!-- ═══ CATEGORIES ═══ -->
+  <div id="partsSub-categories" class="parts-sub" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openCategoryModal()">+ Add Category</button>
+    </div>
+    <div class="store-grid" id="partsCategoryGrid"></div>
   </div>
 
   <!-- ═══ STORES ═══ -->
@@ -3946,6 +4027,11 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
   <div id="partsSub-cash" class="parts-sub" style="display:none;">
     <div class="cash-stats" id="cashStats"></div>
 
+    <div class="cashbrk-card">
+      <div class="tx-form-title" style="margin-bottom:10px;">Where Cash Balance comes from</div>
+      <div id="cashBreakdownRows"></div>
+    </div>
+
     <div class="tx-form">
       <div class="tx-form-title">🏦 Deposit or Withdraw</div>
       <div class="cash-toggle">
@@ -3965,12 +4051,15 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       </div>
       <div style="margin-bottom:14px;">
         <div class="builder-label">Note <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="cashTxNote" placeholder="e.g. Initial capital / personal withdrawal" dir="auto" style="width:100%;margin:0;"/>
+        <input type="text" class="modal-input" id="cashTxNote" placeholder="مثلاً: سرمایه اولیه یا برداشت شخصی" dir="auto" style="width:100%;margin:0;"/>
       </div>
       <button class="tx-save-btn" onclick="saveCashTx()">Save</button>
     </div>
 
-    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Cash Ledger</div>
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Recent Money Movements <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits, withdrawals, purchases and sales, all in one timeline)</span></div>
+    <div class="money-ledger" id="moneyMovementsList"></div>
+
+    <div class="tx-form-title" style="margin:28px auto 12px;max-width:680px;">Manual Capital Ledger <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits/withdrawals only — editable)</span></div>
     <div class="cash-ledger" id="cashLedgerList"></div>
   </div>
 
@@ -4000,6 +4089,21 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
         <div class="mchart-title">Units Sold by Car Model</div>
         <div class="mchart-sub">Within the selected range</div>
         <div class="mchart-wrap"><canvas id="partsCarModelChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Cumulative Profit Trend</div>
+        <div class="mchart-sub">Running total, month by month — the growth curve of the business</div>
+        <div class="mchart-wrap"><canvas id="partsCumulativeChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Units Sold per Month</div>
+        <div class="mchart-sub">Sales volume, separate from revenue — how much you're actually moving</div>
+        <div class="mchart-wrap"><canvas id="partsUnitsChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Top 5 Products by Units Sold</div>
+        <div class="mchart-sub">Within the selected range</div>
+        <div class="mchart-wrap"><canvas id="partsTopUnitsChart"></canvas></div>
       </div>
     </div>
 
@@ -4041,6 +4145,22 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       <table class="parts-table" id="partsStoreTable"><thead><tr>
         <th>Store</th><th># Purchases</th><th>Total Spend</th>
       </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-glossary">
+      <div class="parts-glossary-title">📖 راهنمای اصطلاحات این داشبورد</div>
+      <dl class="parts-glossary-grid">
+        <div class="parts-glossary-item"><dt>Revenue — درآمد</dt><dd>کل پولی که از فروش‌ها به دست آورده‌ای، قبل از کم کردن هزینه خرید همون قطعات.</dd></div>
+        <div class="parts-glossary-item"><dt>COGS — بهای تمام‌شده کالای فروخته‌شده</dt><dd>هزینه‌ای که برای خرید همون قطعاتی که فروختی، قبلاً پرداخت کرده بودی.</dd></div>
+        <div class="parts-glossary-item"><dt>Gross Profit — سود ناخالص</dt><dd>درآمد منهای COGS؛ یعنی از هر فروش واقعاً چقدر سود کردی.</dd></div>
+        <div class="parts-glossary-item"><dt>Margin — حاشیه سود</dt><dd>سود به‌صورت درصدی از درآمد. هرچی این عدد بالاتر باشه، روی هر فروش سود بیشتری مونده.</dd></div>
+        <div class="parts-glossary-item"><dt>Purchase Spend — هزینه خرید</dt><dd>کل پولی که تا امروز برای خرید قطعات پرداخت کردی — چه فروخته باشی چه هنوز توی انبارت باشه.</dd></div>
+        <div class="parts-glossary-item"><dt>Inventory Value — ارزش موجودی</dt><dd>ارزش قطعاتی که هنوز نفروختی، حساب‌شده به قیمتی که خریدیشون (نه قیمت فروش).</dd></div>
+        <div class="parts-glossary-item"><dt>Cash Balance — موجودی نقدی</dt><dd>پول نقد واقعی بیزنس: سرمایه‌ای که گذاشتی + درآمد فروش‌ها − برداشت‌ها − هزینه خریدها. همون لحظه که یه چیزی می‌فروشی، سودش مستقیم میاد توی همین عدد.</dd></div>
+        <div class="parts-glossary-item"><dt>Business Value — ارزش کل بیزنس</dt><dd>موجودی نقدی + ارزش موجودی انبار. یعنی اگه همین الان همه‌چیز رو نقد کنی، بیزنس چقدر می‌ارزه.</dd></div>
+        <div class="parts-glossary-item"><dt>Low Stock — موجودی کم</dt><dd>قطعاتی که تعدادشون به آستانه‌ی هشدار رسیده و بهتره زودتر دوباره تهیه‌شون کنی.</dd></div>
+        <div class="parts-glossary-item"><dt>Avg Cost — میانگین قیمت تمام‌شده</dt><dd>وقتی یه قطعه رو چند بار با قیمت‌های مختلف خریدی، سیستم قدیمی‌ترین خریدها رو اول حساب می‌کنه (به این روش FIFO می‌گن) تا سود هر فروش درست محاسبه بشه.</dd></div>
+      </dl>
     </div>
   </div>
 
@@ -4404,17 +4524,49 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 .crop-zoom-row .cz-icon{font-size:14px;color:var(--text3);}
 .crop-hint{font-size:11.5px;color:var(--text3);text-align:center;margin:-6px 0 14px;}
 /* Modal stacking: Purchase/Sale sit at the base; Product/Store can open on top of
-   them (e.g. "+ New product…" from inside a purchase); Car Model/Brand can open on
-   top of Product; the crop tool and doc viewer always win, regardless of HTML order. */
+   them (e.g. "+ New product…" from inside a purchase); Car Model/Brand/Part Type/
+   Category can open on top of Product; the crop tool and doc viewer always win,
+   regardless of HTML order. */
 #purchaseModalOverlay,#saleModalOverlay{z-index:9000;}
 #productModalOverlay,#storeModalOverlay{z-index:9500;}
-#carModelModalOverlay,#brandModalOverlay{z-index:9800;}
+#carModelModalOverlay,#brandModalOverlay,#partTypeModalOverlay,#categoryModalOverlay{z-index:9800;}
 #partImgCropOverlay{z-index:99999;}
 #docViewerOverlay{z-index:99997;}
+
+/* Every "add" modal can grow past the viewport once a purchase/sale has several
+   line items, or a product has many fields — scroll the modal body instead of
+   letting the Save/Cancel buttons get pushed off-screen. */
+.overlay .modal{max-height:92vh;overflow-y:auto;}
 
 .doc-chip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--cream3);
   background:var(--cream2);color:var(--text2);cursor:pointer;transition:all .15s;}
 .doc-chip:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
+
+/* ─── Searchable dropdowns ───────────────────────────
+   Every <select> with more than a couple of options gets wrapped into one of
+   these by enhanceSearchSelect() in js_parts.js: the native <select> stays in
+   the DOM (hidden) as the source of truth for all existing code, and this
+   text-input + filtered list sits on top of it. Fixes the native <select>'s
+   broken RTL rendering for Persian text as a side effect. */
+.ss-wrap{position:relative;width:100%;}
+.ss-wrap select.ss-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
+/* The visible control carries .builder-select too (see enhanceSearchSelect in
+   js_parts.js) so it keeps the exact same look as a real <select> — only
+   text-align/cursor are forced here for the RTL search-combobox behavior.
+   The ▾ marks it as a picker, not a plain text field — a native <select>'s
+   arrow disappears once it's replaced by a text input, so we draw our own. */
+.ss-wrap::after{content:'▾';position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--text3);font-size:10px;pointer-events:none;}
+.ss-input{width:100%;box-sizing:border-box;cursor:pointer;text-align:right;padding-left:24px;}
+.ss-dropdown{display:none;position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;
+  border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);
+  max-height:260px;overflow-y:auto;z-index:80;padding:4px;}
+.ss-dropdown.open{display:block;}
+.ss-option{padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--text2);
+  text-align:right;direction:rtl;}
+.ss-option:hover,.ss-option.sel{background:var(--cream2);color:var(--text);}
+.ss-empty{padding:10px;font-size:12px;color:var(--text4);font-style:italic;text-align:center;}
+.tx-item-row .ss-wrap{width:100%;}
 </style>
 <div class="overlay" id="productModalOverlay">
   <div class="modal" style="max-width:480px;">
@@ -4431,8 +4583,11 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Part type</div>
-        <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+        <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Part type</span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openPartTypeModal(null,'product')">+ New</button>
+        </div>
+        <select class="builder-select" id="pfPartType" style="width:100%;margin:0;" onchange="suggestProductName()"></select>
       </div>
       <div>
         <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
@@ -4445,6 +4600,7 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
     <div style="margin-bottom:10px;">
       <div class="builder-label" style="margin-bottom:8px;">Car model <span style="font-weight:400;color:var(--text4);">(tap to select, multiple allowed)</span></div>
       <input type="hidden" id="pfCarModel"/>
+      <input type="text" class="modal-input" id="pfCarModelSearch" placeholder="🔍 جستجوی مدل ماشین..." dir="auto" style="width:100%;margin-bottom:8px;font-size:12px;padding:8px 12px;" oninput="filterCarModelTags(this.value)"/>
       <div class="cm-tagwrap" id="pfCarModelTags"></div>
     </div>
     <div class="pmodal-row">
@@ -4454,18 +4610,20 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
       </div>
       <div>
         <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" style="width:100%;margin:0;"/>
+        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Category <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfCategory" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" list="pfCategoryList"/>
-        <datalist id="pfCategoryList"></datalist>
+        <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Category <span style="font-weight:400;color:var(--text4);">(optional)</span></span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openCategoryModal(null,'product')">+ New</button>
+        </div>
+        <select class="builder-select" id="pfCategory" style="width:100%;margin:0;"></select>
       </div>
       <div>
         <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." style="width:100%;margin:0;"/>
+        <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:10px;">
@@ -4580,6 +4738,38 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeBrandModal()">Cancel</button>
       <button class="btn-ok" onclick="saveBrandModal()">Save Brand</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Part Type modal (managed list, used by the product's part-type picker) -->
+<div class="overlay" id="partTypeModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="partTypeModalTitle">Add Part Type</h3>
+    <input type="hidden" id="partTypeModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="ptfName" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();savePartTypeModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePartTypeModal()">Cancel</button>
+      <button class="btn-ok" onclick="savePartTypeModal()">Save Part Type</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Category modal (managed list, used by the product's category picker) -->
+<div class="overlay" id="categoryModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="categoryModalTitle">Add Category</h3>
+    <input type="hidden" id="categoryModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="ctfName" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCategoryModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeCategoryModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveCategoryModal()">Save Category</button>
     </div>
   </div>
 </div>
@@ -12373,7 +12563,7 @@ function renderJalaliPicker(containerId, hiddenInputId, isoValue, onChange) {
 //  and the shared helpers/classes in js_core.js + head.html.
 // ══════════════════════════════════════════════════════
 
-const PARTS = {products:[],stores:[],car_models:[],brands:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
+const PARTS = {products:[],stores:[],car_models:[],brands:[],part_types:[],categories:[],purchases:[],sales:[],capital_transactions:[],stock:{},avg_cost:{},by_product:{},by_store:{},
   totals:{},low_stock:[],low_stock_threshold:2};
 let partsLoaded = false;
 let partsCurrentSub = 'products';
@@ -12385,6 +12575,9 @@ let editingCashTxId = null;
 let cashTxType = 'deposit';
 let productModalReturnTo = null; // null | 'purchase' | 'sale'
 let brandModalReturnTo = null;   // null | 'product' — where to land a newly-created brand
+let partTypeModalReturnTo = null;// null | 'product'
+let categoryModalReturnTo = null;// null | 'product'
+let carModelTagFilter = '';      // live search filter typed above the car-model tag cloud
 let productImageData = null;     // base64 currently staged in the product modal
 let storeImageData = null;       // base64 currently staged in the store modal
 let purchaseInvoiceImage = null; // null = unchanged, '' = removed, dataURL = newly staged
@@ -12404,6 +12597,9 @@ let partsRevenueChartInstance = null;
 let partsStoreChartInstance = null;
 let partsBrandChartInstance = null;
 let partsCarModelChartInstance = null;
+let partsCumulativeChartInstance = null;
+let partsUnitsChartInstance = null;
+let partsTopUnitsChartInstance = null;
 const QTY_PRESET_VALUES = [1,2,3,4,5,7,10,15,20,30,50];
 
 function fmtT(n){
@@ -12424,10 +12620,96 @@ async function initPartsBiz(){
     renderJalaliPicker('purchaseReceiptDatePicker','purchaseReceiptDateHidden',null,()=>{});
     renderJalaliPicker('saleDatePicker','saleDateHidden',null,()=>{});
     renderJalaliPicker('cashDatePicker','cashDateHidden',null,()=>{});
+    // Every dropdown that can realistically grow past a handful of items gets
+    // turned into a searchable combobox — see enhanceSearchSelect() below.
+    ['partsFilterCarModel','partsFilterBrand','partsFilterPartType','partsFilterCategory',
+     'pfPartType','pfBrand','pfCategory','purchaseStoreSelect','purchaseItemProduct','saleItemProduct']
+      .forEach(id=>enhanceSearchSelect(id));
     partsLoaded = true;
   }
   await fetchParts();
   showPartsSub(partsCurrentSub);
+}
+
+// ─── SEARCHABLE SELECT (fixes native <select> RTL rendering too) ──
+// Wraps an existing, already-populated <select> with a text-input-driven
+// combobox. The original <select> stays in the DOM (visually hidden) as the
+// single source of truth, so every existing call site that reads or writes
+// `.value`, or listens for a `change` event, keeps working untouched — we
+// intercept `.value =` so the visible search box stays in sync automatically.
+function enhanceSearchSelect(selectId){
+  const select = document.getElementById(selectId);
+  if(!select || select._ssEnabled) return;
+  select._ssEnabled = true;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ss-wrap';
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(select);
+  select.classList.add('ss-native');
+  select.tabIndex = -1;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'ss-input builder-select';
+  input.setAttribute('dir','rtl');
+  input.autocomplete = 'off';
+  wrap.appendChild(input);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'ss-dropdown';
+  wrap.appendChild(dropdown);
+
+  const nativeDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  function currentLabel(){
+    const opt = select.options[select.selectedIndex];
+    return opt ? opt.textContent : '';
+  }
+  function sync(){ input.value = currentLabel(); }
+  Object.defineProperty(select, 'value', {
+    get(){ return nativeDesc.get.call(select); },
+    set(v){ nativeDesc.set.call(select, v); sync(); },
+    configurable: true,
+  });
+  select._ssSync = sync;
+
+  function buildList(filter){
+    const f = (filter||'').trim().toLowerCase();
+    const items = Array.from(select.options).filter(o=> !f || o.textContent.toLowerCase().includes(f));
+    dropdown.innerHTML = items.length
+      ? items.map(o=>`<div class="ss-option${o.value===select.value?' sel':''}" data-value="${escHtml(o.value)}">${escHtml(o.textContent)}</div>`).join('')
+      : '<div class="ss-empty">موردی پیدا نشد</div>';
+  }
+  function openDropdown(){
+    buildList(input.value===currentLabel() ? '' : input.value);
+    dropdown.classList.add('open');
+  }
+  function closeDropdown(){ dropdown.classList.remove('open'); }
+  function pick(v){
+    select.value = v; // goes through the defineProperty setter above → syncs input + fires below
+    closeDropdown();
+    select.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  input.addEventListener('focus', ()=>{ input.select(); openDropdown(); });
+  input.addEventListener('input', ()=>{ buildList(input.value); dropdown.classList.add('open'); });
+  input.addEventListener('blur', ()=> setTimeout(()=>{ closeDropdown(); sync(); }, 150));
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){ closeDropdown(); sync(); input.blur(); }
+    else if(e.key==='Enter'){
+      e.preventDefault();
+      const first = dropdown.querySelector('.ss-option');
+      if(first) pick(first.dataset.value);
+    }
+  });
+  dropdown.addEventListener('mousedown', e=>{
+    const item = e.target.closest('.ss-option');
+    if(item) { e.preventDefault(); pick(item.dataset.value); }
+  });
+  sync();
+}
+function ssSync(id){
+  const el = document.getElementById(id);
+  if(el && el._ssSync) el._ssSync();
 }
 
 async function fetchParts(){
@@ -12456,6 +12738,8 @@ function renderPartsAll(){
   renderPartsProducts();
   renderCarModelsGrid();
   renderBrandsGrid();
+  renderPartTypesGrid();
+  renderCategoriesGrid();
   renderStoreGrid();
   renderStoreSelect();
   renderProductSelects();
@@ -12466,7 +12750,9 @@ function renderPartsAll(){
   renderPurchaseTabStats();
   renderSaleTabStats();
   renderCashStats();
+  renderCashBreakdown();
   renderCashLedger();
+  renderMoneyMovements();
   renderPartsHero();
   if(document.getElementById('partsSub-reports').style.display !== 'none') renderReports();
 }
@@ -12515,6 +12801,61 @@ function renderCashStats(){
       <div class="parts-kpi-label">${label}</div>
       <div class="parts-kpi-val" style="color:${color}">${val}</div>
     </div>`).join('');
+}
+// Spells out exactly why Cash Balance is what it is — every sale's revenue
+// (which already carries its profit inside it) flows straight into this
+// number the moment it's recorded, same as every purchase flows straight out.
+function renderCashBreakdown(){
+  const wrap = document.getElementById('cashBreakdownRows');
+  if(!wrap) return;
+  const t = PARTS.totals;
+  const rows = [
+    ['💰','Capital deposited', t.total_deposits||0, 'pos'],
+    ['🏧','Capital withdrawn', -(t.total_withdrawals||0), 'neg'],
+    ['💵','Sales revenue (all time)', t.revenue||0, 'pos'],
+    ['🧾','Purchase spend (all time)', -(t.purchase_spend||0), 'neg'],
+  ];
+  wrap.innerHTML = rows.map(([icon,label,amt])=>`
+    <div class="cashbrk-row">
+      <div class="cashbrk-label">${icon} ${label}</div>
+      <div class="cashbrk-amt ${amt>=0?'pos':'neg'}">${amt>=0?'+':'−'}${fmtT(Math.abs(amt))}</div>
+    </div>`).join('') + `
+    <div class="cashbrk-row total">
+      <div class="cashbrk-label">🏦 = Cash Balance</div>
+      <div class="cashbrk-amt ${(t.cash_balance||0)>=0?'pos':'neg'}">${fmtT(t.cash_balance||0)}</div>
+    </div>`;
+}
+// A single chronological timeline of every deposit, withdrawal, purchase and
+// sale — the full "what happened to my money" picture in one place.
+function renderMoneyMovements(){
+  const wrap = document.getElementById('moneyMovementsList');
+  if(!wrap) return;
+  const events = [];
+  PARTS.capital_transactions.forEach(t=>{
+    events.push({date:t.date, dir: t.type==='deposit'?'in':'out', amount: Number(t.amount)||0,
+      label: t.type==='deposit' ? '💰 Capital deposit' : '🏧 Capital withdrawal', sub: t.note||''});
+  });
+  PARTS.purchases.forEach(p=>{
+    const total = p.items.reduce((s,it)=>s+it.qty*it.unit_price,0);
+    const store = storeById(p.store_id);
+    events.push({date:p.order_date, dir:'out', amount: total,
+      label: '🧾 Purchase — '+(store?store.name:'(deleted store)'),
+      sub: p.items.length+' item'+(p.items.length===1?'':'s')});
+  });
+  PARTS.sales.forEach(s=>{
+    events.push({date:s.date, dir:'in', amount: s.revenue,
+      label: '💵 Sale'+(s.customer_name?' — '+s.customer_name:''),
+      sub: 'profit '+fmtT(s.profit)});
+  });
+  events.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  wrap.innerHTML = events.length ? events.slice(0,80).map(e=>`
+    <div class="money-row ${e.dir}">
+      <div class="money-row-main">
+        <div class="money-row-label">${escHtml(e.label)}</div>
+        <div class="money-row-sub">${jalaliFullLabel(e.date)}${e.sub?' · '+escHtml(e.sub):''}</div>
+      </div>
+      <div class="money-row-amt">${e.dir==='in'?'+':'−'}${fmtT(e.amount)}</div>
+    </div>`).join('') : '<div class="parts-empty"><div class="pe-icon">🏦</div><div class="pe-text">No money movements yet.</div></div>';
 }
 async function saveCashTx(){
   const amount = parseFloat(document.getElementById('cashTxAmount').value);
@@ -12583,7 +12924,7 @@ function renderCashLedger(){
 // ─── SUB-NAV ───────────────────────────────────────
 function showPartsSub(name){
   partsCurrentSub = name;
-  ['products','carmodels','brands','stores','purchase','sales','cash','reports'].forEach(s=>{
+  ['products','carmodels','brands','parttypes','categories','stores','purchase','sales','cash','reports'].forEach(s=>{
     document.getElementById('partsSub-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.parts-subtab').forEach(b=>b.classList.toggle('active', b.dataset.sub===name));
@@ -12632,23 +12973,23 @@ function renderPartsFilters(){
       const o = document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o);
     });
     if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    ssSync(id);
   };
-  // Car model filter is sourced from the managed list (Car Models tab), plus any
-  // legacy values still sitting on old products that were saved before that tab existed.
+  // Car model / brand / part type / category filters are sourced from their
+  // managed lists (their own tabs), plus any legacy free-text values still
+  // sitting on old products saved before those tabs existed.
   const managedNames = PARTS.car_models.map(c=>c.name);
   const legacyNames = PARTS.products.flatMap(p=>productCarModels(p));
   fill('partsFilterCarModel', [...managedNames, ...legacyNames]);
   const managedBrandNames = PARTS.brands.map(b=>b.name);
   const legacyBrandNames = PARTS.products.map(p=>p.brand);
   fill('partsFilterBrand', [...managedBrandNames, ...legacyBrandNames]);
-  fill('partsFilterCategory', PARTS.products.map(p=>p.category));
-  const dl = document.getElementById('pfCategoryList');
-  if(dl){
-    dl.innerHTML = '';
-    [...new Set(PARTS.products.map(p=>p.category).filter(Boolean))].sort().forEach(c=>{
-      const o = document.createElement('option'); o.value=c; dl.appendChild(o);
-    });
-  }
+  const managedPartTypeNames = PARTS.part_types.map(t=>t.name);
+  const legacyPartTypeNames = PARTS.products.map(p=>p.part_type);
+  fill('partsFilterPartType', [...managedPartTypeNames, ...legacyPartTypeNames]);
+  const managedCatNames = PARTS.categories.map(c=>c.name);
+  const legacyCatNames = PARTS.products.map(p=>p.category);
+  fill('partsFilterCategory', [...managedCatNames, ...legacyCatNames]);
 }
 
 function renderPartsProducts(){
@@ -12656,11 +12997,16 @@ function renderPartsProducts(){
   const q = (document.getElementById('partsSearchInput').value||'').trim().toLowerCase();
   const fCar = document.getElementById('partsFilterCarModel').value;
   const fBrand = document.getElementById('partsFilterBrand').value;
+  const fPartType = document.getElementById('partsFilterPartType').value;
   const fCat = document.getElementById('partsFilterCategory').value;
+
+  const clearBtn = document.getElementById('ptClearFiltersBtn');
+  if(clearBtn) clearBtn.style.display = (q||fCar||fBrand||fPartType||fCat) ? 'inline-block' : 'none';
 
   let list = PARTS.products.filter(p=>{
     if(fCar && !productCarModels(p).includes(fCar)) return false;
     if(fBrand && p.brand !== fBrand) return false;
+    if(fPartType && p.part_type !== fPartType) return false;
     if(fCat && p.category !== fCat) return false;
     if(q){
       const hay = [p.name,productCarModels(p).join(' '),p.brand,p.part_type,p.variant,p.oem_code,p.notes].join(' ').toLowerCase();
@@ -12705,6 +13051,14 @@ function renderPartsProducts(){
     grid.appendChild(el);
   });
 }
+function clearPartsFilters(){
+  document.getElementById('partsSearchInput').value = '';
+  document.getElementById('partsFilterCarModel').value = '';
+  document.getElementById('partsFilterBrand').value = '';
+  document.getElementById('partsFilterPartType').value = '';
+  document.getElementById('partsFilterCategory').value = '';
+  renderPartsProducts();
+}
 
 function escHtml(s){
   if(s==null) return '';
@@ -12729,11 +13083,11 @@ function openProductModal(id, returnTo){
 
   if(id){
     const p = productById(id);
-    document.getElementById('pfPartType').value = p.part_type||'';
+    renderPartTypeSelect(p.part_type||'');
     renderBrandSelect(p.brand||'');
     document.getElementById('pfVariant').value = p.variant||'';
     document.getElementById('pfOemCode').value = p.oem_code||'';
-    document.getElementById('pfCategory').value = p.category||'';
+    renderCategorySelect(p.category||'');
     document.getElementById('pfTorob').value = p.torob_link||'';
     document.getElementById('pfName').value = p.name||'';
     document.getElementById('pfNotes').value = p.notes||'';
@@ -12747,12 +13101,16 @@ function openProductModal(id, returnTo){
       preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     }
   } else {
-    ['pfPartType','pfCarModel','pfVariant','pfOemCode','pfCategory','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    ['pfCarModel','pfVariant','pfOemCode','pfTorob','pfName','pfNotes'].forEach(f=>document.getElementById(f).value='');
+    renderPartTypeSelect('');
     renderBrandSelect('');
+    renderCategorySelect('');
     preview.style.display='none'; hintIcon.style.display='block'; hintText.style.display='block'; removeBtn.style.display='none';
     partImgAutoName = '';
     renderCarModelTags([]);
   }
+  document.getElementById('pfCarModelSearch').value = '';
+  filterCarModelTags('');
   document.getElementById('productModalOverlay').classList.add('open');
 }
 
@@ -12769,7 +13127,13 @@ function renderCarModelTags(selected){
     wrap.innerHTML = '<div style="font-size:12px;color:var(--text4);font-style:italic;">No car models yet — add some in the Car Models tab first.</div>';
     return;
   }
-  PARTS.car_models.forEach(cm=>{
+  const f = (carModelTagFilter||'').trim().toLowerCase();
+  const visible = PARTS.car_models.filter(cm=>!f || cm.name.toLowerCase().includes(f));
+  if(!visible.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text4);font-style:italic;">No car models match your search.</div>';
+    return;
+  }
+  visible.forEach(cm=>{
     const active = selectedCarModels.includes(cm.name);
     const b = document.createElement('button');
     b.type = 'button';
@@ -12779,6 +13143,10 @@ function renderCarModelTags(selected){
     wrap.appendChild(b);
   });
   syncCarModelHidden();
+}
+function filterCarModelTags(v){
+  carModelTagFilter = v||'';
+  renderCarModelTags(selectedCarModels);
 }
 function toggleCarModel(m){
   const i = selectedCarModels.indexOf(m);
@@ -12928,6 +13296,163 @@ function renderBrandSelect(selected){
   sel.innerHTML = '<option value="">— no brand —</option>' +
     names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   sel.value = selected || '';
+  ssSync('pfBrand');
+}
+
+// ─── PART TYPES TAB (add / edit / delete, independent of products) ──
+// Same structured-list pattern as Brands / Car Models.
+function renderPartTypesGrid(){
+  const grid = document.getElementById('partsPartTypeGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.part_types.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🔧</div><div class="pe-text">No part types yet — click "+ Add Part Type" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.part_types].sort((a,b)=>a.name.localeCompare(b.name)).forEach(t=>{
+    const usedBy = PARTS.products.filter(p=>p.part_type===t.name).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(t.name)}">🔧</div>
+          <div class="store-card-name">${escHtml(t.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openPartTypeModal('${t.id}')">✎ Edit</button>
+          <button class="del" onclick="deletePartTypeEntry('${t.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openPartTypeModal(id, returnTo){
+  partTypeModalReturnTo = returnTo || null;
+  document.getElementById('partTypeModalId').value = id||'';
+  document.getElementById('partTypeModalTitle').textContent = id ? 'Edit Part Type' : 'Add Part Type';
+  document.getElementById('ptfName').value = id ? (PARTS.part_types.find(t=>t.id===id)||{}).name||'' : '';
+  document.getElementById('partTypeModalOverlay').classList.add('open');
+}
+function closePartTypeModal(){
+  document.getElementById('partTypeModalOverlay').classList.remove('open');
+  partTypeModalReturnTo = null;
+}
+async function savePartTypeModal(){
+  const id = document.getElementById('partTypeModalId').value;
+  const name = document.getElementById('ptfName').value.trim();
+  if(!name){ showToast('Give the part type a name','error'); return; }
+  const dupe = PARTS.part_types.find(t=>t.name.toLowerCase()===name.toLowerCase() && t.id!==id);
+  if(dupe){ showToast('That part type already exists','error'); return; }
+  const prevIds = new Set(PARTS.part_types.map(t=>t.id));
+  const returnTo = partTypeModalReturnTo;
+  if(id){ await postParts('update_part_type', {id, name}); }
+  else { await postParts('add_part_type', {name}); }
+  closePartTypeModal();
+  showToast(id ? 'Part type updated' : 'Part type added','success');
+  if(!id && returnTo==='product'){
+    const newType = PARTS.part_types.find(t=>!prevIds.has(t.id));
+    if(newType){
+      renderPartTypeSelect(newType.name);
+      suggestProductName();
+    }
+  }
+}
+function deletePartTypeEntry(id){
+  const t = PARTS.part_types.find(x=>x.id===id);
+  if(t){
+    const usedBy = PARTS.products.filter(p=>p.part_type===t.name).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${t.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_part_type',{id});
+  showToast('Part type deleted','success');
+}
+function renderPartTypeSelect(selected){
+  const sel = document.getElementById('pfPartType');
+  if(!sel) return;
+  const names = PARTS.part_types.map(t=>t.name);
+  if(selected && !names.includes(selected)) names.unshift(selected);
+  sel.innerHTML = '<option value="">— no part type —</option>' +
+    names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = selected || '';
+  ssSync('pfPartType');
+}
+
+// ─── CATEGORIES TAB (add / edit / delete, independent of products) ──
+function renderCategoriesGrid(){
+  const grid = document.getElementById('partsCategoryGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!PARTS.categories.length){
+    grid.innerHTML = '<div class="parts-empty"><div class="pe-icon">🗂️</div><div class="pe-text">No categories yet — click "+ Add Category" to create your first one.</div></div>';
+    return;
+  }
+  [...PARTS.categories].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
+    const usedBy = PARTS.products.filter(p=>p.category===c.name).length;
+    const el = document.createElement('div');
+    el.className = 'store-card';
+    el.innerHTML = `
+      <div class="store-card-body">
+        <div class="store-card-headrow">
+          <div class="store-avatar" style="background:${hashColor(c.name)}">🗂️</div>
+          <div class="store-card-name">${escHtml(c.name)}</div>
+        </div>
+        <div class="store-card-row"><span class="lbl">🔩</span>${usedBy ? usedBy+' product'+(usedBy===1?'':'s') : 'Not used by any product yet'}</div>
+        <div class="store-card-actions">
+          <button onclick="openCategoryModal('${c.id}')">✎ Edit</button>
+          <button class="del" onclick="deleteCategoryEntry('${c.id}')">🗑 Delete</button>
+        </div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+function openCategoryModal(id, returnTo){
+  categoryModalReturnTo = returnTo || null;
+  document.getElementById('categoryModalId').value = id||'';
+  document.getElementById('categoryModalTitle').textContent = id ? 'Edit Category' : 'Add Category';
+  document.getElementById('ctfName').value = id ? (PARTS.categories.find(c=>c.id===id)||{}).name||'' : '';
+  document.getElementById('categoryModalOverlay').classList.add('open');
+}
+function closeCategoryModal(){
+  document.getElementById('categoryModalOverlay').classList.remove('open');
+  categoryModalReturnTo = null;
+}
+async function saveCategoryModal(){
+  const id = document.getElementById('categoryModalId').value;
+  const name = document.getElementById('ctfName').value.trim();
+  if(!name){ showToast('Give the category a name','error'); return; }
+  const dupe = PARTS.categories.find(c=>c.name.toLowerCase()===name.toLowerCase() && c.id!==id);
+  if(dupe){ showToast('That category already exists','error'); return; }
+  const prevIds = new Set(PARTS.categories.map(c=>c.id));
+  const returnTo = categoryModalReturnTo;
+  if(id){ await postParts('update_category', {id, name}); }
+  else { await postParts('add_category', {name}); }
+  closeCategoryModal();
+  showToast(id ? 'Category updated' : 'Category added','success');
+  if(!id && returnTo==='product'){
+    const newCat = PARTS.categories.find(c=>!prevIds.has(c.id));
+    if(newCat){ renderCategorySelect(newCat.name); }
+  }
+}
+function deleteCategoryEntry(id){
+  const c = PARTS.categories.find(x=>x.id===id);
+  if(c){
+    const usedBy = PARTS.products.filter(p=>p.category===c.name).length;
+    if(usedBy && !confirm(`${usedBy} product${usedBy===1?'':'s'} still use "${c.name}". Delete it from the list anyway? Existing products keep the text but it won't be selectable anymore.`)) return;
+  }
+  postParts('delete_category',{id});
+  showToast('Category deleted','success');
+}
+function renderCategorySelect(selected){
+  const sel = document.getElementById('pfCategory');
+  if(!sel) return;
+  const names = PARTS.categories.map(c=>c.name);
+  if(selected && !names.includes(selected)) names.unshift(selected);
+  sel.innerHTML = '<option value="">— no category —</option>' +
+    names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = selected || '';
+  ssSync('pfCategory');
 }
 function closeProductModal(){
   document.getElementById('productModalOverlay').classList.remove('open');
@@ -13156,6 +13681,7 @@ function renderStoreSelect(){
     ? PARTS.stores.map(s=>`<option value="${s.id}">${escHtml(s.name)}</option>`).join('')
     : '<option value="">— add a store first —</option>';
   if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+  ssSync('purchaseStoreSelect');
 }
 function deleteStore(id){
   postParts('delete_store',{id});
@@ -13218,6 +13744,7 @@ function renderProductSelects(){
   const pSel = document.getElementById('purchaseItemProduct');
   const pCur = pSel.value; pSel.innerHTML = opts;
   if([...pSel.options].some(o=>o.value===pCur)) pSel.value = pCur;
+  ssSync('purchaseItemProduct');
 
   const sSel = document.getElementById('saleItemProduct');
   const sCur = sSel.value;
@@ -13225,6 +13752,7 @@ function renderProductSelects(){
     ? PARTS.products.map(p=>`<option value="${p.id}">${escHtml(productLabel(p))} — ${PARTS.stock[p.id]||0} in stock</option>`).join('')
     : '<option value="">— add a product first —</option>';
   if([...sSel.options].some(o=>o.value===sCur)) sSel.value = sCur;
+  ssSync('saleItemProduct');
   onSaleProductChange();
 }
 
@@ -13676,14 +14204,14 @@ function renderReports(){
     <tr><td>${escHtml(storeById(sid) ? storeById(sid).name : '(deleted store)')}</td><td>${v.count}</td><td>${fmtT(v.spend)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="parts-table-empty">No purchases in this range yet.</td></tr>`;
 
-  renderPartsCharts(filteredSales, filteredPurchases, storeRows);
+  renderPartsCharts(filteredSales, filteredPurchases, storeRows, byProd);
 }
 async function saveLowStockThreshold(){
   const v = parseFloat(document.getElementById('lowStockThresholdInput').value);
   await postParts('set_low_stock_threshold',{value: isNaN(v)?2:v});
 }
 
-function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
+function renderPartsCharts(filteredSales, filteredPurchases, storeRows, byProd){
   const palette = ['#e85d3a','#3a7a5a','#2a6a9a','#d4821a','#7a3a6a','#c44a6a','#5a9a7a','#f07a5c'];
 
   // Revenue / purchase spend / profit by Jalali month — the full money-in vs
@@ -13693,14 +14221,15 @@ function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
     const j = gregToJalali(sale.date);
     if(!j) return;
     const key = j.y+'/'+String(j.m).padStart(2,'0');
-    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0, spend:0});
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name+' '+j.y, revenue:0, profit:0, spend:0, units:0});
     b.revenue += sale.revenue; b.profit += sale.profit;
+    b.units += sale.items.reduce((s,it)=>s+it.qty, 0);
   });
   filteredPurchases.forEach(pur=>{
     const j = gregToJalali(pur.order_date);
     if(!j) return;
     const key = j.y+'/'+String(j.m).padStart(2,'0');
-    const b = byMonth[key] || (byMonth[key]={label:j.month_name ? j.month_name+' '+j.y : key, revenue:0, profit:0, spend:0});
+    const b = byMonth[key] || (byMonth[key]={label:j.month_name ? j.month_name+' '+j.y : key, revenue:0, profit:0, spend:0, units:0});
     b.spend += pur.items.reduce((a,it)=>a+it.qty*it.unit_price,0);
   });
   const monthKeys = Object.keys(byMonth).sort();
@@ -13778,6 +14307,47 @@ function renderPartsCharts(filteredSales, filteredPurchases, storeRows){
   cmBody.innerHTML = cmRows.length ? cmRows.map(([name,v])=>`
     <tr><td>${escHtml(name)}</td><td>${fmtNum(v.qty)}</td><td>${fmtT(v.revenue)}</td></tr>`).join('')
     : `<tr><td colspan="3" class="parts-table-empty">No sales in this range yet.</td></tr>`;
+
+  // Cumulative profit — a running total across the months in range, so the
+  // overall growth trajectory of the business is visible at a glance.
+  let running = 0;
+  const cumulativeData = monthKeys.map(k=>{ running += byMonth[k].profit; return running; });
+  const cumCtx = document.getElementById('partsCumulativeChart');
+  if(partsCumulativeChartInstance) partsCumulativeChartInstance.destroy();
+  partsCumulativeChartInstance = new Chart(cumCtx, {
+    type:'line',
+    data:{ labels: monthKeys.map(k=>byMonth[k].label),
+      datasets:[{ label:'Cumulative Profit', data: cumulativeData, borderColor:'#3a7a5a',
+        backgroundColor:'rgba(58,122,90,0.12)', fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:'#3a7a5a' }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Units sold per month — sales volume as a distinct metric from revenue,
+  // since a month can move a lot of cheap parts or a few expensive ones.
+  const unitsCtx = document.getElementById('partsUnitsChart');
+  if(partsUnitsChartInstance) partsUnitsChartInstance.destroy();
+  partsUnitsChartInstance = new Chart(unitsCtx, {
+    type:'bar',
+    data:{ labels: monthKeys.map(k=>byMonth[k].label),
+      datasets:[{ label:'Units Sold', data: monthKeys.map(k=>byMonth[k].units), backgroundColor:'#2a6a9a' }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{font:{size:10}},beginAtZero:true},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Top 5 products by units sold — complements the "Top Products by Profit"
+  // table with a volume-based view (highest movers aren't always the most profitable).
+  const topUnitsRows = Object.entries(byProd||{}).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5);
+  const topUnitsCtx = document.getElementById('partsTopUnitsChart');
+  if(partsTopUnitsChartInstance) partsTopUnitsChartInstance.destroy();
+  partsTopUnitsChartInstance = new Chart(topUnitsCtx, {
+    type:'bar',
+    data:{ labels: topUnitsRows.map(([pid])=>productLabel(productById(pid))),
+      datasets:[{ label:'Units Sold', data: topUnitsRows.map(([,v])=>v.qty),
+        backgroundColor: topUnitsRows.map((_,i)=>palette[i%palette.length]) }]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:10}},beginAtZero:true},y:{ticks:{font:{size:10}}}}}
+  });
 }
 // ══════════════════════════════════════════════════════
 //  GOALS MODULE  —  js_goals.js

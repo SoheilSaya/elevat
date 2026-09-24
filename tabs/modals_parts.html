@@ -23,17 +23,49 @@
 .crop-zoom-row .cz-icon{font-size:14px;color:var(--text3);}
 .crop-hint{font-size:11.5px;color:var(--text3);text-align:center;margin:-6px 0 14px;}
 /* Modal stacking: Purchase/Sale sit at the base; Product/Store can open on top of
-   them (e.g. "+ New product…" from inside a purchase); Car Model/Brand can open on
-   top of Product; the crop tool and doc viewer always win, regardless of HTML order. */
+   them (e.g. "+ New product…" from inside a purchase); Car Model/Brand/Part Type/
+   Category can open on top of Product; the crop tool and doc viewer always win,
+   regardless of HTML order. */
 #purchaseModalOverlay,#saleModalOverlay{z-index:9000;}
 #productModalOverlay,#storeModalOverlay{z-index:9500;}
-#carModelModalOverlay,#brandModalOverlay{z-index:9800;}
+#carModelModalOverlay,#brandModalOverlay,#partTypeModalOverlay,#categoryModalOverlay{z-index:9800;}
 #partImgCropOverlay{z-index:99999;}
 #docViewerOverlay{z-index:99997;}
+
+/* Every "add" modal can grow past the viewport once a purchase/sale has several
+   line items, or a product has many fields — scroll the modal body instead of
+   letting the Save/Cancel buttons get pushed off-screen. */
+.overlay .modal{max-height:92vh;overflow-y:auto;}
 
 .doc-chip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--cream3);
   background:var(--cream2);color:var(--text2);cursor:pointer;transition:all .15s;}
 .doc-chip:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
+
+/* ─── Searchable dropdowns ───────────────────────────
+   Every <select> with more than a couple of options gets wrapped into one of
+   these by enhanceSearchSelect() in js_parts.js: the native <select> stays in
+   the DOM (hidden) as the source of truth for all existing code, and this
+   text-input + filtered list sits on top of it. Fixes the native <select>'s
+   broken RTL rendering for Persian text as a side effect. */
+.ss-wrap{position:relative;width:100%;}
+.ss-wrap select.ss-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
+/* The visible control carries .builder-select too (see enhanceSearchSelect in
+   js_parts.js) so it keeps the exact same look as a real <select> — only
+   text-align/cursor are forced here for the RTL search-combobox behavior.
+   The ▾ marks it as a picker, not a plain text field — a native <select>'s
+   arrow disappears once it's replaced by a text input, so we draw our own. */
+.ss-wrap::after{content:'▾';position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--text3);font-size:10px;pointer-events:none;}
+.ss-input{width:100%;box-sizing:border-box;cursor:pointer;text-align:right;padding-left:24px;}
+.ss-dropdown{display:none;position:absolute;top:calc(100% + 4px);right:0;left:0;background:#fff;
+  border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);
+  max-height:260px;overflow-y:auto;z-index:80;padding:4px;}
+.ss-dropdown.open{display:block;}
+.ss-option{padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--text2);
+  text-align:right;direction:rtl;}
+.ss-option:hover,.ss-option.sel{background:var(--cream2);color:var(--text);}
+.ss-empty{padding:10px;font-size:12px;color:var(--text4);font-style:italic;text-align:center;}
+.tx-item-row .ss-wrap{width:100%;}
 </style>
 <div class="overlay" id="productModalOverlay">
   <div class="modal" style="max-width:480px;">
@@ -50,8 +82,11 @@
 
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Part type</div>
-        <input type="text" class="modal-input" id="pfPartType" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+        <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Part type</span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openPartTypeModal(null,'product')">+ New</button>
+        </div>
+        <select class="builder-select" id="pfPartType" style="width:100%;margin:0;" onchange="suggestProductName()"></select>
       </div>
       <div>
         <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
@@ -64,6 +99,7 @@
     <div style="margin-bottom:10px;">
       <div class="builder-label" style="margin-bottom:8px;">Car model <span style="font-weight:400;color:var(--text4);">(tap to select, multiple allowed)</span></div>
       <input type="hidden" id="pfCarModel"/>
+      <input type="text" class="modal-input" id="pfCarModelSearch" placeholder="🔍 جستجوی مدل ماشین..." dir="auto" style="width:100%;margin-bottom:8px;font-size:12px;padding:8px 12px;" oninput="filterCarModelTags(this.value)"/>
       <div class="cm-tagwrap" id="pfCarModelTags"></div>
     </div>
     <div class="pmodal-row">
@@ -73,18 +109,20 @@
       </div>
       <div>
         <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" style="width:100%;margin:0;"/>
+        <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Category <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfCategory" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" list="pfCategoryList"/>
-        <datalist id="pfCategoryList"></datalist>
+        <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Category <span style="font-weight:400;color:var(--text4);">(optional)</span></span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openCategoryModal(null,'product')">+ New</button>
+        </div>
+        <select class="builder-select" id="pfCategory" style="width:100%;margin:0;"></select>
       </div>
       <div>
         <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." style="width:100%;margin:0;"/>
+        <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:10px;">
@@ -199,6 +237,38 @@
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeBrandModal()">Cancel</button>
       <button class="btn-ok" onclick="saveBrandModal()">Save Brand</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Part Type modal (managed list, used by the product's part-type picker) -->
+<div class="overlay" id="partTypeModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="partTypeModalTitle">Add Part Type</h3>
+    <input type="hidden" id="partTypeModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="ptfName" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();savePartTypeModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePartTypeModal()">Cancel</button>
+      <button class="btn-ok" onclick="savePartTypeModal()">Save Part Type</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parts Biz: Category modal (managed list, used by the product's category picker) -->
+<div class="overlay" id="categoryModalOverlay">
+  <div class="modal" style="max-width:380px;">
+    <h3 id="categoryModalTitle">Add Category</h3>
+    <input type="hidden" id="categoryModalId"/>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">Name</div>
+      <input type="text" class="modal-input" id="ctfName" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCategoryModal();}"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeCategoryModal()">Cancel</button>
+      <button class="btn-ok" onclick="saveCategoryModal()">Save Category</button>
     </div>
   </div>
 </div>

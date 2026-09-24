@@ -1917,7 +1917,8 @@ def car_api():
 PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
 
 def _parts_defaults():
-    return {"products": [], "stores": [], "car_models": [], "brands": [], "purchases": [], "sales": [], "capital_transactions": [],
+    return {"products": [], "stores": [], "car_models": [], "brands": [], "part_types": [], "categories": [],
+            "purchases": [], "sales": [], "capital_transactions": [],
             "low_stock_threshold": 2, "unit_migrated_v1": True}
 
 def load_parts():
@@ -1930,6 +1931,8 @@ def load_parts():
         d.setdefault("stores", [])
         d.setdefault("car_models", [])
         d.setdefault("brands", [])
+        d.setdefault("part_types", [])
+        d.setdefault("categories", [])
         d.setdefault("purchases", [])
         d.setdefault("sales", [])
         d.setdefault("capital_transactions", [])
@@ -1967,6 +1970,29 @@ def load_parts():
                     seen.add(name.lower())
                     d["brands"].append({"id": _new_id(), "name": name, "created_at": str(date.today())})
             d["brands_migrated_v1"] = True
+            save_parts(d)
+
+        # ── Same one-time backfill for Part Type and Category, which used to
+        # be free-typed text fields too and are now managed lists.
+        if not d.get("part_types_migrated_v1"):
+            existing_names = {t.get("name", "").strip().lower() for t in d["part_types"]}
+            seen = set()
+            for p in d["products"]:
+                name = (p.get("part_type") or "").strip()
+                if name and name.lower() not in existing_names and name.lower() not in seen:
+                    seen.add(name.lower())
+                    d["part_types"].append({"id": _new_id(), "name": name, "created_at": str(date.today())})
+            d["part_types_migrated_v1"] = True
+            save_parts(d)
+        if not d.get("categories_migrated_v1"):
+            existing_names = {c.get("name", "").strip().lower() for c in d["categories"]}
+            seen = set()
+            for p in d["products"]:
+                name = (p.get("category") or "").strip()
+                if name and name.lower() not in existing_names and name.lower() not in seen:
+                    seen.add(name.lower())
+                    d["categories"].append({"id": _new_id(), "name": name, "created_at": str(date.today())})
+            d["categories_migrated_v1"] = True
             save_parts(d)
         return d
     except (json.JSONDecodeError, ValueError):
@@ -2154,6 +2180,8 @@ def parts_api():
             "stores": data["stores"],
             "car_models": data["car_models"],
             "brands": data["brands"],
+            "part_types": data["part_types"],
+            "categories": data["categories"],
             "purchases": data["purchases"],
             "sales": analytics["sales"],
             "capital_transactions": data["capital_transactions"],
@@ -2258,6 +2286,40 @@ def parts_api():
         bid = body.get("id")
         data["brands"] = [b for b in data["brands"] if b["id"] != bid]
 
+    # ── PART TYPES (managed list, used by the product's part-type picker) ──
+    elif action == "add_part_type":
+        data["part_types"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_part_type":
+        for t in data["part_types"]:
+            if t["id"] == body.get("id"):
+                if "name" in body:
+                    t["name"] = (body.get("name") or "").strip()
+                break
+    elif action == "delete_part_type":
+        tid = body.get("id")
+        data["part_types"] = [t for t in data["part_types"] if t["id"] != tid]
+
+    # ── CATEGORIES (managed list, used by the product's category picker) ──
+    elif action == "add_category":
+        data["categories"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_category":
+        for c in data["categories"]:
+            if c["id"] == body.get("id"):
+                if "name" in body:
+                    c["name"] = (body.get("name") or "").strip()
+                break
+    elif action == "delete_category":
+        cid = body.get("id")
+        data["categories"] = [c for c in data["categories"] if c["id"] != cid]
+
     # ── PURCHASES (one store visit, many line items) ──
     elif action == "add_purchase":
         items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
@@ -2360,6 +2422,8 @@ def parts_api():
         "stores": data["stores"],
         "car_models": data["car_models"],
         "brands": data["brands"],
+        "part_types": data["part_types"],
+        "categories": data["categories"],
         "purchases": data["purchases"],
         "sales": analytics["sales"],
         "capital_transactions": data["capital_transactions"],
