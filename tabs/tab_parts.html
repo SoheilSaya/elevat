@@ -2,21 +2,44 @@
 <div id="parts-view" style="display:none;">
 <div class="parts-container">
 <style>
-.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:50px;padding:5px;border:1.5px solid var(--warm);
-  margin-bottom:20px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%;}
-.parts-subnav::-webkit-scrollbar{display:none;}
-.parts-subtab{padding:8px 15px;border-radius:50px;border:none;background:transparent;font-family:'Bricolage Grotesque',sans-serif;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+.parts-container{font-family:'Vazirmatn',Tahoma,'Segoe UI',sans-serif;}
+.parts-subnav{display:flex;gap:6px;background:var(--cream2);border-radius:20px;padding:8px;border:1.5px solid var(--warm);
+  margin-bottom:20px;flex-wrap:wrap;max-width:100%;}
+.parts-subtab{padding:8px 15px;border-radius:50px;border:none;background:transparent;font-family:'Vazirmatn','Bricolage Grotesque',sans-serif;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
 .parts-subtab.active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
 .parts-sub{animation:fadeUp .3s ease both;}
+.parts-subnav-group{position:relative;}
+.parts-subtab.group-btn.has-active{background:#fff;color:var(--text);box-shadow:var(--shadow);font-weight:600;}
+.subnav-caret{font-size:9px;margin-right:2px;opacity:.7;transition:transform .18s;display:inline-block;}
+.parts-subnav-group:hover .subnav-caret{transform:rotate(180deg);}
+.subnav-dropdown{display:flex;flex-direction:column;gap:2px;position:absolute;top:calc(100% + 8px);inset-inline-start:0;
+  background:#fff;border:1.5px solid var(--warm);border-radius:14px;box-shadow:0 10px 30px rgba(40,25,15,.16);padding:7px;min-width:200px;z-index:80;
+  opacity:0;visibility:hidden;transform:translateY(-8px) scale(.96);pointer-events:none;
+  transition:opacity .2s cubic-bezier(.2,.8,.3,1),transform .2s cubic-bezier(.2,.8,.3,1),visibility .2s;}
+/* Opens on hover (desktop) via pure CSS, AND on click via the .open class
+   JS adds (needed for touch devices, where :hover never fires). A small
+   invisible bridge (::before) keeps it open while the mouse travels from
+   the button down into the menu, so it doesn't snap shut mid-move. */
+.parts-subnav-group::before{content:'';position:absolute;top:100%;inset-inline-start:0;width:100%;height:8px;}
+.parts-subnav-group:hover .subnav-dropdown,.subnav-dropdown.open{opacity:1;visibility:visible;transform:translateY(0) scale(1);pointer-events:auto;}
+.subnav-dropdown button{text-align:right;padding:10px 13px;border:none;background:transparent;border-radius:10px;
+  font-family:'Vazirmatn',sans-serif;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
+.subnav-dropdown button:hover{background:var(--cream2);color:var(--ink);}
+.subnav-dropdown button.active{background:var(--sageL);color:var(--sage);}
 
 .parts-toolbar{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:18px 20px 16px;box-shadow:var(--shadow);margin-bottom:20px;}
 .parts-toolbar-top{display:flex;gap:12px;align-items:center;margin-bottom:16px;}
 .parts-toolbar-top .modal-input{flex:1;min-width:0;height:46px;box-sizing:border-box;font-size:14px;margin:0;width:auto;}
 .parts-toolbar-top .parts-add-btn{height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;flex-shrink:0;margin-left:0;}
+.parts-toolbar-top .parts-header-btn{height:46px;box-sizing:border-box;flex-shrink:0;}
 .parts-toolbar-filters{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;}
 .pt-filter{display:flex;flex-direction:column;gap:5px;}
 .pt-filter-label{font-size:11px;font-weight:700;color:var(--text3);padding:0 2px;}
 .pt-filter .builder-select{width:160px;}
+.ss-option{display:flex;align-items:center;gap:10px;padding-top:8px!important;padding-bottom:8px!important;}
+.ss-thumb{width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--cream2);border:1px solid var(--cream3);}
+.ss-thumb-icon{display:flex;align-items:center;justify-content:center;font-size:19px;}
 .pt-filter .ss-wrap{height:40px;width:160px;}
 .pt-filter .ss-wrap .ss-input{height:100%;box-sizing:border-box;}
 .pt-clear-filters{font-size:12px;font-weight:600;color:var(--coral);background:none;border:none;cursor:pointer;
@@ -25,6 +48,7 @@
 @media(max-width:760px){
   .parts-toolbar-top{flex-direction:column;align-items:stretch;}
   .parts-toolbar-top .parts-add-btn{width:100%;}
+  .parts-toolbar-top .parts-header-btn{width:100%;}
   .pt-filter{flex:1 1 140px;}
   .pt-filter .builder-select,.pt-filter .ss-wrap{width:100%;}
 }
@@ -34,7 +58,10 @@
 .parts-add-btn.sage:hover{background:var(--sage2);}
 
 .parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:24px;}
-.part-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column;animation:fadeUp .3s ease both;}
+.part-card{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column;animation:fadeUp .3s ease both;position:relative;}
+.part-card-select{position:absolute;top:8px;left:8px;z-index:5;width:19px;height:19px;cursor:pointer;accent-color:var(--sage);}
+.bulk-bar{display:flex;align-items:center;gap:10px;background:var(--plumL,#f1e8f5);border:1.5px solid var(--plum);border-radius:var(--r2);padding:10px 14px;margin-bottom:14px;flex-wrap:wrap;}
+.bulk-bar .count{font-weight:800;color:var(--plum);font-size:13px;}
 .part-card:hover{border-color:var(--warmD);transform:translateY(-2px);}
 .part-card-img{width:100%;aspect-ratio:1/1;height:auto;background:var(--cream2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:34px;color:var(--text4);flex-shrink:0;}
 .part-card-img img{width:100%;height:100%;object-fit:cover;}
@@ -49,6 +76,11 @@
 .part-card-stock.low{color:var(--amber);background:var(--amberL);}
 .part-card-stock.out{color:var(--text3);background:var(--cream2);}
 .part-card-cost{font-size:10.5px;color:var(--text3);margin-top:1px;font-family:'JetBrains Mono',monospace;}
+.pricing-calc-block{margin-top:8px;padding:8px 10px;background:var(--cream2);border-radius:var(--r2);border:1.5px dashed var(--warm);}
+.pricing-calc-block.infeasible{color:var(--coral);font-size:11px;font-weight:600;text-align:right;direction:rtl;}
+.pricing-calc-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:var(--text2);}
+.pricing-calc-price{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--sage);}
+.pricing-calc-sub{font-size:10px;color:var(--text3);margin-top:3px;line-height:1.6;direction:rtl;text-align:right;}
 .part-card-actions{display:flex;gap:6px;padding:10px 14px;border-top:1.5px solid var(--cream2);}
 .part-card-actions button{flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--cream3);background:var(--cream2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;}
 .part-card-actions button:hover{border-color:var(--coral2);color:var(--coral);background:#fff;}
@@ -75,13 +107,24 @@
 
 .tx-form{background:#fff;border:1.5px solid var(--warm);border-radius:var(--r);padding:22px;box-shadow:var(--shadow);margin:0 auto 24px;max-width:680px;}
 .tx-form-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;margin-bottom:16px;}
+.pe-form-desc{font-size:12.5px;color:var(--text3);margin:-10px 0 16px;line-height:1.7;direction:rtl;text-align:right;}
 .tx-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 .tx-row.three{grid-template-columns:1fr 1fr 1fr;}
 .tx-samedaywrap{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);margin-bottom:14px;cursor:pointer;user-select:none;}
 .tx-samedaywrap input{width:16px;height:16px;accent-color:var(--sage);cursor:pointer;}
 .tx-item-builder{background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);padding:14px;margin-bottom:14px;}
 .tx-item-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;}
+.tx-item-row.with-discount{grid-template-columns:2fr 1fr 1fr 1fr auto;}
 .tx-item-row .builder-select,.tx-item-row .modal-input{margin:0;width:100%;}
+/* Product picker gets its own full-width row; qty/price/discount/add sit on
+   the row below — the dropdown is where the long names and stock counts
+   live, so it needs the room, not a squeezed 1fr column. */
+.tx-item-row-v2{display:flex;flex-direction:column;gap:10px;}
+.tx-item-row-product .builder-select{width:100%;margin:0;}
+.tx-item-row-fields{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;}
+.tx-item-row-fields.no-discount{grid-template-columns:1fr 1fr auto;}
+.tx-item-row-fields .modal-input{margin:0;width:100%;}
+@media(max-width:640px){.tx-item-row-fields,.tx-item-row-fields.no-discount{grid-template-columns:1fr 1fr;}.tx-item-row-fields .tx-additem-btn{grid-column:1/-1;}}
 .tx-additem-btn{padding:10px 16px;border-radius:var(--r2);border:none;background:var(--sage);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;height:41px;}
 .tx-additem-btn:hover{background:var(--sage2);}
 .tx-cart{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
@@ -93,6 +136,53 @@
 .tx-cart-del{width:24px;height:24px;border:none;background:transparent;color:var(--text4);cursor:pointer;font-size:16px;border-radius:5px;flex-shrink:0;}
 .tx-cart-del:hover{background:var(--coralL);color:var(--coral);}
 .tx-cart-empty{color:var(--text4);font-size:12px;font-style:italic;padding:10px 2px;}
+.cheapest-row td{background:var(--sageL);font-weight:700;}
+.icon-btn-sm{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;
+  border:1.5px solid var(--cream3);background:var(--cream2);font-size:13px;cursor:pointer;color:var(--text2);
+  transition:all .15s;padding:0;line-height:1;}
+.icon-btn-sm:hover{background:#fff;border-color:var(--sage);color:var(--ink);}
+.icon-btn-sm.del:hover{background:var(--coralL);border-color:var(--coral);color:var(--coral);}
+.pay-badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.pay-badge.pay-paid{background:var(--sageL);color:var(--sage);}
+.pay-badge.pay-partial{background:#fff3d6;color:#d4821a;}
+.pay-badge.pay-unpaid{background:var(--coralL);color:var(--coral);}
+#invoicePrintArea{direction:rtl;text-align:right;}
+.inv-header{text-align:center;margin-bottom:18px;}
+.inv-logo{max-width:150px;max-height:150px;margin-bottom:10px;object-fit:contain;}
+.inv-biz-name{font-family:'Vazirmatn','Fraunces',serif;font-weight:700;font-size:22px;color:var(--ink);}
+.inv-biz-meta{font-size:12px;color:var(--text3);margin-top:3px;}
+.inv-meta-row{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--text2);border-top:1.5px solid var(--cream3);border-bottom:1.5px solid var(--cream3);padding:9px 2px;margin-bottom:12px;}
+.inv-customer{font-size:13px;color:var(--text2);margin-bottom:14px;background:var(--cream2);border-radius:var(--r2);padding:8px 12px;}
+.inv-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12.5px;margin-bottom:16px;}
+.inv-table th{background:var(--cream2);padding:9px 6px;text-align:center;font-weight:700;border-bottom:1.5px solid var(--cream3);}
+.inv-table td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--cream3);vertical-align:middle;}
+.inv-table td.inv-td-desc{text-align:right;}
+.inv-table td:nth-child(4),.inv-table td:nth-child(5){font-family:'JetBrains Mono',monospace;}
+.inv-totals{width:100%;max-width:320px;margin-right:0;margin-left:auto;display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--text2);}
+.inv-total-row{display:flex;justify-content:space-between;align-items:center;}
+.inv-total-row span:last-child{font-family:'JetBrains Mono',monospace;}
+.inv-grand{font-weight:800;font-size:17px;color:var(--ink);border-top:1.5px solid var(--cream3);padding-top:9px;margin-top:5px;}
+.inv-delivery{margin-top:12px;font-size:12.5px;color:var(--text2);text-align:center;}
+.inv-note,.inv-footer{margin-top:14px;font-size:12px;color:var(--text3);text-align:center;}
+/* Classic theme (default): warm cream accents, serif business name */
+.inv-theme-classic .inv-header{border-bottom:3px double var(--cream3);padding-bottom:14px;}
+.inv-theme-classic .inv-table th{background:var(--cream3);}
+.inv-theme-classic .inv-grand{background:var(--cream2);border-radius:var(--r2);padding:9px 12px;border-top:none;}
+/* Minimal theme: flat black-on-white, no fills, tighter lines — closer to a plain SAP-style print */
+.inv-theme-minimal{font-family:'Vazirmatn',Tahoma,sans-serif;}
+.inv-theme-minimal .inv-header{border-bottom:1px solid #000;padding-bottom:10px;}
+.inv-theme-minimal .inv-biz-name{font-family:'Vazirmatn',sans-serif;color:#000;}
+.inv-theme-minimal .inv-meta-row{border-color:#000;color:#000;}
+.inv-theme-minimal .inv-table{border:1px solid #000;}
+.inv-theme-minimal .inv-table th{background:#fff;border-bottom:1px solid #000;color:#000;}
+.inv-theme-minimal .inv-table td{border-bottom:1px solid #ddd;color:#000;}
+.inv-theme-minimal .inv-customer{background:#fff;border:1px solid #ddd;}
+.inv-theme-minimal .inv-grand{border-top:1px solid #000;color:#000;}
+@media print{
+  body *{visibility:hidden;}
+  #invoicePrintArea,#invoicePrintArea *{visibility:visible;}
+  #invoicePrintArea{position:absolute;top:0;left:0;width:100%;padding:20px;}
+}
 .tx-total-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--sageL);border-radius:var(--r2);margin-bottom:16px;}
 .tx-total-row .lbl{font-size:13px;font-weight:600;color:var(--sage);}
 .tx-total-row .val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--sage);}
@@ -121,7 +211,10 @@
 .parts-tab-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;}
 .parts-tab-header .parts-kpis.compact{flex:1;margin-bottom:0;max-width:none;}
 .parts-tab-header .parts-add-btn{margin-left:0;flex-shrink:0;margin-top:2px;}
-@media(max-width:700px){.parts-tab-header{flex-direction:column;}.parts-tab-header .parts-add-btn{width:100%;}}
+.parts-tab-header-actions{display:flex;gap:8px;flex-shrink:0;margin-top:2px;flex-wrap:wrap;}
+.parts-header-btn{padding:10px 18px;border-radius:50px;border:1.5px solid var(--cream3);background:#fff;color:var(--text2);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.parts-header-btn:hover{background:var(--cream2);border-color:var(--sage);color:var(--ink);}
+@media(max-width:700px){.parts-tab-header{flex-direction:column;}.parts-tab-header .parts-add-btn{width:100%;}.parts-tab-header-actions{width:100%;}.parts-tab-header-actions .parts-header-btn{flex:1;}}
 .parts-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
 .parts-range-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
 .parts-range-chip{padding:7px 16px;border-radius:50px;border:1.5px solid var(--cream3);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;}
@@ -142,6 +235,8 @@
 .cash-toggle button{flex:1;padding:12px;border-radius:var(--r2);border:1.5px solid var(--cream3);background:var(--cream2);font-weight:700;font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s;}
 .cash-toggle button.active.deposit{background:var(--sageL);border-color:var(--sage);color:var(--sage);}
 .cash-toggle button.active.withdrawal{background:var(--coralL);border-color:var(--coral);color:var(--coral);}
+.cash-toggle button.active.partial{background:#fff3d6;border-color:#d4821a;color:#d4821a;}
+.cash-toggle button.active:not(.deposit):not(.withdrawal):not(.partial){background:var(--cream3);border-color:var(--text3);color:var(--ink);}
 .cash-ledger{display:flex;flex-direction:column;gap:8px;max-width:680px;margin:0 auto;}
 .cash-ledger-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;border:1.5px solid var(--warm);border-radius:var(--r2);box-shadow:var(--shadow);animation:fadeUp .3s ease both;}
 .cash-ledger-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
@@ -200,11 +295,13 @@
 .parts-hero-text{flex:1;min-width:180px;position:relative;z-index:1;}
 .parts-hero-title{font-family:'Fraunces',serif;font-size:22px;font-weight:700;letter-spacing:-.3px;}
 .parts-hero-sub{font-size:12.5px;color:rgba(255,255,255,.55);margin-top:4px;}
-.parts-hero-stats{display:flex;gap:26px;position:relative;z-index:1;flex-wrap:wrap;}
-.phs-item{text-align:center;min-width:78px;}
-.phs-val{font-family:'Fraunces',serif;font-size:21px;font-weight:800;color:var(--coral2);}
-.phs-lbl{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
-@media(max-width:700px){.parts-hero{flex-direction:column;align-items:flex-start;}.parts-hero-stats{width:100%;justify-content:space-between;gap:10px;}}
+.parts-hero-stats{display:flex;position:relative;z-index:1;flex-wrap:wrap;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:6px 4px;}
+.phs-item{text-align:center;min-width:110px;padding:8px 18px;position:relative;transition:background .15s;border-radius:10px;}
+.phs-item:hover{background:rgba(255,255,255,.06);}
+.phs-item:not(:first-child)::before{content:'';position:absolute;right:100%;top:50%;transform:translateY(-50%);width:1px;height:26px;background:rgba(255,255,255,.1);}
+.phs-val{font-family:'Fraunces',serif;font-size:22px;font-weight:800;color:var(--coral2);direction:ltr;display:block;}
+.phs-lbl{font-size:10.5px;color:rgba(255,255,255,.55);letter-spacing:.02em;margin-top:3px;direction:rtl;}
+@media(max-width:700px){.parts-hero{flex-direction:column;align-items:flex-start;}.parts-hero-stats{width:100%;justify-content:space-between;gap:2px;}.phs-item{min-width:0;flex:1;padding:8px 6px;}}
 
 .parts-cat-stripe{height:4px;width:100%;flex-shrink:0;}
 .store-avatar{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
@@ -219,34 +316,81 @@
 .parts-kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;margin-bottom:4px;}
 .parts-kpi-val{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:var(--text);}
 
-@media(max-width:900px){.tx-row,.tx-row.three{grid-template-columns:1fr;}.tx-item-row{grid-template-columns:1fr;}.parts-kpis{grid-template-columns:1fr 1fr;}.parts-charts{grid-template-columns:1fr;}}
+@media(max-width:900px){.tx-row,.tx-row.three{grid-template-columns:1fr;}.tx-item-row,.tx-item-row.with-discount{grid-template-columns:1fr;}.parts-kpis{grid-template-columns:1fr 1fr;}.parts-charts{grid-template-columns:1fr;}}
 </style>
 
   <div class="parts-hero">
     <div class="parts-hero-icon">🔧</div>
     <div class="parts-hero-text">
-      <div class="parts-hero-title">Parts Biz</div>
-      <div class="parts-hero-sub">Buy from Torob, stock the shop, sell alongside every repair.</div>
+      <div class="parts-hero-title" dir="auto">مدیریت یدکی‌فروشی</div>
+      <div class="parts-hero-sub" dir="auto">خرید از تامین‌کننده‌ها، مدیریت موجودی، و فروش کنار هر تعمیر.</div>
     </div>
     <div class="parts-hero-stats">
-      <div class="phs-item"><div class="phs-val" id="heroCashVal">—</div><div class="phs-lbl">Cash balance</div></div>
-      <div class="phs-item"><div class="phs-val" id="heroValueVal">—</div><div class="phs-lbl">Inventory value</div></div>
-      <div class="phs-item"><div class="phs-val" id="heroBizVal">—</div><div class="phs-lbl">Total business value</div></div>
-      <div class="phs-item"><div class="phs-val" id="heroProfitVal">—</div><div class="phs-lbl">Profit, 30d</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroCashVal">—</div><div class="phs-lbl">موجودی نقدی</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroValueVal">—</div><div class="phs-lbl">ارزش موجودی انبار</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroBizVal">—</div><div class="phs-lbl">ارزش کل کسب‌وکار</div></div>
+      <div class="phs-item"><div class="phs-val" id="heroProfitVal">—</div><div class="phs-lbl">سود ۳۰ روز اخیر</div></div>
     </div>
   </div>
 
   <div class="parts-subnav">
-    <button class="parts-subtab active" data-sub="products" onclick="showPartsSub('products')">📦 Products</button>
-    <button class="parts-subtab" data-sub="carmodels" onclick="showPartsSub('carmodels')">🚗 Car Models</button>
-    <button class="parts-subtab" data-sub="brands" onclick="showPartsSub('brands')">🏷️ Brands</button>
-    <button class="parts-subtab" data-sub="parttypes" onclick="showPartsSub('parttypes')">🔧 Part Types</button>
-    <button class="parts-subtab" data-sub="categories" onclick="showPartsSub('categories')">🗂️ Categories</button>
-    <button class="parts-subtab" data-sub="stores" onclick="showPartsSub('stores')">🏬 Stores</button>
-    <button class="parts-subtab" data-sub="purchase" onclick="showPartsSub('purchase')">🧾 Purchases</button>
-    <button class="parts-subtab" data-sub="sales" onclick="showPartsSub('sales')">💵 Sales</button>
-    <button class="parts-subtab" data-sub="cash" onclick="showPartsSub('cash')">🏦 Cash</button>
-    <button class="parts-subtab" data-sub="reports" onclick="showPartsSub('reports')">📊 Reports</button>
+    <button class="parts-subtab active" data-sub="products" onclick="pickSubnavItem('products')">📦 محصولات</button>
+
+    <div class="parts-subnav-group" data-group="catalog">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('catalog', event)">📂 تعاریف پایه <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-catalog">
+        <button data-sub="carmodels" onclick="pickSubnavItem('carmodels')">🚗 Car Models</button>
+        <button data-sub="brands" onclick="pickSubnavItem('brands')">🏷️ Brands</button>
+        <button data-sub="parttypes" onclick="pickSubnavItem('parttypes')">🔧 Part Types</button>
+        <button data-sub="categories" onclick="pickSubnavItem('categories')">🗂️ Categories</button>
+        <button data-sub="genericitems" onclick="pickSubnavItem('genericitems')">🏷️ Generic Items</button>
+      </div>
+    </div>
+
+    <div class="parts-subnav-group" data-group="parties">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('parties', event)">🤝 طرف‌حساب‌ها <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-parties">
+        <button data-sub="stores" onclick="pickSubnavItem('stores')">🏬 تامین‌کنندگان</button>
+        <button data-sub="agents" onclick="pickSubnavItem('agents')">🧑‍💼 نمایندگان فروش</button>
+        <button data-sub="customers" onclick="pickSubnavItem('customers')">👥 باشگاه مشتریان</button>
+      </div>
+    </div>
+
+    <div class="parts-subnav-group" data-group="buying">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('buying', event)">🛒 خرید <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-buying">
+        <button data-sub="pricelists" onclick="pickSubnavItem('pricelists')">📋 Price Lists</button>
+        <button data-sub="compare" onclick="pickSubnavItem('compare')">⚖️ Compare & Cart</button>
+        <button data-sub="purchase" onclick="pickSubnavItem('purchase')">🧾 Purchases</button>
+      </div>
+    </div>
+
+    <div class="parts-subnav-group" data-group="selling">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('selling', event)">💵 فروش <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-selling">
+        <button data-sub="quotes" onclick="pickSubnavItem('quotes')">📝 پیش‌فاکتور</button>
+        <button data-sub="sales" onclick="pickSubnavItem('sales')">💵 Sales</button>
+        <button data-sub="returns" onclick="pickSubnavItem('returns')">↩️ مرجوعی</button>
+      </div>
+    </div>
+
+    <div class="parts-subnav-group" data-group="finance">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('finance', event)">💰 مالی <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-finance">
+        <button data-sub="expenses" onclick="pickSubnavItem('expenses')">💸 Expenses</button>
+        <button data-sub="cash" onclick="pickSubnavItem('cash')">🏦 Cash</button>
+        <button data-sub="ledger" onclick="pickSubnavItem('ledger')">💳 گردش حساب</button>
+      </div>
+    </div>
+
+    <div class="parts-subnav-group" data-group="analysis">
+      <button class="parts-subtab group-btn" onclick="toggleSubnavGroup('analysis', event)">📊 تحلیل و تنظیمات <span class="subnav-caret">▾</span></button>
+      <div class="subnav-dropdown" id="subnavDropdown-analysis">
+        <button data-sub="variables" onclick="pickSubnavItem('variables')">🎛️ متغیرها</button>
+        <button data-sub="reportbuilder" onclick="pickSubnavItem('reportbuilder')">📈 گزارش‌ساز</button>
+        <button data-sub="reports" onclick="pickSubnavItem('reports')">📊 Reports</button>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ PRODUCTS ═══ -->
@@ -254,6 +398,7 @@
     <div class="parts-toolbar">
       <div class="parts-toolbar-top">
         <input type="text" class="modal-input" id="partsSearchInput" placeholder="🔍 جستجو: اسم، مدل ماشین، برند، کد..." dir="auto" oninput="renderPartsProducts()"/>
+        <button class="parts-header-btn" onclick="openPricingSettingsModal()">⚙️ تنظیمات قیمت‌گذاری</button>
         <button class="parts-add-btn" onclick="openProductModal()">+ افزودن محصول</button>
       </div>
       <div class="parts-toolbar-filters">
@@ -276,13 +421,19 @@
         <button class="pt-clear-filters" id="ptClearFiltersBtn" onclick="clearPartsFilters()" style="display:none;">✕ پاک کردن فیلترها</button>
       </div>
     </div>
+    <div class="bulk-bar" id="bulkBar" style="display:none;">
+      <span class="count"><span id="bulkCount">0</span> کالا انتخاب شده</span>
+      <button class="parts-header-btn" onclick="selectAllVisibleProducts()">انتخاب همه (فیلتر فعلی)</button>
+      <button class="parts-header-btn" onclick="clearBulkSelection()">لغو انتخاب</button>
+      <button class="parts-add-btn sage" style="margin:0;" onclick="openBulkEditModal()">✏️ ویرایش گروهی</button>
+    </div>
     <div class="parts-grid" id="partsProductGrid"></div>
   </div>
 
   <!-- ═══ CAR MODELS ═══ -->
   <div id="partsSub-carmodels" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="parts-add-btn sage" onclick="openCarModelModal()">+ Add Car Model</button>
+      <button class="parts-add-btn sage" onclick="openCarModelModal()">+ افزودن مدل خودرو</button>
     </div>
     <div class="store-grid" id="partsCarModelGrid"></div>
   </div>
@@ -291,7 +442,7 @@
   <!-- ═══ BRANDS ═══ -->
   <div id="partsSub-brands" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="parts-add-btn sage" onclick="openBrandModal()">+ Add Brand</button>
+      <button class="parts-add-btn sage" onclick="openBrandModal()">+ افزودن برند</button>
     </div>
     <div class="store-grid" id="partsBrandGrid"></div>
   </div>
@@ -299,7 +450,7 @@
   <!-- ═══ PART TYPES ═══ -->
   <div id="partsSub-parttypes" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="parts-add-btn sage" onclick="openPartTypeModal()">+ Add Part Type</button>
+      <button class="parts-add-btn sage" onclick="openPartTypeModal()">+ افزودن نوع قطعه</button>
     </div>
     <div class="store-grid" id="partsPartTypeGrid"></div>
   </div>
@@ -307,18 +458,153 @@
   <!-- ═══ CATEGORIES ═══ -->
   <div id="partsSub-categories" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="parts-add-btn sage" onclick="openCategoryModal()">+ Add Category</button>
+      <button class="parts-add-btn sage" onclick="openCategoryModal()">+ افزودن دسته‌بندی</button>
     </div>
     <div class="store-grid" id="partsCategoryGrid"></div>
   </div>
 
+  <!-- ═══ GENERIC ITEMS ═══ -->
+  <div id="partsSub-genericitems" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">برای مقایسهٔ قیمت بین برندهای مختلف یه کالای مشابه (مثلاً «رله کولر پراید» به‌جای یک برند خاص)، این‌جا یه آیتم کلی بساز و توی «لیست قیمت» ازش استفاده کن.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openGenericModal()">+ افزودن کالای کلی</button>
+    </div>
+    <div class="store-grid" id="partsGenericGrid"></div>
+  </div>
+
+
   <!-- ═══ STORES ═══ -->
   <div id="partsSub-stores" class="parts-sub" style="display:none;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="parts-add-btn sage" onclick="openStoreModal()">+ Add Store</button>
+      <button class="parts-add-btn sage" onclick="openStoreModal()">+ افزودن تامین‌کننده</button>
     </div>
     <div class="store-grid" id="partsStoreGrid"></div>
   </div>
+
+  <!-- ═══ SALES AGENTS ═══ -->
+  <div id="partsSub-agents" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">نمایندگان فروش، افرادی‌ان که برات کالا می‌فروشن یا مشتری میارن (مثلاً مکانیک‌ها) — نه تامین‌کننده. موقع ثبت هر فروش می‌تونی یکی‌شون رو انتخاب کنی و تعیین کنی توی فاکتور چاپی اسمش بیاد یا نه. اگه درصد پورسانت براشون بذاری، توی گزارش‌ها سهم هر نماینده خودکار حساب می‌شه.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openAgentModal()">+ افزودن نماینده</button>
+    </div>
+    <div class="store-grid" id="partsAgentGrid"></div>
+  </div>
+
+  <!-- ═══ CUSTOMERS ═══ -->
+  <div id="partsSub-customers" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">دفتر مشتری‌هات — وقتی موقع فروش یکی رو انتخاب کنی، اسم/تلفن/آدرسش خودکار پر می‌شه و می‌تونی تاریخچه‌ی خریدش رو ببینی.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn sage" onclick="openCustomerModal()">+ افزودن مشتری</button>
+    </div>
+    <div class="store-grid" id="partsCustomerGrid"></div>
+  </div>
+
+  <!-- ═══ PRICE LISTS ═══ -->
+  <div id="partsSub-pricelists" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">📋 ثبت قیمت تامین‌کننده</div>
+      <div class="pe-form-desc">قیمتی که یه تامین‌کننده برای یه کالا بهت داده رو با تاریخش این‌جا ثبت کن — یا از محصولات تعریف‌شده انتخاب کن، یا از کالای کلی (مثل «رله کولر پراید») برای مقایسه بین برندها. فقط یکی از این دوتا رو انتخاب کن.</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">تامین‌کننده</div>
+          <select class="modal-input" id="peStoreSelect" style="width:100%;margin:0;"></select>
+        </div>
+        <div>
+          <div class="builder-label">Price (K T) — قیمت</div>
+          <input type="number" class="modal-input" id="pePrice" placeholder="e.g. 850" min="0" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">📦 محصول تعریف‌شده</div>
+          <select class="modal-input" id="peProductSelect" style="width:100%;margin:0;"></select>
+        </div>
+        <div>
+          <div class="builder-label">🏷️ یا کالای کلی</div>
+          <div style="display:flex;gap:8px;">
+            <select class="modal-input" id="peGenericSelect" style="width:100%;margin:0;"></select>
+            <button type="button" class="parts-header-btn" style="flex-shrink:0;padding:10px 14px;" onclick="openNewGenericFromPriceEntry()">+ جدید</button>
+          </div>
+        </div>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Date — تاریخ</div>
+          <div class="jalali-picker-wrap" id="peDatePicker"></div>
+          <input type="hidden" id="peDateHidden"/>
+        </div>
+        <div>
+          <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+          <input type="text" class="modal-input" id="peNotes" dir="auto" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="tx-save-btn" id="peSaveBtn" style="margin:0;" onclick="savePriceEntry()">Add Price Entry</button>
+        <button class="parts-header-btn" id="peCancelBtn" style="display:none;" onclick="cancelEditPriceEntry()">Cancel edit</button>
+      </div>
+    </div>
+
+    <div class="parts-tab-header" style="margin:22px 0 12px;">
+      <div class="tx-form-title" style="margin:0;">لیست قیمت به تفکیک تامین‌کننده</div>
+      <select class="modal-input" id="pfPriceListFilterStore" style="width:auto;margin:0;" onchange="renderPriceList()"></select>
+    </div>
+    <div id="storeTrendPanel"></div>
+    <div id="priceListContent"></div>
+  </div>
+
+  <!-- ═══ COMPARE & CART ═══ -->
+  <div id="partsSub-compare" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">⚖️ مقایسه قیمت بین تامین‌کننده‌ها</div>
+      <div class="pe-form-desc">یه کالا یا کالای کلی رو انتخاب کن تا ببینی کدوم تامین‌کننده الان ارزون‌تره و روند قیمتش در طول زمان چطور بوده.</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">📦 از محصولات تعریف‌شده</div>
+          <select class="modal-input" id="cpProductSelect" style="width:100%;margin:0;" onchange="runPriceComparison()"></select>
+        </div>
+        <div>
+          <div class="builder-label">🏷️ یا از کالای کلی</div>
+          <select class="modal-input" id="cpGenericSelect" style="width:100%;margin:0;" onchange="runPriceComparison()"></select>
+        </div>
+      </div>
+      <div id="compareResult"></div>
+      <div class="mchart-wrap" style="height:220px;margin-top:10px;"><canvas id="comparePriceChart" style="display:none;"></canvas></div>
+    </div>
+
+    <div class="tx-form">
+      <div class="tx-form-title">🛒 سبد خرید و بهینه‌ساز</div>
+      <div class="pe-form-desc">هر چی لازم داری بخری رو به سبد اضافه کن، بعد بزن «پیدا کردن ارزون‌ترین ترکیب» تا بهترین حالت خرید (با احتساب هزینه ارسال هر تامین‌کننده) رو بهت نشون بدم.</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">📦 از محصولات تعریف‌شده</div>
+          <select class="modal-input" id="cartProductSelect" style="width:100%;margin:0;"></select>
+        </div>
+        <div>
+          <div class="builder-label">🏷️ یا از کالای کلی</div>
+          <select class="modal-input" id="cartGenericSelect" style="width:100%;margin:0;"></select>
+        </div>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Qty — تعداد</div>
+          <input type="number" class="modal-input" id="cpCartQty" value="1" min="1" style="width:100%;margin:0;"/>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="tx-save-btn" style="margin:0;" onclick="addCompareCartItem()">+ افزودن به سبد</button>
+        </div>
+      </div>
+      <div class="tx-cart" id="compareCart"></div>
+      <button class="tx-save-btn" onclick="optimizeCompareCart()">🧮 پیدا کردن ارزون‌ترین ترکیب خرید</button>
+      <div id="cartOptimizeResult" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
 
   <!-- ═══ PURCHASES ═══ -->
   <div id="partsSub-purchase" class="parts-sub" style="display:none;">
@@ -327,27 +613,123 @@
       <button class="parts-add-btn" onclick="openPurchaseModal()">+ New Purchase</button>
     </div>
 
-    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Purchase History</div>
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">تاریخچه خرید</div>
     <div class="tx-list" id="purchaseHistoryList"></div>
+  </div>
+
+  <!-- ═══ QUOTATIONS (پیش‌فاکتور) ═══ -->
+  <div id="partsSub-quotes" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">پیش‌فاکتور روی موجودی و حساب‌وکتاب هیچ اثری نمی‌ذاره تا وقتی که واقعاً تبدیلش کنی به فروش.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="parts-add-btn" onclick="openQuoteModal()">+ پیش‌فاکتور جدید</button>
+    </div>
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">لیست پیش‌فاکتورها</div>
+    <div class="tx-list" id="quotesList"></div>
   </div>
 
   <!-- ═══ SALES ═══ -->
   <div id="partsSub-sales" class="parts-sub" style="display:none;">
     <div class="parts-tab-header">
       <div class="parts-kpis compact" id="saleTabStats"></div>
-      <button class="parts-add-btn" onclick="openSaleModal()">+ New Sale</button>
+      <div class="parts-tab-header-actions">
+        <button class="parts-header-btn" onclick="openBusinessProfileModal()">⚙️ Business Info</button>
+        <button class="parts-add-btn" onclick="openSaleModal()">+ New Sale</button>
+      </div>
     </div>
 
-    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Sales Log</div>
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">سوابق فروش</div>
     <div class="tx-list" id="salesHistoryList"></div>
   </div>
+
+  <!-- ═══ SALE RETURNS (مرجوعی) ═══ -->
+  <div id="partsSub-returns" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">↩️ ثبت مرجوعی</div>
+      <div class="pe-form-desc">اول فروش مورد نظر رو پیدا کن، بعد تعداد هر ردیف که برمی‌گرده رو مشخص کن. اگه بخوای موجودی هم برمی‌گرده به انبار.</div>
+      <div style="margin-bottom:10px;">
+        <div class="builder-label">فروش</div>
+        <select class="modal-input" id="retSaleSelect" style="width:100%;margin:0;" onchange="renderReturnItemPicker()"></select>
+      </div>
+      <div id="returnItemPicker"></div>
+      <div class="tx-row" id="returnCashRow" style="display:none;">
+        <div>
+          <div class="builder-label">مبلغ نقدی که برمی‌گردونی (K T)</div>
+          <input type="number" class="modal-input" id="retCashRefunded" min="0" style="width:100%;margin:0;"/>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">بقیه‌ی مبلغ (اگه چیزی مونده بود) از بدهی مشتری کم می‌شه.</div>
+        </div>
+        <div>
+          <div class="builder-label">تاریخ</div>
+          <div class="jalali-picker-wrap" id="retDatePicker"></div>
+          <input type="hidden" id="retDateHidden"/>
+        </div>
+      </div>
+      <div id="retReasonWrap" style="display:none;margin-bottom:10px;">
+        <div class="builder-label">دلیل مرجوعی</div>
+        <select class="modal-input" id="retReason" style="width:100%;margin:0;"></select>
+      </div>
+      <label id="retRestockWrap" style="display:none;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:var(--text2);cursor:pointer;">
+        <input type="checkbox" id="retRestock" checked style="width:16px;height:16px;"/>
+        این کالا سالمه و به انبار برگرده
+      </label>
+      <input type="text" class="modal-input" id="retNote" placeholder="یادداشت (اختیاری)" dir="auto" style="width:100%;margin-bottom:14px;display:none;"/>
+      <div id="returnSummary"></div>
+      <button class="tx-save-btn" id="retSaveBtn" style="display:none;" onclick="saveSaleReturn()">ثبت مرجوعی</button>
+    </div>
+    <div class="tx-form-title" style="margin:22px auto 12px;max-width:680px;">تاریخچه مرجوعی‌ها</div>
+    <div class="tx-list" id="returnsHistoryList"></div>
+  </div>
+
+  <!-- ═══ BUSINESS EXPENSES ═══ -->
+  <div id="partsSub-expenses" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">این‌جا برای هزینه‌هایی‌ه که کالا برای فروش نیست — مثل خرید دستگاه پوز، اجاره، تبلیغات. توی موجودی و سود هر قطعه اثر نمی‌ذاره، ولی از موجودی نقدی بیزنس کم می‌شه.</div>
+    </div>
+    <div class="tx-form">
+      <div class="tx-form-title">💸 Record a Business Expense</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Category</div>
+          <select class="modal-input" id="expCategorySelect" style="width:100%;margin:0;"></select>
+        </div>
+        <div>
+          <div class="builder-label">Amount (K T)</div>
+          <input type="number" class="modal-input" id="expAmount" placeholder="e.g. 1200" min="0" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">Title</div>
+        <input type="text" class="modal-input" id="expTitle" placeholder="مثلاً: خرید دستگاه پوز" dir="auto" style="width:100%;margin:0;"/>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">Date</div>
+          <div class="jalali-picker-wrap" id="expDatePicker"></div>
+          <input type="hidden" id="expDateHidden"/>
+        </div>
+        <div>
+          <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+          <input type="text" class="modal-input" id="expNotes" dir="auto" style="width:100%;margin:0;"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="tx-save-btn" id="expSaveBtn" onclick="saveExpense()">Add Expense</button>
+        <button id="expCancelBtn" style="display:none;" onclick="cancelEditExpense()">Cancel edit</button>
+      </div>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">جمع هزینه‌های جاری: <span id="expenseTabTotal" style="font-weight:800;color:var(--coral);">0</span></div>
+    <div class="cash-ledger" id="expenseLedger"></div>
+  </div>
+
 
   <!-- ═══ CASH / CAPITAL ═══ -->
   <div id="partsSub-cash" class="parts-sub" style="display:none;">
     <div class="cash-stats" id="cashStats"></div>
 
     <div class="cashbrk-card">
-      <div class="tx-form-title" style="margin-bottom:10px;">Where Cash Balance comes from</div>
+      <div class="tx-form-title" style="margin-bottom:10px;">موجودی نقدی از کجا میاد</div>
       <div id="cashBreakdownRows"></div>
     </div>
 
@@ -375,14 +757,131 @@
       <button class="tx-save-btn" onclick="saveCashTx()">Save</button>
     </div>
 
-    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">Recent Money Movements <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits, withdrawals, purchases and sales, all in one timeline)</span></div>
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">آخرین گردش‌های مالی <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits, withdrawals, purchases and sales, all in one timeline)</span></div>
     <div class="money-ledger" id="moneyMovementsList"></div>
 
-    <div class="tx-form-title" style="margin:28px auto 12px;max-width:680px;">Manual Capital Ledger <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits/withdrawals only — editable)</span></div>
+    <div class="tx-form-title" style="margin:28px auto 12px;max-width:680px;">دفتر سرمایه (واریز/برداشت دستی) <span style="font-weight:400;color:var(--text4);font-size:12px;">(deposits/withdrawals only — editable)</span></div>
     <div class="cash-ledger" id="cashLedgerList"></div>
   </div>
 
+  <!-- ═══ ACCOUNT LEDGER & RECONCILIATION ═══ -->
+  <div id="partsSub-ledger" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">اینجا همه‌ی رویدادهایی که پول واقعی جابه‌جا کرده رو با موجودی لحظه‌به‌لحظه می‌بینی — واریز/برداشت، دریافتی از فروش‌ها، پرداختی به تامین‌کننده‌ها، هزینه‌ها. پایین‌تر هم می‌تونی موجودی واقعی حساب/صندوقت رو با چیزی که سیستم حساب کرده مقایسه کنی (مغایرت‌گیری).</div>
+    </div>
+
+    <div class="tx-form-title" style="margin:0 auto 12px;max-width:680px;">📒 گردش حساب کامل</div>
+    <div class="parts-table-wrap" style="max-width:900px;margin:0 auto 28px;">
+      <table class="parts-table" id="fullLedgerTable"><thead><tr>
+        <th>تاریخ</th><th>شرح</th><th>مبلغ</th><th>موجودی پس از این رویداد</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="tx-form" style="max-width:680px;">
+      <div class="tx-form-title">🧮 مغایرت‌گیری (Reconciliation)</div>
+      <div class="pe-form-desc">موجودی واقعی حساب بانکی یا صندوقت رو وارد کن تا با موجودی محاسبه‌شده‌ی سیستم مقایسه بشه. اگه اختلافی بود، می‌تونی با یه کلیک یه تراکنش تعدیل ثبت کنی تا موجودی سیستم با واقعیت یکی بشه.</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">موجودی واقعی الان (K T)</div>
+          <input type="number" class="modal-input" id="recActualBalance" placeholder="e.g. 45000" style="width:100%;margin:0;"/>
+        </div>
+        <div>
+          <div class="builder-label">تاریخ</div>
+          <div class="jalali-picker-wrap" id="recDatePicker"></div>
+          <input type="hidden" id="recDateHidden"/>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <input type="text" class="modal-input" id="recNote" placeholder="مثلاً: کارمزد بانکی کم شده بود" dir="auto" style="width:100%;margin:0;"/>
+      </div>
+      <div id="recPreview" style="margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="tx-save-btn" style="margin:0;" onclick="previewReconciliation()">🔍 محاسبه مغایرت</button>
+      </div>
+    </div>
+
+    <div class="tx-form-title" style="margin:22px auto 12px;max-width:680px;">تاریخچه مغایرت‌گیری‌ها</div>
+    <div class="cash-ledger" id="reconciliationHistory" style="max-width:680px;margin:0 auto;"></div>
+  </div>
+
   <!-- ═══ REPORTS / BUSINESS DASHBOARD ═══ -->
+  <!-- ═══ VARIABLES (پیش‌فرض‌ها و متغیرهای قیمت‌گذاری) ═══ -->
+  <div id="partsSub-variables" class="parts-sub" style="display:none;">
+    <div class="parts-empty" style="margin-bottom:14px;padding:12px 16px;">
+      <div class="pe-text" dir="auto" style="text-align:right;">هر عدد ثابت و درصدی که به نرم‌افزار دادی — یه جا. تنظیمات سراسری این‌جا خلاصه می‌شه، و هر کالایی که براش یه تنظیم اختصاصی گذاشتی (نه پیش‌فرض) این‌جا لیست می‌شه تا یادت نره.</div>
+    </div>
+
+    <div class="tx-form">
+      <div class="tx-form-title">⚙️ تنظیمات سراسری قیمت‌گذاری</div>
+      <div id="globalVarsSummary"></div>
+      <button class="parts-header-btn" style="margin-top:10px;" onclick="openPricingSettingsModal()">✎ ویرایش تنظیمات سراسری</button>
+    </div>
+
+    <div class="tx-form-title" style="margin:22px auto 12px;max-width:900px;">📦 تنظیمات اختصاصی هر کالا <span style="font-weight:400;color:var(--text4);font-size:12px;">(کالاهایی که پیش‌فرض سراسری براشون فرق داره)</span></div>
+    <div class="parts-table-wrap" style="max-width:900px;margin:0 auto 20px;">
+      <table class="parts-table" id="productVarsTable"><thead><tr>
+        <th>کالا</th><th>ارسال</th><th>سهم نماینده</th><th>مارجین هدف</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="tx-form-title" style="margin:22px auto 12px;max-width:900px;">🧑‍💼 پیش‌فرض فعلی هر نماینده</div>
+    <div class="parts-table-wrap" style="max-width:900px;margin:0 auto;">
+      <table class="parts-table" id="agentVarsTable"><thead><tr>
+        <th>نماینده</th><th>درصد پیش‌فرض فعلی</th><th>مبنا</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ═══ REPORT BUILDER (گزارش‌ساز سفارشی) ═══ -->
+  <div id="partsSub-reportbuilder" class="parts-sub" style="display:none;">
+    <div class="tx-form">
+      <div class="tx-form-title">📈 بساز چی ببینی</div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">بر چه مبنایی تفکیک بشه؟ (بُعد)</div>
+          <select class="modal-input" id="rbDimension" style="width:100%;margin:0;" onchange="onRbDimensionChange()"></select>
+        </div>
+        <div>
+          <div class="builder-label">چه عددی رو ببینیم؟ (متغیر اول)</div>
+          <select class="modal-input" id="rbMetric1" style="width:100%;margin:0;" onchange="renderReportBuilder()"></select>
+        </div>
+      </div>
+      <div class="tx-row">
+        <div>
+          <div class="builder-label">متغیر دوم <span style="font-weight:400;color:var(--text4);">(اختیاری — برای مقایسه/همبستگی)</span></div>
+          <select class="modal-input" id="rbMetric2" style="width:100%;margin:0;" onchange="renderReportBuilder()">
+            <option value="">— هیچی —</option>
+          </select>
+        </div>
+        <div>
+          <div class="builder-label">نوع نمایش</div>
+          <select class="modal-input" id="rbChartType" style="width:100%;margin:0;" onchange="renderReportBuilder()">
+            <option value="table">📋 جدول</option>
+            <option value="line">📈 خط</option>
+            <option value="bar">📊 میله‌ای</option>
+            <option value="pie">🥧 دایره‌ای (فقط متغیر اول)</option>
+            <option value="number">🔢 عدد تکی (جمع کل)</option>
+          </select>
+        </div>
+      </div>
+      <div id="rbTimeGroupWrap" style="margin-bottom:14px;">
+        <div class="builder-label">تفکیک زمانی</div>
+        <select class="modal-input" id="rbTimeGroup" style="width:100%;margin:0;" onchange="renderReportBuilder()">
+          <option value="day">روزانه</option>
+          <option value="week">هفتگی</option>
+          <option value="month" selected>ماهانه</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="rbFillZero" style="width:16px;height:16px;" onchange="renderReportBuilder()"/>
+          بازه‌های بدون داده رو هم با صفر نشون بده <span style="font-weight:400;color:var(--text4);">(مثلاً این هفته فقط ۲ روز فروش داشتی ولی می‌خوای ۷ تا میله ببینی)</span>
+        </label>
+      </div>
+      <button class="parts-header-btn" style="float:left;" onclick="exportTableToCsv('rbTable','report.csv')">⬇️ CSV</button>
+      <div id="rbOutput"></div>
+    </div>
+  </div>
+
   <div id="partsSub-reports" class="parts-sub" style="display:none;">
     <div class="parts-range-chips" id="partsRangeChips"></div>
 
@@ -395,7 +894,7 @@
         <div class="mchart-wrap"><canvas id="partsRevenueChart"></canvas></div>
       </div>
       <div class="mchart-card">
-        <div class="mchart-title">Spend by Store</div>
+        <div class="mchart-title">هزینه خرید به تفکیک تامین‌کننده</div>
         <div class="mchart-sub">Total purchase cost, within the selected range</div>
         <div class="mchart-wrap"><canvas id="partsStoreChart"></canvas></div>
       </div>
@@ -427,21 +926,21 @@
     </div>
 
     <div class="parts-table-wrap">
-      <div class="parts-table-title">Top Products by Profit</div>
+      <div class="parts-table-title">پرسودترین محصولات</div>
       <table class="parts-table" id="partsTopProductsTable"><thead><tr>
         <th>Product</th><th>Units Sold</th><th>Revenue</th><th>COGS</th><th>Profit</th>
       </tr></thead><tbody></tbody></table>
     </div>
 
     <div class="parts-table-wrap">
-      <div class="parts-table-title">Profit by Brand</div>
+      <div class="parts-table-title">سود به تفکیک برند</div>
       <table class="parts-table" id="partsBrandTable"><thead><tr>
         <th>Brand</th><th>Units Sold</th><th>Revenue</th><th>Profit</th>
       </tr></thead><tbody></tbody></table>
     </div>
 
     <div class="parts-table-wrap">
-      <div class="parts-table-title">Sales by Car Model</div>
+      <div class="parts-table-title">فروش به تفکیک مدل خودرو</div>
       <table class="parts-table" id="partsCarModelTable"><thead><tr>
         <th>Car Model</th><th>Units Sold</th><th>Revenue</th>
       </tr></thead><tbody></tbody></table>
@@ -449,7 +948,7 @@
 
     <div class="parts-table-wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;padding-right:18px;">
-        <div class="parts-table-title">Low Stock</div>
+        <div class="parts-table-title">موجودی کم</div>
         <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);">
           Alert at ≤ <input type="number" class="modal-input" id="lowStockThresholdInput" min="0" step="1" style="width:60px;padding:5px 8px;margin:0;" onchange="saveLowStockThreshold()"/> units
         </div>
@@ -460,9 +959,110 @@
     </div>
 
     <div class="parts-table-wrap">
-      <div class="parts-table-title">Spend by Store</div>
+      <div class="parts-table-title">هزینه خرید به تفکیک تامین‌کننده</div>
       <table class="parts-table" id="partsStoreTable"><thead><tr>
-        <th>Store</th><th># Purchases</th><th>Total Spend</th>
+        <th>تامین‌کننده</th><th>تعداد خرید</th><th>جمع هزینه</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">📥 Accounts Receivable <span style="font-weight:400;color:var(--text4);font-size:11px;">(کی به تو بدهکاره)</span>
+        <button class="parts-header-btn" style="float:left;padding:4px 12px;font-size:11px;" onclick="exportTableToCsv('partsARTable','accounts-receivable.csv')">⬇️ CSV</button></div>
+      <table class="parts-table" id="partsARTable"><thead><tr>
+        <th>Customer</th><th># Unpaid/Partial Sales</th><th>Outstanding</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">📤 Accounts Payable <span style="font-weight:400;color:var(--text4);font-size:11px;">(تو به کی بدهکاری)</span>
+        <button class="parts-header-btn" style="float:left;padding:4px 12px;font-size:11px;" onclick="exportTableToCsv('partsAPTable','accounts-payable.csv')">⬇️ CSV</button></div>
+      <table class="parts-table" id="partsAPTable"><thead><tr>
+        <th>تامین‌کننده</th><th># خرید نسیه/قسمتی</th><th>مانده</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">مارجین و مارکاپ هر محصول <span style="font-weight:400;color:var(--text4);font-size:11px;">(needs a sale price set on the product)</span>
+        <button class="parts-header-btn" style="float:left;padding:4px 12px;font-size:11px;" onclick="exportTableToCsv('partsMarginTable','margin-markup.csv')">⬇️ CSV</button></div>
+      <table class="parts-table" id="partsMarginTable"><thead><tr>
+        <th>Product</th><th>Stock</th><th>Avg Cost</th><th>Sale Price</th><th>Margin %</th><th>Markup %</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">تحلیل ABC <span style="font-weight:400;color:var(--text4);font-size:11px;">(A = ~80% of revenue, B = next 15%, C = long tail — where to focus attention)</span></div>
+      <table class="parts-table" id="partsABCTable"><thead><tr>
+        <th>Product</th><th>Revenue</th><th>Cumulative %</th><th>Class</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">برترین مشتریان</div>
+      <table class="parts-table" id="partsTopCustomersTable"><thead><tr>
+        <th>Customer</th><th>Orders</th><th>Revenue</th><th>Profit</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">🧑‍💼 Sales by Agent <span style="font-weight:400;color:var(--text4);font-size:11px;">(فروش و پورسانت هر نماینده)</span>
+        <button class="parts-header-btn" style="float:left;padding:4px 12px;font-size:11px;" onclick="exportTableToCsv('partsAgentTable','sales-by-agent.csv')">⬇️ CSV</button></div>
+      <table class="parts-table" id="partsAgentTable"><thead><tr>
+        <th>Agent</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Commission Rate</th><th>Accrued</th><th>Paid</th><th>Payable</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">↩️ Returns <span style="font-weight:400;color:var(--text4);font-size:11px;">(مرجوعی‌ها در این بازه)</span></div>
+      <div style="padding:10px 4px;font-weight:700;font-size:13px;color:var(--coral);" id="partsReturnsTotal">0 مرجوعی · 0 T</div>
+    </div>
+
+
+    <div class="parts-charts">
+      <div class="mchart-card">
+        <div class="mchart-title">Margin % — Top 10 Products</div>
+        <div class="mchart-sub">Highest margin first</div>
+        <div class="mchart-wrap"><canvas id="partsMarginChart"></canvas></div>
+      </div>
+      <div class="mchart-card">
+        <div class="mchart-title">Business Expenses by Category</div>
+        <div class="mchart-sub">Everything that isn't inventory</div>
+        <div class="mchart-wrap"><canvas id="partsExpenseCategoryChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">مقایسه قیمت تامین‌کننده‌ها <span style="font-weight:400;color:var(--text4);font-size:11px;">(از روی لیست قیمت‌هات)</span></div>
+      <table class="parts-table" id="partsSupplierCompareTable"><thead><tr>
+        <th>کالا</th><th># تامین‌کننده</th><th>ارزان‌ترین</th><th>گران‌ترین</th><th>اختلاف</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">رتبه‌بندی تامین‌کننده‌ها بر اساس «بیشتر ارزان‌تر بودن»</div>
+      <table class="parts-table" id="partsCheapestSupplierTable"><thead><tr>
+        <th>تامین‌کننده</th><th>چندبار ارزان‌ترین بود</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">پیشنهاد سفارش مجدد <span style="font-weight:400;color:var(--text4);font-size:11px;">(low stock + cheapest known current supplier)</span></div>
+      <table class="parts-table" id="partsReorderTable"><thead><tr>
+        <th>محصول</th><th>موجودی</th><th>ارزان‌ترین تامین‌کننده فعلی</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">موجودی راکد <span style="font-weight:400;color:var(--text4);font-size:11px;">(in stock, never sold)</span>
+        <span style="float:left;font-weight:800;color:var(--coral);">جمع ارزش: <span id="partsNonMovingTotal">0</span></span></div>
+      <table class="parts-table" id="partsNonMovingTable"><thead><tr>
+        <th>Product</th><th>Stock</th><th>Avg Cost</th><th>Value Tied Up</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="parts-table-wrap">
+      <div class="parts-table-title">هزینه‌های جاری به تفکیک دسته</div>
+      <table class="parts-table" id="partsExpenseCategoryTable"><thead><tr>
+        <th>Category</th><th>Count</th><th>Total</th>
       </tr></thead><tbody></tbody></table>
     </div>
 
@@ -472,13 +1072,21 @@
         <div class="parts-glossary-item"><dt>Revenue — درآمد</dt><dd>کل پولی که از فروش‌ها به دست آورده‌ای، قبل از کم کردن هزینه خرید همون قطعات.</dd></div>
         <div class="parts-glossary-item"><dt>COGS — بهای تمام‌شده کالای فروخته‌شده</dt><dd>هزینه‌ای که برای خرید همون قطعاتی که فروختی، قبلاً پرداخت کرده بودی.</dd></div>
         <div class="parts-glossary-item"><dt>Gross Profit — سود ناخالص</dt><dd>درآمد منهای COGS؛ یعنی از هر فروش واقعاً چقدر سود کردی.</dd></div>
-        <div class="parts-glossary-item"><dt>Margin — حاشیه سود</dt><dd>سود به‌صورت درصدی از درآمد. هرچی این عدد بالاتر باشه، روی هر فروش سود بیشتری مونده.</dd></div>
+        <div class="parts-glossary-item"><dt>Margin — حاشیه سود</dt><dd>سود به‌صورت درصدی از قیمت فروش. هرچی این عدد بالاتر باشه، روی هر فروش سود بیشتری مونده.</dd></div>
+        <div class="parts-glossary-item"><dt>Markup — نسبت سود به قیمت خرید</dt><dd>سود به‌صورت درصدی از قیمت تمام‌شده (نه قیمت فروش). همون چیزیه که وقتی می‌گی «فلان درصد روش کشیدم» منظورته.</dd></div>
         <div class="parts-glossary-item"><dt>Purchase Spend — هزینه خرید</dt><dd>کل پولی که تا امروز برای خرید قطعات پرداخت کردی — چه فروخته باشی چه هنوز توی انبارت باشه.</dd></div>
+        <div class="parts-glossary-item"><dt>Business Expenses — هزینه‌های جاری بیزنس</dt><dd>هزینه‌هایی که کالای فروشی نیستن (دستگاه پوز، اجاره، تبلیغات و ...). روی سود هر قطعه اثر نمی‌ذارن ولی از موجودی نقدی کم می‌شن.</dd></div>
+        <div class="parts-glossary-item"><dt>Net Profit (after expenses) — سود خالص نهایی</dt><dd>سود ناخالص منهای همه‌ی هزینه‌های جاری بیزنس؛ نزدیک‌ترین عدد به «واقعاً چقدر بردی».</dd></div>
         <div class="parts-glossary-item"><dt>Inventory Value — ارزش موجودی</dt><dd>ارزش قطعاتی که هنوز نفروختی، حساب‌شده به قیمتی که خریدیشون (نه قیمت فروش).</dd></div>
-        <div class="parts-glossary-item"><dt>Cash Balance — موجودی نقدی</dt><dd>پول نقد واقعی بیزنس: سرمایه‌ای که گذاشتی + درآمد فروش‌ها − برداشت‌ها − هزینه خریدها. همون لحظه که یه چیزی می‌فروشی، سودش مستقیم میاد توی همین عدد.</dd></div>
+        <div class="parts-glossary-item"><dt>Cash Balance — موجودی نقدی</dt><dd>پول نقد واقعی بیزنس: سرمایه‌ای که گذاشتی + درآمد فروش‌ها − برداشت‌ها − هزینه خریدها − هزینه‌های جاری. همون لحظه که یه چیزی می‌فروشی، سودش مستقیم میاد توی همین عدد.</dd></div>
         <div class="parts-glossary-item"><dt>Business Value — ارزش کل بیزنس</dt><dd>موجودی نقدی + ارزش موجودی انبار. یعنی اگه همین الان همه‌چیز رو نقد کنی، بیزنس چقدر می‌ارزه.</dd></div>
         <div class="parts-glossary-item"><dt>Low Stock — موجودی کم</dt><dd>قطعاتی که تعدادشون به آستانه‌ی هشدار رسیده و بهتره زودتر دوباره تهیه‌شون کنی.</dd></div>
         <div class="parts-glossary-item"><dt>Avg Cost — میانگین قیمت تمام‌شده</dt><dd>وقتی یه قطعه رو چند بار با قیمت‌های مختلف خریدی، سیستم قدیمی‌ترین خریدها رو اول حساب می‌کنه (به این روش FIFO می‌گن) تا سود هر فروش درست محاسبه بشه.</dd></div>
+        <div class="parts-glossary-item"><dt>Accounts Receivable — حساب‌های دریافتنی</dt><dd>جمع پولی که مشتری‌ها بابت فروش‌های نسیه یا قسمتی هنوز بهت نداده‌ان.</dd></div>
+        <div class="parts-glossary-item"><dt>Accounts Payable — حساب‌های پرداختنی</dt><dd>جمع پولی که خودت بابت خریدهای نسیه یا قسمتی هنوز به تامین‌کننده‌ها ندادی.</dd></div>
+        <div class="parts-glossary-item"><dt>ABC Analysis</dt><dd>محصولاتت رو بر اساس سهم‌شون از کل درآمد رتبه‌بندی می‌کنه: دسته A حدود ۸۰٪ درآمد رو می‌سازه (مهم‌ترین‌ها)، B دسته میانی، C دم دراز محصولات کم‌فروش.</dd></div>
+        <div class="parts-glossary-item"><dt>Reorder Point — نقطه سفارش مجدد</dt><dd>عددی که وقتی موجودی یه محصول بهش برسه، هشدار موجودی کم می‌بینی. اگه برای یه محصول خاص تنظیم نکنی، از آستانه‌ی سراسری استفاده می‌شه.</dd></div>
+        <div class="parts-glossary-item"><dt>تخفیف، مالیات، هزینه ارسال</dt><dd>همه‌ی این‌ها روی سود واقعی حساب می‌شن، نه فقط ظاهر فاکتور: تخفیف (چه روی هر ردیف چه کل فاکتور) از درآمد کم می‌شه، هزینه ارسالی که از مشتری می‌گیری به درآمد اضافه می‌شه، ولی مالیات جزو سود تو نیست — چون مالِ خودته، فقط از مشتری جمع‌آوری می‌کنی و باید بعداً به دولت بدی، پس توی محاسبه‌ی سود حساب نمی‌شه (ولی توی مبلغ کل فاکتور و طلب از مشتری هست).</dd></div>
       </dl>
     </div>
   </div>

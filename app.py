@@ -1916,9 +1916,26 @@ def car_api():
 
 PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
 
+def _default_business_profile():
+    return {"name": "", "address": "", "phone": "", "logo": "", "footer_note": "",
+            "next_invoice_no": 1, "next_po_no": 1, "next_quote_no": 1, "invoice_theme": "classic"}
+
+RETURN_REASONS = ["کالای معیوب", "ارسال اشتباه", "انصراف مشتری", "کیفیت پایین", "اندازه/مدل نامناسب", "سایر"]
+
+def _default_pricing_settings():
+    # Global assumptions for the per-product "what should I sell it for" calculator
+    return {"shipping_cost": 0, "shipping_payer": "business", "shipping_split_ratio": 0.5,
+            "agent_share_pct": 33.33, "include_agent_share": True,
+            "target_margin_pct": 20, "round_step": 1}
+
 def _parts_defaults():
     return {"products": [], "stores": [], "car_models": [], "brands": [], "part_types": [], "categories": [],
             "purchases": [], "sales": [], "capital_transactions": [],
+            "generic_products": [], "price_entries": [], "business_expenses": [],
+            "reconciliations": [], "sales_agents": [],
+            "customers": [], "sale_returns": [], "quotations": [], "agent_payouts": [],
+            "pricing_settings": _default_pricing_settings(),
+            "business_profile": _default_business_profile(),
             "low_stock_threshold": 2, "unit_migrated_v1": True}
 
 def load_parts():
@@ -1936,7 +1953,72 @@ def load_parts():
         d.setdefault("purchases", [])
         d.setdefault("sales", [])
         d.setdefault("capital_transactions", [])
+        d.setdefault("generic_products", [])
+        d.setdefault("price_entries", [])
+        d.setdefault("business_expenses", [])
+        d.setdefault("reconciliations", [])
+        d.setdefault("sales_agents", [])
+        d.setdefault("customers", [])
+        d.setdefault("sale_returns", [])
+        for r in d["sale_returns"]:
+            r.setdefault("reason", "سایر")
+        d.setdefault("quotations", [])
+        d.setdefault("agent_payouts", [])
+        d.setdefault("pricing_settings", _default_pricing_settings())
+        for k, v in _default_pricing_settings().items():
+            d["pricing_settings"].setdefault(k, v)
+        for a in d["sales_agents"]:
+            a.setdefault("commission_basis", "revenue")
+        d.setdefault("business_profile", _default_business_profile())
+        for k, v in _default_business_profile().items():
+            d["business_profile"].setdefault(k, v)
         d.setdefault("low_stock_threshold", 2)
+        # Optional sale price on products (None = not set, still using guesswork elsewhere)
+        for p in d["products"]:
+            p.setdefault("sale_price", None)
+            p.setdefault("reorder_point", None)
+            # Per-product overrides for the pricing calculator — every field is
+            # optional and falls back to the global pricing_settings when null
+            p.setdefault("calc_shipping_payer", None)
+            p.setdefault("calc_shipping_cost", None)
+            p.setdefault("calc_shipping_split_ratio", None)
+            p.setdefault("calc_include_agent_share", None)
+            p.setdefault("calc_agent_share_pct", None)
+            p.setdefault("calc_target_margin_pct", None)
+        # Optional shipping terms on stores, used by the price-comparison cart optimizer
+        for s in d["stores"]:
+            s.setdefault("shipping_cost", 0)
+            s.setdefault("free_shipping_min", 0)
+        # Payment tracking (accounts receivable / payable) — default "paid" so
+        # existing data's cash balance keeps behaving exactly as it did before
+        _agents_idx = {a["id"]: a for a in d.get("sales_agents", [])}
+        for sale in d["sales"]:
+            sale.setdefault("payment_status", "paid")
+            sale.setdefault("amount_paid", 0)
+            sale.setdefault("shipping_cost", 0)
+            sale.setdefault("shipping_payer", "customer")
+            sale.setdefault("shipping_split_ratio", 0.5)
+            sale.setdefault("delivery_method", "")
+            sale.setdefault("agent_id", None)
+            sale.setdefault("customer_id", None)
+            sale.setdefault("show_agent_on_invoice", False)
+            # One-time migration: sales created before commission was snapshotted
+            # per-sale get the agent's rate AT THAT TIME copied in, so historical
+            # commission totals don't silently change. Every sale from here on
+            # always stores its own percent/basis explicitly.
+            if "commission_percent" not in sale:
+                ag = _agents_idx.get(sale.get("agent_id"))
+                sale["commission_percent"] = ag.get("commission_percent") if ag else None
+                sale["commission_basis"] = ag.get("commission_basis") if ag else None
+            else:
+                sale.setdefault("commission_basis", None)
+            for it in sale.get("items", []):
+                it.setdefault("discount", 0)
+        for pur in d["purchases"]:
+            pur.setdefault("payment_status", "paid")
+            pur.setdefault("amount_paid", 0)
+            pur.setdefault("delivery_method", "")
+            pur.setdefault("po_no", None)
 
         # ── One-time migration: money in this file used to be stored in
         # full Tomans; everywhere else in the app (Money tab, Car tab)
@@ -2009,6 +2091,53 @@ def _new_id():
 # Nothing about cost/COGS/profit is stored — it's always recomputed
 # live from products+stores+purchases+sales. That means editing or
 # deleting an old purchase/sale can never leave stale numbers behind.
+def _resolve_sale_commission(data, agent_id, body):
+    """Everything about an agent's cut is optional and per-sale: leave the field
+    out entirely and it falls back to whatever the agent's default currently is;
+    send an explicit number and that's what THIS sale uses forever (immutable
+    history) AND becomes the agent's new default for next time; send an empty
+    string to mean "no commission on this one" without touching their default."""
+    if not agent_id:
+        return None, None
+    agent = next((a for a in data["sales_agents"] if a["id"] == agent_id), None)
+    if not agent:
+        return None, None
+    if "commission_percent" not in body:
+        return agent.get("commission_percent"), agent.get("commission_basis")
+    raw = body.get("commission_percent")
+    if raw in (None, ""):
+        return None, None
+    pct = float(raw)
+    basis = body.get("commission_basis") if body.get("commission_basis") in ("revenue", "profit") else (agent.get("commission_basis") or "profit")
+    if agent.get("commission_percent") != pct or agent.get("commission_basis") != basis:
+        agent["commission_percent"] = pct
+        agent["commission_basis"] = basis
+    return pct, basis
+
+def _calc_doc_totals(items, invoice_discount, tax_pct, shipping, payer, ratio):
+    """Same money math the sales loop uses, for documents that never touch the
+    books (quotations): item discounts -> invoice discount -> tax -> shipping share."""
+    subtotal = sum(max(float(it.get("qty") or 0) * float(it.get("unit_price") or 0) - float(it.get("discount") or 0), 0.0)
+                   for it in items)
+    net = max(subtotal - float(invoice_discount or 0), 0.0)
+    if payer == "business":
+        charged = 0.0
+    elif payer == "split":
+        charged = float(shipping or 0) * float(ratio if ratio not in (None, "") else 0.5)
+    else:
+        charged = float(shipping or 0)
+    tax = net * float(tax_pct or 0) / 100
+    return {"subtotal": round(subtotal, 2), "net_revenue": round(net, 2), "tax_amount": round(tax, 2),
+            "shipping_charged_to_customer": round(charged, 2), "invoice_total": round(net + charged + tax, 2)}
+
+def annotate_quotations(data):
+    out = []
+    for q in data.get("quotations", []):
+        t = _calc_doc_totals(q.get("items", []), q.get("discount"), q.get("tax_percent"),
+                             q.get("shipping_cost"), q.get("shipping_payer", "customer"), q.get("shipping_split_ratio"))
+        out.append({**q, **t})
+    return out
+
 def compute_parts_analytics(data):
     products = {p["id"]: p for p in data["products"]}
     stores   = {s["id"]: s for s in data["stores"]}
@@ -2029,12 +2158,34 @@ def compute_parts_analytics(data):
                 "price": float(it.get("unit_price") or 0),
                 "sale_id": sale["id"], "idx": idx,
             })
+    # Sale returns: goods coming back. Appended AFTER the sales so a same-day
+    # return is processed after the sale it belongs to (its restock cost is the
+    # exact per-unit cost that sale item was booked at).
+    sales_by_id = {sl["id"]: sl for sl in data["sales"]}
+    sold_qty = {}
+    for sl in data["sales"]:
+        for i, it in enumerate(sl.get("items", [])):
+            sold_qty[(sl["id"], i)] = float(it.get("qty") or 0)
+    for ret in data.get("sale_returns", []):
+        sl = sales_by_id.get(ret.get("sale_id"))
+        if not sl:
+            continue
+        sl_date = sl.get("date") or "0000-00-00"
+        ret_date = max(ret.get("date") or sl_date, sl_date)
+        for it in ret.get("items", []):
+            events.append({
+                "date": ret_date, "type": "return", "pid": it.get("product_id"),
+                "qty": float(it.get("qty") or 0), "sale_id": sl["id"], "idx": int(it.get("idx") or 0),
+                "restock": bool(ret.get("restock", True)),
+                "refund_price": float(it.get("refund_unit_price") or 0),
+            })
     # Stable sort: purchases were appended before sales, so on a date
     # tie stock arrives before it's sold that same day.
     events.sort(key=lambda e: e["date"])
 
     lots = {}          # product_id -> [[remaining_qty, unit_cost], ...]  oldest first
     sale_cogs = {}      # (sale_id, idx) -> cost
+    ret_qty, ret_revenue, ret_cogs = {}, {}, {}   # (sale_id, idx) -> returned qty / refunded revenue / cost put back
 
     # precompute overall avg purchase price per product, used only as a
     # fallback if a sale outruns every tracked lot (oversold / no purchase logged yet)
@@ -2052,6 +2203,18 @@ def compute_parts_analytics(data):
         if e["type"] == "purchase":
             if e["qty"] > 0:
                 lots[pid].append([e["qty"], e["price"]])
+        elif e["type"] == "return":
+            key = (e["sale_id"], e["idx"])
+            sold = sold_qty.get(key, 0.0)
+            q = max(min(e["qty"], sold - ret_qty.get(key, 0.0)), 0.0)
+            if q <= 1e-9:
+                continue
+            ret_qty[key] = ret_qty.get(key, 0.0) + q
+            ret_revenue[key] = ret_revenue.get(key, 0.0) + q * e["refund_price"]
+            if e["restock"]:
+                unit_cost = (sale_cogs.get(key, 0.0) / sold) if sold > 0 else 0.0
+                lots[pid].append([q, unit_cost])
+                ret_cogs[key] = ret_cogs.get(key, 0.0) + q * unit_cost
         else:
             remaining = e["qty"]
             cost = 0.0
@@ -2083,63 +2246,297 @@ def compute_parts_analytics(data):
     # Annotate sales with cogs/profit per item (revenue always = qty*unit_price)
     sales_out = []
     total_revenue = total_cogs = total_purchase_spend = 0.0
+    total_paid_to_suppliers = total_received_from_customers = 0.0
+    accounts_payable = accounts_receivable = 0.0
+    ap_by_store = {}      # store_id -> {outstanding, count}
+    ar_by_customer = {}   # customer name -> {outstanding, count}
     by_product = {}   # pid -> {qty_sold, revenue, cogs, profit, qty_purchased, spend}
     by_store = {}      # store_id -> {spend, purchases}
+    ledger_events = []  # unified account ledger — every event that moves cash
 
     for pur in data["purchases"]:
         sid = pur.get("store_id")
         by_store.setdefault(sid, {"spend": 0.0, "purchase_count": 0, "items_count": 0})
         by_store[sid]["purchase_count"] += 1
+        pur_spend = 0.0
         for it in pur.get("items", []):
             pid = it.get("product_id")
             qty = float(it.get("qty") or 0); price = float(it.get("unit_price") or 0)
             spend = qty * price
+            pur_spend += spend
             total_purchase_spend += spend
             by_store[sid]["spend"] += spend
             by_store[sid]["items_count"] += 1
             bp = by_product.setdefault(pid, {"qty_sold": 0, "revenue": 0.0, "cogs": 0.0, "profit": 0.0, "qty_purchased": 0, "spend": 0.0})
             bp["qty_purchased"] += qty
             bp["spend"] += spend
+        pstatus = pur.get("payment_status", "paid")
+        if pstatus == "paid":
+            paid = pur_spend
+        elif pstatus == "unpaid":
+            paid = 0.0
+        else:
+            paid = min(float(pur.get("amount_paid") or 0), pur_spend)
+        total_paid_to_suppliers += paid
+        outstanding = round(pur_spend - paid, 2)
+        if outstanding > 0.01:
+            accounts_payable += outstanding
+            b = ap_by_store.setdefault(sid, {"outstanding": 0.0, "count": 0})
+            b["outstanding"] += outstanding
+            b["count"] += 1
+        if paid > 0.01:
+            store_name = next((s["name"] for s in data["stores"] if s["id"] == sid), "(deleted store)")
+            ledger_events.append({
+                "date": pur.get("order_date"), "type": "purchase_payment",
+                "description": f"خرید از {store_name}" + (f" (PO#{pur.get('po_no')})" if pur.get("po_no") else ""),
+                "amount": -round(paid, 2), "ref_id": pur["id"],
+            })
+
+    # ── Returns & agents: prepare what the sales loop needs ──
+    agents_by_id = {a["id"]: a for a in data.get("sales_agents", [])}
+    _zero_agent = lambda: {"orders": 0, "revenue": 0.0, "profit": 0.0, "accrued": 0.0, "paid": 0.0}
+    agent_summary = {}
+    total_agent_commission = total_cash_refunds = total_shipping_paid = 0.0
+    returns_value = 0.0
+    returns_count = 0
+    returns_by_reason = {}
+    refunds_by_sale = {}
+    for ret in data.get("sale_returns", []):
+        sl = sales_by_id.get(ret.get("sale_id"))
+        if not sl:
+            continue
+        returns_count += 1
+        reason = ret.get("reason") or "سایر"
+        rb = returns_by_reason.setdefault(reason, {"count": 0, "value": 0.0})
+        rb["count"] += 1
+        rb["value"] += float(ret.get("refund_total") or 0)
+        cash = float(ret.get("cash_refunded") or 0)
+        refunds_by_sale[sl["id"]] = refunds_by_sale.get(sl["id"], 0.0) + cash
+        total_cash_refunds += cash
+        if cash > 0.01:
+            ledger_events.append({
+                "date": max(ret.get("date") or sl.get("date") or "", sl.get("date") or ""), "type": "sale_refund",
+                "description": f"مرجوعی به {sl.get('customer_name') or 'مشتری بدون نام'}",
+                "amount": -round(cash, 2), "ref_id": ret["id"],
+            })
 
     for sale in data["sales"]:
         s = dict(sale)
         items_out = []
-        sale_revenue = sale_cogs_total = 0.0
+        raw_items = []
+        subtotal_after_item_disc = 0.0
+        sale_cogs_gross = 0.0
         for idx, it in enumerate(sale.get("items", [])):
             pid = it.get("product_id")
             qty = float(it.get("qty") or 0); price = float(it.get("unit_price") or 0)
-            revenue = qty * price
-            cogs = sale_cogs.get((sale["id"], idx), 0.0)
-            profit = revenue - cogs
-            items_out.append({**it, "revenue": round(revenue, 2), "cogs": round(cogs, 2), "profit": round(profit, 2)})
-            sale_revenue += revenue
-            sale_cogs_total += cogs
-            bp = by_product.setdefault(pid, {"qty_sold": 0, "revenue": 0.0, "cogs": 0.0, "profit": 0.0, "qty_purchased": 0, "spend": 0.0})
-            bp["qty_sold"] += qty
-            bp["revenue"] += revenue
-            bp["cogs"] += cogs
+            item_discount = float(it.get("discount") or 0)
+            net_line = max(qty * price - item_discount, 0.0)
+            key = (sale["id"], idx)
+            cogs = sale_cogs.get(key, 0.0)
+            sale_cogs_gross += cogs
+            subtotal_after_item_disc += net_line
+            raw_items.append({"orig": it, "pid": pid, "qty": qty, "net_line": net_line, "cogs": cogs,
+                              "rq": ret_qty.get(key, 0.0), "rrev": ret_revenue.get(key, 0.0), "rcogs": ret_cogs.get(key, 0.0)})
+
+        # An invoice-level discount is spread proportionally across the lines
+        # so per-product profit reporting (by_product, margin, ABC analysis)
+        # stays accurate instead of the discount vanishing into thin air.
+        invoice_discount = float(sale.get("discount") or 0)
+        alloc_ratio = (invoice_discount / subtotal_after_item_disc) if subtotal_after_item_disc > 0 else 0.0
+        alloc_ratio = min(alloc_ratio, 1.0)
+
+        returned_revenue_net = returned_cogs = 0.0
+        for row in raw_items:
+            final_revenue = row["net_line"] * (1 - alloc_ratio)
+            rev_after = final_revenue - row["rrev"]          # what's left after refunds
+            cogs_after = row["cogs"] - row["rcogs"]          # cost put back on the shelf is no longer a cost
+            profit = rev_after - cogs_after
+            returned_revenue_net += row["rrev"]
+            returned_cogs += row["rcogs"]
+            items_out.append({**row["orig"], "revenue": round(rev_after, 2), "cogs": round(cogs_after, 2), "profit": round(profit, 2),
+                              "returned_qty": round(row["rq"], 3),
+                              "eff_unit_net": round(final_revenue / row["qty"], 2) if row["qty"] > 0 else 0})
+            bp = by_product.setdefault(row["pid"], {"qty_sold": 0, "revenue": 0.0, "cogs": 0.0, "profit": 0.0, "qty_purchased": 0, "spend": 0.0})
+            bp["qty_sold"] += row["qty"] - row["rq"]
+            bp["revenue"] += rev_after
+            bp["cogs"] += cogs_after
             bp["profit"] += profit
+
+        net_revenue = max(subtotal_after_item_disc - invoice_discount, 0.0)
+        shipping = float(sale.get("shipping_cost") or 0)
+        shipping_payer = sale.get("shipping_payer", "customer")
+        shipping_ratio = float(sale.get("shipping_split_ratio") or 0.5)
+        if shipping_payer == "customer":
+            shipping_charged_to_customer = shipping
+        elif shipping_payer == "business":
+            shipping_charged_to_customer = 0.0
+        else:  # split
+            shipping_charged_to_customer = shipping * shipping_ratio
+        # The shop always actually pays the courier the full `shipping` cost;
+        # only the portion charged to the customer comes back as revenue, so
+        # whatever the shop absorbs shows up as a real dent in profit.
+        shipping_net_profit_effect = shipping_charged_to_customer - shipping
+        tax_pct = float(sale.get("tax_percent") or 0)
+        tax_amount = net_revenue * tax_pct / 100
+        # Tax collected from the customer is money owed onward to the tax
+        # authority, not the shop's own income — it's part of what's charged
+        # and collected (invoice_total / AR), but excluded from revenue/profit.
+        invoice_total = net_revenue + shipping_charged_to_customer + tax_amount
+        returned_tax = returned_revenue_net * tax_pct / 100
+        returned_value_total = returned_revenue_net + returned_tax
+        net_invoice_total = invoice_total - returned_value_total
+        returns_value += returned_value_total
+        sale_revenue = net_revenue + shipping_net_profit_effect - returned_revenue_net
+        sale_cogs_total = sale_cogs_gross - returned_cogs
+        sale_profit = sale_revenue - sale_cogs_total
+
+        sstatus = sale.get("payment_status", "paid")
+        if sstatus == "paid":
+            received = invoice_total
+        elif sstatus == "unpaid":
+            received = 0.0
+        else:
+            received = min(float(sale.get("amount_paid") or 0), invoice_total)
+        cash_refunded = refunds_by_sale.get(sale["id"], 0.0)
+        total_received_from_customers += received
+        # What the customer still owes: the invoice as reduced by returns, minus
+        # what they actually kept paying after any cash was handed back to them.
+        outstanding = round(max(net_invoice_total - (received - cash_refunded), 0.0), 2)
+        if outstanding > 0.01:
+            accounts_receivable += outstanding
+            cust = sale.get("customer_name") or "بدون نام"
+            b = ar_by_customer.setdefault(cust, {"outstanding": 0.0, "count": 0})
+            b["outstanding"] += outstanding
+            b["count"] += 1
+        cust_label = sale.get("customer_name") or "مشتری بدون نام"
+        if received > 0.01:
+            ledger_events.append({
+                "date": sale.get("date"), "type": "sale_receipt",
+                "description": f"فروش به {cust_label}" + (f" (فاکتور #{sale.get('invoice_no')})" if sale.get("invoice_no") else ""),
+                "amount": round(received, 2), "ref_id": sale["id"],
+            })
+        if shipping > 0.01:
+            # The courier is paid the FULL shipping cost regardless of who the
+            # customer is charged — this is real cash leaving the business.
+            total_shipping_paid += shipping
+            ledger_events.append({
+                "date": sale.get("date"), "type": "shipping_paid",
+                "description": f"هزینه ارسال فروش به {cust_label}",
+                "amount": -round(shipping, 2), "ref_id": sale["id"],
+            })
+
+        agent = agents_by_id.get(sale.get("agent_id"))
+        commission = 0.0
+        if agent:
+            summ = agent_summary.setdefault(agent["id"], _zero_agent())
+            summ["orders"] += 1
+            summ["revenue"] += sale_revenue
+            summ["profit"] += sale_profit
+            # Commission uses the percent/basis SNAPSHOTTED on this sale at the
+            # time it was made — not the agent's current default — so changing
+            # an agent's usual rate later never rewrites past sales' history.
+            pct = sale.get("commission_percent")
+            if pct not in (None, ""):
+                basis = sale.get("commission_basis") or agent.get("commission_basis") or "profit"
+                base = sale_profit if basis == "profit" else sale_revenue
+                commission = max(base, 0.0) * float(pct) / 100
+                summ["accrued"] += commission
+                total_agent_commission += commission
+
         s["items"] = items_out
         s["revenue"] = round(sale_revenue, 2)
         s["cogs"] = round(sale_cogs_total, 2)
-        s["profit"] = round(sale_revenue - sale_cogs_total, 2)
+        s["profit"] = round(sale_profit, 2)
+        s["tax_amount"] = round(tax_amount, 2)
+        s["shipping_charged_to_customer"] = round(shipping_charged_to_customer, 2)
+        s["shipping_net_profit_effect"] = round(shipping_net_profit_effect, 2)
+        s["invoice_total"] = round(invoice_total, 2)
+        s["returned_value_total"] = round(returned_value_total, 2)
+        s["net_invoice_total"] = round(net_invoice_total, 2)
+        s["cash_refunded"] = round(cash_refunded, 2)
+        s["agent_commission"] = round(commission, 2)
+        s["amount_received"] = round(received, 2)
+        s["amount_outstanding"] = outstanding
         sales_out.append(s)
         total_revenue += sale_revenue
         total_cogs += sale_cogs_total
 
     low_stock_threshold = data.get("low_stock_threshold", 2)
-    low_stock = [pid for pid, q in stock.items() if pid in products and q <= low_stock_threshold]
+    low_stock = [pid for pid, q in stock.items() if pid in products
+                 and q <= (products[pid].get("reorder_point") if products[pid].get("reorder_point") not in (None, "") else low_stock_threshold)]
 
     inventory_value = sum(stock[pid] * avg_cost_remaining[pid] for pid in stock)
 
     # ── Cash / capital ledger ────────────────────────
     # Cash balance is fully derived, never stored: what the owner put in,
-    # minus what they took out, minus every purchase, plus every sale.
+    # minus what they took out, minus what was actually PAID to suppliers,
+    # minus expenses, plus what was actually RECEIVED from customers — so a
+    # sale or purchase left "unpaid"/"partial" doesn't move cash until settled.
     total_deposits = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "deposit")
     total_withdrawals = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "withdrawal")
-    cash_balance = total_deposits - total_withdrawals - total_purchase_spend + total_revenue
-    business_value = cash_balance + inventory_value
-    net_capital = total_deposits - total_withdrawals
+    total_adjustments = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "adjustment")
+    total_expenses = sum(float(x.get("amount") or 0) for x in data.get("business_expenses", []))
+
+    # Agent commission: accrued per sale above, settled here by recorded payouts.
+    # A payout moves cash but is NOT another expense — the cost was already
+    # recognised when the commission accrued, so profit isn't hit twice.
+    total_agent_payouts = 0.0
+    for p in data.get("agent_payouts", []):
+        amt = float(p.get("amount") or 0)
+        total_agent_payouts += amt
+        summ = agent_summary.setdefault(p.get("agent_id"), _zero_agent())
+        summ["paid"] += amt
+        agent_name = (agents_by_id.get(p.get("agent_id")) or {}).get("name", "(نماینده حذف‌شده)")
+        ledger_events.append({
+            "date": p.get("date"), "type": "agent_payout",
+            "description": f"پرداخت پورسانت به {agent_name}" + (f" — {p.get('note')}" if p.get("note") else ""),
+            "amount": -round(amt, 2), "ref_id": p["id"],
+        })
+    for aid in agents_by_id:
+        agent_summary.setdefault(aid, _zero_agent())
+    for summ in agent_summary.values():
+        summ["payable"] = summ["accrued"] - summ["paid"]
+    agent_commission_payable = total_agent_commission - total_agent_payouts
+
+    cash_balance = (total_deposits - total_withdrawals + total_adjustments - total_paid_to_suppliers - total_expenses
+                    + total_received_from_customers - total_cash_refunds - total_shipping_paid - total_agent_payouts)
+    business_value = cash_balance + inventory_value + accounts_receivable - accounts_payable - agent_commission_payable
+    net_capital = total_deposits - total_withdrawals + total_adjustments
+
+    # ── Unified account ledger ("گردش حساب") — every event that ever moved
+    # cash, in one chronological statement with a running balance, the way a
+    # bank statement or a general ledger does ──
+    for t in data.get("capital_transactions", []):
+        ttype = t.get("type")
+        amt = float(t.get("amount") or 0)
+        signed = amt if ttype == "deposit" else (-amt if ttype == "withdrawal" else amt)
+        label = {"deposit": "واریز سرمایه", "withdrawal": "برداشت", "adjustment": "تعدیل مغایرت‌گیری"}.get(ttype, ttype)
+        ledger_events.append({
+            "date": t.get("date"), "type": "capital_" + str(ttype),
+            "description": label + (f" — {t.get('note')}" if t.get("note") else ""),
+            "amount": round(signed, 2), "ref_id": t["id"],
+        })
+    for x in data.get("business_expenses", []):
+        ledger_events.append({
+            "date": x.get("date"), "type": "expense",
+            "description": f"هزینه: {x.get('title') or x.get('category')}",
+            "amount": -round(float(x.get("amount") or 0), 2), "ref_id": x["id"],
+        })
+    ledger_events.sort(key=lambda e: (e.get("date") or "", e.get("type") or ""))
+    running = 0.0
+    cash_ledger = []
+    for e in ledger_events:
+        running += e["amount"]
+        cash_ledger.append({**e, "running_balance": round(running, 2)})
+
+    # ── Expenses by category, for the reports dashboard ──
+    expenses_by_category = {}
+    for x in data.get("business_expenses", []):
+        cat = x.get("category") or "سایر"
+        b = expenses_by_category.setdefault(cat, {"amount": 0.0, "count": 0})
+        b["amount"] += float(x.get("amount") or 0)
+        b["count"] += 1
+    net_profit_after_expenses = round((total_revenue - total_cogs) - total_expenses - total_agent_commission, 2)
 
     return {
         "sales": sales_out,
@@ -2164,9 +2561,53 @@ def compute_parts_analytics(data):
             "net_capital": round(net_capital, 2),
             "cash_balance": round(cash_balance, 2),
             "business_value": round(business_value, 2),
+            "total_expenses": round(total_expenses, 2),
+            "net_profit_after_expenses": net_profit_after_expenses,
+            "gross_margin_pct": round((total_revenue - total_cogs) / total_revenue * 100, 2) if total_revenue > 0 else 0,
+            "accounts_receivable": round(accounts_receivable, 2),
+            "accounts_payable": round(accounts_payable, 2),
+            "total_received_from_customers": round(total_received_from_customers, 2),
+            "total_paid_to_suppliers": round(total_paid_to_suppliers, 2),
+            "total_agent_commission": round(total_agent_commission, 2),
+            "total_agent_payouts": round(total_agent_payouts, 2),
+            "agent_commission_payable": round(agent_commission_payable, 2),
+            "total_cash_refunds": round(total_cash_refunds, 2),
+            "total_shipping_paid": round(total_shipping_paid, 2),
+            "returns_value": round(returns_value, 2),
+            "returns_count": returns_count,
         },
+        "agent_summary": {aid: {k: round(v, 2) if isinstance(v, float) else v for k, v in summ.items()}
+                          for aid, summ in agent_summary.items()},
+        "returns_by_reason": {k: {"count": v["count"], "value": round(v["value"], 2)} for k, v in returns_by_reason.items()},
+        "expenses_by_category": {k: {"amount": round(v["amount"], 2), "count": v["count"]} for k, v in expenses_by_category.items()},
+        "ar_by_customer": {k: {"outstanding": round(v["outstanding"], 2), "count": v["count"]} for k, v in ar_by_customer.items()},
+        "ap_by_store": {k: {"outstanding": round(v["outstanding"], 2), "count": v["count"]} for k, v in ap_by_store.items()},
+        "cash_ledger": cash_ledger,
         "low_stock": low_stock,
         "low_stock_threshold": low_stock_threshold,
+    }
+
+def _parts_payload(data, analytics):
+    """Single source of truth for what the frontend receives — used by both GET
+    and every POST action, so the two can never drift apart again."""
+    return {
+        "products": data["products"], "stores": data["stores"], "car_models": data["car_models"],
+        "brands": data["brands"], "part_types": data["part_types"], "categories": data["categories"],
+        "purchases": data["purchases"], "sales": analytics["sales"],
+        "capital_transactions": data["capital_transactions"],
+        "generic_products": data["generic_products"], "price_entries": data["price_entries"],
+        "business_expenses": data["business_expenses"], "business_profile": data["business_profile"],
+        "reconciliations": data["reconciliations"], "sales_agents": data["sales_agents"],
+        "customers": data["customers"], "sale_returns": data["sale_returns"],
+        "quotations": annotate_quotations(data), "agent_payouts": data["agent_payouts"],
+        "pricing_settings": data["pricing_settings"],
+        "stock": analytics["stock"], "avg_cost": analytics["avg_cost"],
+        "by_product": analytics["by_product"], "by_store": analytics["by_store"],
+        "totals": analytics["totals"], "expenses_by_category": analytics["expenses_by_category"],
+        "ar_by_customer": analytics["ar_by_customer"], "ap_by_store": analytics["ap_by_store"],
+        "cash_ledger": analytics["cash_ledger"], "agent_summary": analytics["agent_summary"],
+        "returns_by_reason": analytics["returns_by_reason"],
+        "low_stock": analytics["low_stock"], "low_stock_threshold": analytics["low_stock_threshold"],
     }
 
 @app.route("/api/parts", methods=["GET", "POST"])
@@ -2175,30 +2616,18 @@ def parts_api():
 
     if request.method == "GET":
         analytics = compute_parts_analytics(data)
-        return jsonify({
-            "products": data["products"],
-            "stores": data["stores"],
-            "car_models": data["car_models"],
-            "brands": data["brands"],
-            "part_types": data["part_types"],
-            "categories": data["categories"],
-            "purchases": data["purchases"],
-            "sales": analytics["sales"],
-            "capital_transactions": data["capital_transactions"],
-            "stock": analytics["stock"],
-            "avg_cost": analytics["avg_cost"],
-            "by_product": analytics["by_product"],
-            "by_store": analytics["by_store"],
-            "totals": analytics["totals"],
-            "low_stock": analytics["low_stock"],
-            "low_stock_threshold": analytics["low_stock_threshold"],
-        })
+        return jsonify(_parts_payload(data, analytics))
 
     body = request.json or {}
     action = body.get("action")
 
     # ── PRODUCTS ─────────────────────────────────────
+    def _num_or_none(v):
+        return float(v) if v not in (None, "") else None
+
     if action == "add_product":
+        sp = body.get("sale_price", None)
+        rp = body.get("reorder_point", None)
         data["products"].append({
             "id": _new_id(),
             "name": body.get("name", "").strip(),
@@ -2211,6 +2640,14 @@ def parts_api():
             "notes": body.get("notes", "").strip(),
             "torob_link": body.get("torob_link", "").strip(),
             "image": body.get("image", ""),
+            "sale_price": (float(sp) if sp not in (None, "") else None),
+            "reorder_point": (float(rp) if rp not in (None, "") else None),
+            "calc_shipping_payer": body.get("calc_shipping_payer") if body.get("calc_shipping_payer") in ("customer", "business", "split") else None,
+            "calc_shipping_cost": _num_or_none(body.get("calc_shipping_cost")),
+            "calc_shipping_split_ratio": _num_or_none(body.get("calc_shipping_split_ratio")),
+            "calc_include_agent_share": body.get("calc_include_agent_share") if "calc_include_agent_share" in body and body.get("calc_include_agent_share") != "" else None,
+            "calc_agent_share_pct": _num_or_none(body.get("calc_agent_share_pct")),
+            "calc_target_margin_pct": _num_or_none(body.get("calc_target_margin_pct")),
             "created_at": str(date.today()),
         })
     elif action == "update_product":
@@ -2221,10 +2658,93 @@ def parts_api():
                         p[k] = (body.get(k) or "").strip()
                 if "image" in body:
                     p["image"] = body.get("image", "")
+                if "sale_price" in body:
+                    sp = body.get("sale_price", None)
+                    p["sale_price"] = (float(sp) if sp not in (None, "") else None)
+                if "reorder_point" in body:
+                    rp = body.get("reorder_point", None)
+                    p["reorder_point"] = (float(rp) if rp not in (None, "") else None)
+                if "calc_shipping_payer" in body:
+                    p["calc_shipping_payer"] = body.get("calc_shipping_payer") if body.get("calc_shipping_payer") in ("customer", "business", "split") else None
+                if "calc_shipping_cost" in body:
+                    p["calc_shipping_cost"] = _num_or_none(body.get("calc_shipping_cost"))
+                if "calc_shipping_split_ratio" in body:
+                    p["calc_shipping_split_ratio"] = _num_or_none(body.get("calc_shipping_split_ratio"))
+                if "calc_include_agent_share" in body:
+                    v = body.get("calc_include_agent_share")
+                    p["calc_include_agent_share"] = v if v != "" else None
+                if "calc_agent_share_pct" in body:
+                    p["calc_agent_share_pct"] = _num_or_none(body.get("calc_agent_share_pct"))
+                if "calc_target_margin_pct" in body:
+                    p["calc_target_margin_pct"] = _num_or_none(body.get("calc_target_margin_pct"))
                 break
     elif action == "delete_product":
         pid = body.get("id")
         data["products"] = [p for p in data["products"] if p["id"] != pid]
+
+    # ── BULK PRODUCT EDITS — sale price and agent-share, applied to a chosen
+    # set of products (or every product) in one shot ──
+    elif action == "bulk_update_products":
+        ids = body.get("product_ids")
+        targets = data["products"] if not ids else [p for p in data["products"] if p["id"] in ids]
+        field = body.get("field")      # "sale_price" | "agent_share_pct"
+        op = body.get("op")            # see each branch below
+        value = body.get("value")
+        value = float(value) if value not in (None, "") else None
+        analytics_now = compute_parts_analytics(data) if field == "sale_price" and op == "markup_from_cost" else None
+        affected = skipped = 0
+        for p in targets:
+            if field == "sale_price":
+                cur = p.get("sale_price")
+                if op == "markup_from_cost":
+                    cost = (analytics_now["avg_cost"].get(p["id"]) or 0) if analytics_now else 0
+                    if cost <= 0:
+                        skipped += 1; continue
+                    p["sale_price"] = round(cost * (1 + (value or 0) / 100), 2)
+                elif op == "set_flat":
+                    if value is None:
+                        skipped += 1; continue
+                    p["sale_price"] = value
+                elif op == "adjust_relative":
+                    if cur in (None, ""):
+                        skipped += 1; continue
+                    p["sale_price"] = round(cur * (1 + (value or 0) / 100), 2)
+                elif op == "adjust_flat":
+                    if cur in (None, ""):
+                        skipped += 1; continue
+                    p["sale_price"] = round(cur + (value or 0), 2)
+                elif op == "clear":
+                    p["sale_price"] = None
+                else:
+                    skipped += 1; continue
+                affected += 1
+            elif field == "agent_share_pct":
+                cur = p.get("calc_agent_share_pct")
+                if cur is None:
+                    cur = data["pricing_settings"].get("agent_share_pct")
+                if op == "set_flat":
+                    if value is None:
+                        skipped += 1; continue
+                    p["calc_agent_share_pct"] = value
+                    p["calc_include_agent_share"] = True
+                elif op == "adjust_relative":
+                    base = cur or 0
+                    p["calc_agent_share_pct"] = round(base * (1 + (value or 0) / 100), 2)
+                    p["calc_include_agent_share"] = True
+                elif op == "adjust_points":
+                    base = cur or 0
+                    p["calc_agent_share_pct"] = round(max(base + (value or 0), 0), 2)
+                    p["calc_include_agent_share"] = True
+                elif op == "disable":
+                    p["calc_include_agent_share"] = False
+                elif op == "clear":
+                    p["calc_agent_share_pct"] = None
+                    p["calc_include_agent_share"] = None
+                else:
+                    skipped += 1; continue
+                affected += 1
+            else:
+                skipped += 1
 
     # ── STORES ───────────────────────────────────────
     elif action == "add_store":
@@ -2237,6 +2757,8 @@ def parts_api():
             "website": body.get("website", "").strip(),
             "notes": body.get("notes", "").strip(),
             "image": body.get("image", ""),
+            "shipping_cost": float(body.get("shipping_cost") or 0),
+            "free_shipping_min": float(body.get("free_shipping_min") or 0),
             "created_at": str(date.today()),
         })
     elif action == "update_store":
@@ -2247,10 +2769,50 @@ def parts_api():
                         s[k] = (body.get(k) or "").strip()
                 if "image" in body:
                     s["image"] = body.get("image", "")
+                if "shipping_cost" in body:
+                    s["shipping_cost"] = float(body.get("shipping_cost") or 0)
+                if "free_shipping_min" in body:
+                    s["free_shipping_min"] = float(body.get("free_shipping_min") or 0)
                 break
     elif action == "delete_store":
         sid = body.get("id")
         data["stores"] = [s for s in data["stores"] if s["id"] != sid]
+
+    # ── SALES AGENTS / REPS — people who sold on your behalf (e.g. a
+    # mechanic who refers customers to you), distinct from suppliers ──
+    elif action == "add_sales_agent":
+        cp = body.get("commission_percent", None)
+        data["sales_agents"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "address": body.get("address", "").strip(),
+            "phone": body.get("phone", "").strip(),
+            "notes": body.get("notes", "").strip(),
+            "image": body.get("image", ""),
+            "commission_percent": (float(cp) if cp not in (None, "") else None),
+            "commission_basis": body.get("commission_basis") if body.get("commission_basis") in ("revenue", "profit") else "profit",
+            "created_at": str(date.today()),
+        })
+    elif action == "update_sales_agent":
+        for a in data["sales_agents"]:
+            if a["id"] == body.get("id"):
+                for k in ["name", "address", "phone", "notes"]:
+                    if k in body:
+                        a[k] = (body.get(k) or "").strip()
+                if "image" in body:
+                    a["image"] = body.get("image", "")
+                if "commission_percent" in body:
+                    cp = body.get("commission_percent", None)
+                    a["commission_percent"] = (float(cp) if cp not in (None, "") else None)
+                if body.get("commission_basis") in ("revenue", "profit"):
+                    a["commission_basis"] = body.get("commission_basis")
+                break
+    elif action == "delete_sales_agent":
+        aid = body.get("id")
+        data["sales_agents"] = [a for a in data["sales_agents"] if a["id"] != aid]
+        for sale in data["sales"]:
+            if sale.get("agent_id") == aid:
+                sale["agent_id"] = None
 
     # ── CAR MODELS (managed list, used by the product multi-select) ──
     elif action == "add_car_model":
@@ -2324,13 +2886,22 @@ def parts_api():
     elif action == "add_purchase":
         items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
                    "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+        pstatus = body.get("payment_status") if body.get("payment_status") in ("paid", "unpaid", "partial") else "paid"
+        pamt = body.get("amount_paid", None)
+        bp = data["business_profile"]
+        po_no = bp.get("next_po_no", 1)
+        bp["next_po_no"] = int(bp.get("next_po_no", 1)) + 1
         data["purchases"].append({
             "id": _new_id(),
+            "po_no": po_no,
             "store_id": body.get("store_id"),
             "order_date": body.get("order_date"),
             "receipt_date": body.get("receipt_date") or body.get("order_date"),
             "same_day": bool(body.get("same_day", True)),
             "items": items,
+            "delivery_method": body.get("delivery_method", "").strip(),
+            "payment_status": pstatus,
+            "amount_paid": (float(pamt) if pamt not in (None, "") else 0),
             "notes": body.get("notes", "").strip(),
             "invoice_image": body.get("invoice_image", ""),
             "receipt_image": body.get("receipt_image", ""),
@@ -2343,6 +2914,12 @@ def parts_api():
                 if "order_date" in body: pur["order_date"] = body.get("order_date")
                 if "receipt_date" in body: pur["receipt_date"] = body.get("receipt_date")
                 if "same_day" in body: pur["same_day"] = bool(body.get("same_day"))
+                if "delivery_method" in body: pur["delivery_method"] = (body.get("delivery_method") or "").strip()
+                if "payment_status" in body and body.get("payment_status") in ("paid", "unpaid", "partial"):
+                    pur["payment_status"] = body.get("payment_status")
+                if "amount_paid" in body:
+                    pamt = body.get("amount_paid", None)
+                    pur["amount_paid"] = (float(pamt) if pamt not in (None, "") else 0)
                 if "notes" in body: pur["notes"] = (body.get("notes") or "").strip()
                 if "items" in body:
                     pur["items"] = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
@@ -2357,28 +2934,236 @@ def parts_api():
     # ── SALES (one customer/visit, many line items) ──
     elif action == "add_sale":
         items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
-                   "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+                   "unit_price": float(it.get("unit_price") or 0),
+                   "discount": float(it.get("discount") or 0)} for it in body.get("items", [])]
+        disc = body.get("discount", None)
+        taxp = body.get("tax_percent", None)
+        ship = body.get("shipping_cost", None)
+        ship_payer = body.get("shipping_payer") if body.get("shipping_payer") in ("customer", "business", "split") else "customer"
+        ship_ratio = body.get("shipping_split_ratio", None)
+        sstatus = body.get("payment_status") if body.get("payment_status") in ("paid", "unpaid", "partial") else "paid"
+        samt = body.get("amount_paid", None)
+        agent_id = body.get("agent_id") or None
+        commission_pct, commission_basis = _resolve_sale_commission(data, agent_id, body)
         data["sales"].append({
             "id": _new_id(),
             "date": body.get("date"),
             "customer_name": body.get("customer_name", "").strip(),
+            "customer_phone": body.get("customer_phone", "").strip(),
+            "customer_address": body.get("customer_address", "").strip(),
+            "discount": (float(disc) if disc not in (None, "") else 0),
+            "tax_percent": (float(taxp) if taxp not in (None, "") else 0),
+            "shipping_cost": (float(ship) if ship not in (None, "") else 0),
+            "shipping_payer": ship_payer,
+            "shipping_split_ratio": (float(ship_ratio) if ship_ratio not in (None, "") else 0.5),
+            "delivery_method": body.get("delivery_method", "").strip(),
+            "customer_id": body.get("customer_id") or None,
+            "agent_id": agent_id,
+            "commission_percent": commission_pct,
+            "commission_basis": commission_basis,
+            "show_agent_on_invoice": bool(body.get("show_agent_on_invoice", False)),
+            "payment_status": sstatus,
+            "amount_paid": (float(samt) if samt not in (None, "") else 0),
             "notes": body.get("notes", "").strip(),
             "items": items,
+            "invoice_no": None,
+            "invoice_generated_at": None,
             "created_at": str(date.today()),
         })
+        # Saving a sale that came from a quotation closes the loop on it
+        if body.get("from_quotation_id"):
+            for q in data["quotations"]:
+                if q["id"] == body.get("from_quotation_id"):
+                    q["status"] = "converted"
+                    q["converted_sale_id"] = data["sales"][-1]["id"]
     elif action == "update_sale":
         for sale in data["sales"]:
             if sale["id"] == body.get("id"):
                 if "date" in body: sale["date"] = body.get("date")
                 if "customer_name" in body: sale["customer_name"] = (body.get("customer_name") or "").strip()
+                if "customer_phone" in body: sale["customer_phone"] = (body.get("customer_phone") or "").strip()
+                if "customer_address" in body: sale["customer_address"] = (body.get("customer_address") or "").strip()
+                if "discount" in body:
+                    d_ = body.get("discount", None)
+                    sale["discount"] = (float(d_) if d_ not in (None, "") else 0)
+                if "tax_percent" in body:
+                    t_ = body.get("tax_percent", None)
+                    sale["tax_percent"] = (float(t_) if t_ not in (None, "") else 0)
+                if "shipping_cost" in body:
+                    s_ = body.get("shipping_cost", None)
+                    sale["shipping_cost"] = (float(s_) if s_ not in (None, "") else 0)
+                if "shipping_payer" in body and body.get("shipping_payer") in ("customer", "business", "split"):
+                    sale["shipping_payer"] = body.get("shipping_payer")
+                if "shipping_split_ratio" in body:
+                    sr_ = body.get("shipping_split_ratio", None)
+                    sale["shipping_split_ratio"] = (float(sr_) if sr_ not in (None, "") else 0.5)
+                if "delivery_method" in body: sale["delivery_method"] = (body.get("delivery_method") or "").strip()
+                if "customer_id" in body: sale["customer_id"] = body.get("customer_id") or None
+                if "agent_id" in body: sale["agent_id"] = body.get("agent_id") or None
+                if "agent_id" in body or "commission_percent" in body:
+                    pct, basis = _resolve_sale_commission(data, sale.get("agent_id"), body)
+                    sale["commission_percent"] = pct
+                    sale["commission_basis"] = basis
+                if "show_agent_on_invoice" in body: sale["show_agent_on_invoice"] = bool(body.get("show_agent_on_invoice"))
+                if "payment_status" in body and body.get("payment_status") in ("paid", "unpaid", "partial"):
+                    sale["payment_status"] = body.get("payment_status")
+                if "amount_paid" in body:
+                    samt = body.get("amount_paid", None)
+                    sale["amount_paid"] = (float(samt) if samt not in (None, "") else 0)
                 if "notes" in body: sale["notes"] = (body.get("notes") or "").strip()
                 if "items" in body:
-                    sale["items"] = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
-                                        "unit_price": float(it.get("unit_price") or 0)} for it in body.get("items", [])]
+                    new_items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                                  "unit_price": float(it.get("unit_price") or 0),
+                                  "discount": float(it.get("discount") or 0)} for it in body.get("items", [])]
+                    has_returns = any(r.get("sale_id") == sale["id"] for r in data["sale_returns"])
+                    if has_returns and [i["product_id"] for i in new_items] != [i.get("product_id") for i in sale.get("items", [])]:
+                        return jsonify({"ok": False, "error": "این فروش مرجوعی دارد؛ ردیف‌های کالا را نمی‌شود کم/زیاد یا جابه‌جا کرد. اول مرجوعی‌ها را حذف کن."}), 400
+                    sale["items"] = new_items
                 break
     elif action == "delete_sale":
         sid = body.get("id")
         data["sales"] = [s for s in data["sales"] if s["id"] != sid]
+        data["sale_returns"] = [r for r in data["sale_returns"] if r.get("sale_id") != sid]
+        for q in data["quotations"]:
+            if q.get("converted_sale_id") == sid:
+                q["status"] = "open"; q["converted_sale_id"] = None
+
+    # ── CUSTOMERS (باشگاه مشتریان) ──
+    elif action == "add_customer":
+        data["customers"].append({
+            "id": _new_id(), "name": body.get("name", "").strip(), "phone": body.get("phone", "").strip(),
+            "address": body.get("address", "").strip(), "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_customer":
+        for c in data["customers"]:
+            if c["id"] == body.get("id"):
+                for k in ["name", "phone", "address", "notes"]:
+                    if k in body: c[k] = (body.get(k) or "").strip()
+                break
+    elif action == "delete_customer":
+        cid = body.get("id")
+        data["customers"] = [c for c in data["customers"] if c["id"] != cid]
+        for sl in data["sales"]:
+            if sl.get("customer_id") == cid: sl["customer_id"] = None
+        for q in data["quotations"]:
+            if q.get("customer_id") == cid: q["customer_id"] = None
+
+    # ── SALE RETURNS (مرجوعی) ──
+    elif action == "add_sale_return":
+        sale = next((x for x in data["sales"] if x["id"] == body.get("sale_id")), None)
+        if not sale:
+            return jsonify({"ok": False, "error": "فروش پیدا نشد"}), 400
+        now = compute_parts_analytics(data)
+        sale_out = next(x for x in now["sales"] if x["id"] == sale["id"])
+        tax_pct = float(sale.get("tax_percent") or 0)
+        new_items, refund_net = [], 0.0
+        for it in body.get("items", []):
+            idx = int(it.get("idx", -1))
+            qty = float(it.get("qty") or 0)
+            if qty <= 0:
+                continue
+            if idx < 0 or idx >= len(sale_out["items"]) or sale_out["items"][idx].get("product_id") != it.get("product_id"):
+                return jsonify({"ok": False, "error": "ردیف مرجوعی با ردیف فروش نمی‌خواند"}), 400
+            src = sale_out["items"][idx]
+            left = float(src.get("qty") or 0) - float(src.get("returned_qty") or 0)
+            if qty > left + 1e-9:
+                return jsonify({"ok": False, "error": f"بیشتر از تعداد قابل مرجوع است (حداکثر {left:g})"}), 400
+            price = float(it.get("refund_unit_price") if it.get("refund_unit_price") not in (None, "") else src.get("eff_unit_net", 0))
+            if price > float(src.get("eff_unit_net", 0)) + 0.01:
+                return jsonify({"ok": False, "error": "قیمت مرجوعی نمی‌تواند از قیمتی که مشتری واقعاً پرداخته بیشتر باشد"}), 400
+            new_items.append({"idx": idx, "product_id": src["product_id"], "qty": qty, "refund_unit_price": price})
+            refund_net += qty * price
+        if not new_items:
+            return jsonify({"ok": False, "error": "هیچ ردیفی برای مرجوعی انتخاب نشده"}), 400
+        refund_total = refund_net * (1 + tax_pct / 100)
+        cash = body.get("cash_refunded")
+        cash = float(cash) if cash not in (None, "") else refund_total
+        cash = max(0.0, min(cash, refund_total))
+        offset = refund_total - cash
+        if offset > float(sale_out.get("amount_outstanding") or 0) + 0.01:
+            return jsonify({"ok": False, "error": "بخشی که از بدهی مشتری کم می‌شود از مانده بدهی این فروش بیشتر است؛ باقی‌اش را باید نقد برگردانی"}), 400
+        sale_date = sale.get("date") or ""
+        reason = body.get("reason") if body.get("reason") in RETURN_REASONS else "سایر"
+        data["sale_returns"].append({
+            "id": _new_id(), "sale_id": sale["id"],
+            "date": max(body.get("date") or sale_date, sale_date),
+            "items": new_items, "restock": bool(body.get("restock", True)), "reason": reason,
+            "refund_net": round(refund_net, 2), "refund_total": round(refund_total, 2),
+            "cash_refunded": round(cash, 2), "note": body.get("note", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "delete_sale_return":
+        rid = body.get("id")
+        data["sale_returns"] = [r for r in data["sale_returns"] if r["id"] != rid]
+
+    # ── QUOTATIONS (پیش‌فاکتور) — never touch stock or the books until converted ──
+    elif action in ("add_quotation", "update_quotation"):
+        def _num(v, d=0.0):
+            return float(v) if v not in (None, "") else d
+        fields = {
+            "date": body.get("date"), "valid_until": body.get("valid_until") or None,
+            "customer_id": body.get("customer_id") or None,
+            "customer_name": body.get("customer_name", "").strip(),
+            "customer_phone": body.get("customer_phone", "").strip(),
+            "customer_address": body.get("customer_address", "").strip(),
+            "items": [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+                       "unit_price": float(it.get("unit_price") or 0), "discount": float(it.get("discount") or 0)}
+                      for it in body.get("items", [])],
+            "discount": _num(body.get("discount")), "tax_percent": _num(body.get("tax_percent")),
+            "shipping_cost": _num(body.get("shipping_cost")),
+            "shipping_payer": body.get("shipping_payer") if body.get("shipping_payer") in ("customer", "business", "split") else "customer",
+            "shipping_split_ratio": _num(body.get("shipping_split_ratio"), 0.5),
+            "delivery_method": body.get("delivery_method", "").strip(),
+            "agent_id": body.get("agent_id") or None,
+            "show_agent_on_invoice": bool(body.get("show_agent_on_invoice", False)),
+            "notes": body.get("notes", "").strip(),
+        }
+        if action == "add_quotation":
+            bp = data["business_profile"]
+            qno = bp.get("next_quote_no", 1)
+            bp["next_quote_no"] = int(qno) + 1
+            data["quotations"].append({"id": _new_id(), "quote_no": qno, "status": "open",
+                                       "converted_sale_id": None, "created_at": str(date.today()), **fields})
+        else:
+            for q in data["quotations"]:
+                if q["id"] == body.get("id"):
+                    q.update(fields)
+                    break
+    elif action == "set_quotation_status":
+        for q in data["quotations"]:
+            if q["id"] == body.get("id") and body.get("status") in ("open", "rejected"):
+                q["status"] = body.get("status")
+    elif action == "delete_quotation":
+        qid = body.get("id")
+        data["quotations"] = [q for q in data["quotations"] if q["id"] != qid]
+
+    # ── AGENT COMMISSION PAYOUTS ──
+    elif action == "add_agent_payout":
+        amt = float(body.get("amount") or 0)
+        if amt <= 0:
+            return jsonify({"ok": False, "error": "مبلغ پرداخت باید بیشتر از صفر باشد"}), 400
+        data["agent_payouts"].append({
+            "id": _new_id(), "agent_id": body.get("agent_id"), "amount": amt,
+            "date": body.get("date") or str(date.today()), "note": body.get("note", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "delete_agent_payout":
+        pid_ = body.get("id")
+        data["agent_payouts"] = [p for p in data["agent_payouts"] if p["id"] != pid_]
+
+    # ── PRICING CALCULATOR SETTINGS (global assumptions) ──
+    elif action == "update_pricing_settings":
+        ps = data["pricing_settings"]
+        for k in ("shipping_cost", "agent_share_pct", "target_margin_pct", "round_step", "shipping_split_ratio"):
+            if k in body and body.get(k) not in (None, ""):
+                ps[k] = float(body.get(k))
+        if "include_agent_share" in body:
+            ps["include_agent_share"] = bool(body.get("include_agent_share"))
+        if body.get("shipping_payer") in ("customer", "business", "split"):
+            ps["shipping_payer"] = body.get("shipping_payer")
+        if float(ps.get("round_step") or 0) <= 0:
+            ps["round_step"] = 1
 
     elif action == "set_low_stock_threshold":
         try:
@@ -2389,12 +3174,13 @@ def parts_api():
     # ── CASH / CAPITAL LEDGER (deposits & withdrawals) ─
     elif action == "add_capital_tx":
         tx_type = body.get("type")
-        if tx_type not in ("deposit", "withdrawal"):
-            return jsonify({"ok": False, "error": "type must be deposit or withdrawal"}), 400
+        if tx_type not in ("deposit", "withdrawal", "adjustment"):
+            return jsonify({"ok": False, "error": "type must be deposit, withdrawal or adjustment"}), 400
+        amt = float(body.get("amount") or 0)
         data["capital_transactions"].append({
             "id": _new_id(),
             "type": tx_type,
-            "amount": float(body.get("amount") or 0),
+            "amount": amt,
             "date": body.get("date"),
             "note": body.get("note", "").strip(),
             "created_at": str(date.today()),
@@ -2402,7 +3188,7 @@ def parts_api():
     elif action == "update_capital_tx":
         for t in data["capital_transactions"]:
             if t["id"] == body.get("id"):
-                if "type" in body and body.get("type") in ("deposit", "withdrawal"): t["type"] = body.get("type")
+                if "type" in body and body.get("type") in ("deposit", "withdrawal", "adjustment"): t["type"] = body.get("type")
                 if "amount" in body: t["amount"] = float(body.get("amount") or 0)
                 if "date" in body: t["date"] = body.get("date")
                 if "note" in body: t["note"] = (body.get("note") or "").strip()
@@ -2411,30 +3197,146 @@ def parts_api():
         tid = body.get("id")
         data["capital_transactions"] = [t for t in data["capital_transactions"] if t["id"] != tid]
 
+    # ── RECONCILIATION — compare the books' calculated cash balance against
+    # the real bank/cash balance you counted, the way any accounting system
+    # reconciles its ledger against a bank statement ──
+    elif action == "add_reconciliation":
+        analytics_now = compute_parts_analytics(data)
+        system_balance = analytics_now["totals"]["cash_balance"]
+        actual = float(body.get("actual_balance") or 0)
+        diff = round(actual - system_balance, 2)
+        rec_date = body.get("date") or str(date.today())
+        note = body.get("note", "").strip()
+        rec = {
+            "id": _new_id(),
+            "date": rec_date,
+            "actual_balance": round(actual, 2),
+            "system_balance": round(system_balance, 2),
+            "difference": diff,
+            "note": note,
+            "adjustment_created": False,
+            "created_at": str(date.today()),
+        }
+        if body.get("create_adjustment") and abs(diff) > 0.01:
+            data["capital_transactions"].append({
+                "id": _new_id(),
+                "type": "adjustment",
+                "amount": diff,
+                "date": rec_date,
+                "note": ("تعدیل مغایرت‌گیری" + (": " + note if note else "")),
+                "created_at": str(date.today()),
+            })
+            rec["adjustment_created"] = True
+        data["reconciliations"].append(rec)
+    elif action == "delete_reconciliation":
+        rid = body.get("id")
+        data["reconciliations"] = [r for r in data["reconciliations"] if r["id"] != rid]
+
+    # ── GENERIC PRODUCTS (managed list — loose labels like "رله کولر پراید" used
+    # to compare prices across brands/suppliers without pinning to one exact product) ──
+    elif action == "add_generic_product":
+        data["generic_products"].append({
+            "id": _new_id(),
+            "name": body.get("name", "").strip(),
+            "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_generic_product":
+        for g in data["generic_products"]:
+            if g["id"] == body.get("id"):
+                if "name" in body: g["name"] = (body.get("name") or "").strip()
+                if "notes" in body: g["notes"] = (body.get("notes") or "").strip()
+                break
+    elif action == "delete_generic_product":
+        gid = body.get("id")
+        data["generic_products"] = [g for g in data["generic_products"] if g["id"] != gid]
+        data["price_entries"] = [e for e in data["price_entries"] if not (e.get("ref_type") == "generic" and e.get("generic_id") == gid)]
+
+    # ── SUPPLIER PRICE LIST ENTRIES (one price, from one store, for one item,
+    # on one date — the raw material for price comparison + the cart optimizer) ──
+    elif action == "add_price_entry":
+        ref_type = body.get("ref_type") if body.get("ref_type") in ("product", "generic") else "product"
+        data["price_entries"].append({
+            "id": _new_id(),
+            "store_id": body.get("store_id"),
+            "ref_type": ref_type,
+            "product_id": body.get("product_id") if ref_type == "product" else None,
+            "generic_id": body.get("generic_id") if ref_type == "generic" else None,
+            "price": float(body.get("price") or 0),
+            "date": body.get("date") or str(date.today()),
+            "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_price_entry":
+        for e in data["price_entries"]:
+            if e["id"] == body.get("id"):
+                if "store_id" in body: e["store_id"] = body.get("store_id")
+                if "ref_type" in body and body.get("ref_type") in ("product", "generic"):
+                    e["ref_type"] = body.get("ref_type")
+                if "product_id" in body: e["product_id"] = body.get("product_id")
+                if "generic_id" in body: e["generic_id"] = body.get("generic_id")
+                if "price" in body: e["price"] = float(body.get("price") or 0)
+                if "date" in body: e["date"] = body.get("date")
+                if "notes" in body: e["notes"] = (body.get("notes") or "").strip()
+                break
+    elif action == "delete_price_entry":
+        eid = body.get("id")
+        data["price_entries"] = [e for e in data["price_entries"] if e["id"] != eid]
+
+    # ── BUSINESS EXPENSES (overhead that isn't inventory — a POS machine,
+    # rent, ads — real money out, but never touches stock/COGS/products) ──
+    elif action == "add_expense":
+        data["business_expenses"].append({
+            "id": _new_id(),
+            "date": body.get("date") or str(date.today()),
+            "category": body.get("category", "").strip() or "سایر",
+            "title": body.get("title", "").strip(),
+            "amount": float(body.get("amount") or 0),
+            "notes": body.get("notes", "").strip(),
+            "created_at": str(date.today()),
+        })
+    elif action == "update_expense":
+        for x in data["business_expenses"]:
+            if x["id"] == body.get("id"):
+                if "date" in body: x["date"] = body.get("date")
+                if "category" in body: x["category"] = (body.get("category") or "").strip() or "سایر"
+                if "title" in body: x["title"] = (body.get("title") or "").strip()
+                if "amount" in body: x["amount"] = float(body.get("amount") or 0)
+                if "notes" in body: x["notes"] = (body.get("notes") or "").strip()
+                break
+    elif action == "delete_expense":
+        xid = body.get("id")
+        data["business_expenses"] = [x for x in data["business_expenses"] if x["id"] != xid]
+
+    # ── BUSINESS PROFILE (name/address/phone/logo shown on printed invoices) ──
+    elif action == "update_business_profile":
+        bp = data["business_profile"]
+        for k in ["name", "address", "phone", "footer_note"]:
+            if k in body:
+                bp[k] = (body.get(k) or "").strip()
+        if "logo" in body:
+            bp["logo"] = body.get("logo", "")
+        if "invoice_theme" in body and body.get("invoice_theme") in ("classic", "minimal"):
+            bp["invoice_theme"] = body.get("invoice_theme")
+
+    # ── INVOICES (formal, numbered — generated from an existing sale) ──
+    elif action == "generate_invoice":
+        sid = body.get("sale_id")
+        sale = next((s for s in data["sales"] if s["id"] == sid), None)
+        if not sale:
+            return jsonify({"ok": False, "error": "sale not found"}), 400
+        if not sale.get("invoice_no"):
+            bp = data["business_profile"]
+            sale["invoice_no"] = bp.get("next_invoice_no", 1)
+            bp["next_invoice_no"] = int(bp.get("next_invoice_no", 1)) + 1
+            sale["invoice_generated_at"] = datetime.now().isoformat(timespec="seconds")
+
     else:
         return jsonify({"ok": False, "error": "unknown action"}), 400
 
     save_parts(data)
     analytics = compute_parts_analytics(data)
-    return jsonify({
-        "ok": True,
-        "products": data["products"],
-        "stores": data["stores"],
-        "car_models": data["car_models"],
-        "brands": data["brands"],
-        "part_types": data["part_types"],
-        "categories": data["categories"],
-        "purchases": data["purchases"],
-        "sales": analytics["sales"],
-        "capital_transactions": data["capital_transactions"],
-        "stock": analytics["stock"],
-        "avg_cost": analytics["avg_cost"],
-        "by_product": analytics["by_product"],
-        "by_store": analytics["by_store"],
-        "totals": analytics["totals"],
-        "low_stock": analytics["low_stock"],
-        "low_stock_threshold": analytics["low_stock_threshold"],
-    })
+    return jsonify({"ok": True, **_parts_payload(data, analytics)})
 
 
 if __name__=="__main__":
