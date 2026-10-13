@@ -5,6 +5,54 @@ let M = { data: null, viewMonth: null, editingDay: null, charts: {}, dayEntries:
 let allLoans = [];
 let allReceivables = [];
 
+// ── Notes on records ─────────────────────────────
+function escHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function noteHtml(note, size) {
+  if (!note) return '';
+  return `<div style="margin-top:5px;"><span dir="auto" style="display:inline-block;max-width:100%;font-size:${size||13}px;font-weight:500;color:var(--text);background:rgba(26,21,16,0.07);border-radius:8px;padding:4px 10px;line-height:1.6;word-break:break-word;unicode-bidi:plaintext;">📝 ${escHtml(note)}</span></div>`;
+}
+// The day-modal markup lives in index.html, so the note fields are injected here
+// (once) right above the "tag + amount + Add" row of each section.
+function ensureNoteInputs() {
+  const defs = [
+    { amt:'dayTagAmount',    sel:'dayTagSelect',       list:'dayTagEntries',    id:'dayTagNote',    add:'addDayTagEntry',    ph:'📝 Note (optional) — e.g. water bill, pizza & soda…' },
+    { amt:'dayIncomeAmount', sel:'dayIncomeTagSelect', list:'dayIncomeEntries', id:'dayIncomeNote', add:'addDayIncomeEntry', ph:'📝 Note (optional) — e.g. salary from X, sold old phone…' },
+  ];
+  defs.forEach(def => {
+    if (document.getElementById(def.id)) return;
+    const amtEl = document.getElementById(def.amt);
+    if (!amtEl) return;
+    const selEl = document.getElementById(def.sel);
+    const listEl = document.getElementById(def.list);
+    let row = amtEl.parentElement;
+    while (row && selEl && !row.contains(selEl)) row = row.parentElement;
+    // never climb up into a container that also holds the entries list / the whole modal
+    if (!row || (listEl && row.contains(listEl))) row = amtEl.parentElement;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = def.id;
+    input.className = 'm-input';
+    input.maxLength = 200;
+    input.placeholder = def.ph;
+    input.setAttribute('dir', 'auto');
+    input.style.cssText = 'width:100%;margin:0 0 8px 0;box-sizing:border-box;';
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); window[def.add](); } });
+    row.parentNode.insertBefore(input, row);
+    amtEl.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); window[def.add](); } });
+  });
+}
+function editDayEntryNote(kind, idx) {
+  const arr = kind === 'income' ? M.dayIncomeEntries : M.dayEntries;
+  const e = arr[idx];
+  if (!e) return;
+  const val = prompt('Note for "' + e.name + '" (' + e.amount.toLocaleString() + ' K):', e.note || '');
+  if (val === null) return;
+  e.note = val.trim().slice(0, 200);
+  if (kind === 'income') renderDayIncomeEntries(); else renderDayEntries();
+}
+
 async function loadLoans() {
   const r = await fetch('/api/budget/loans');
   allLoans = await r.json();
@@ -150,58 +198,492 @@ function renderReceivables() {
   }).join('');
 }
 
-function renderTransactions() {
-  const el = document.getElementById('txList');
-  const sumEl = document.getElementById('txSummaryRow');
-  if (!el || !M.data) return;
-  const spending = M.data.month.daily_spending || {};
-  const typeF = document.getElementById('txTypeFilter')?.value || 'all';
-  const tagF  = document.getElementById('txTagFilter')?.value || 'all';
-  const sort  = document.getElementById('txSort')?.value || 'date_desc';
+// ══ MONEY ANALYZER — history, stats & "where did my money go" ══════════
+const AN_DOW = ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+const AN_DOW_FULL = ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
+const AN_STOP = new Set(['و','در','به','از','با','برای','که','این','آن','را','یه','یک','تا','هم','رو','the','a','an','of','for','and','to','in','on','at','with','from','my','is']);
+const AN_SPLIT = /[\s,.;:!?()\[\]{}"'«»،؛؟\-_\/\\+&*=#@|]+/;
+const AN_DEFAULT = { range:'month', type:'all', tag:'all', q:'', min:'', max:'', sort:'date_desc', group:'day' };
+let A = { f:{...AN_DEFAULT}, cache:{}, charts:{}, limit:200, seq:0, rows:[], words:[], timer:null, uid:{}, edit:null };
 
-  // Flatten all entries into a tx list
-  let rows = [];
-  Object.entries(spending).forEach(([day, v]) => {
-    const d = parseInt(day);
-    if (typeof v === 'object') {
-      (v.tags || []).forEach(t => rows.push({ day: d, type:'expense', tag_id: t.tag_id, name: t.name, icon: t.icon, color: t.color, amount: t.amount }));
-      (v.income || []).forEach(t => rows.push({ day: d, type:'income', tag_id: t.tag_id, name: t.name, icon: t.icon, color: t.color, amount: t.amount }));
-      (v.fixed_payments || []).forEach(t => rows.push({ day: d, type:'settled', tag_id: '__settled__', name: t.name, icon: t.icon, color: '#6c63ff', amount: t.amount, kind: t.kind }));
-    } else if (v > 0) {
-      rows.push({ day: d, type:'expense', tag_id:'__legacy__', name:'Other', icon:'💰', color:'#a8967c', amount: v });
-    }
+function anFmt(n) { return Math.round(n || 0).toLocaleString(); }
+function anShiftMonth(mk, delta) {
+  const [y, m] = mk.split('-').map(Number);
+  const idx = y * 12 + (m - 1) + delta;
+  return Math.floor(idx / 12) + '-' + String(idx % 12 + 1).padStart(2, '0');
+}
+function anRangeMonths() {
+  const cur = M.viewMonth, r = A.f.range;
+  if (r === '3m') return [0,1,2].map(i => anShiftMonth(cur, -i));
+  if (r === '6m') return [0,1,2,3,4,5].map(i => anShiftMonth(cur, -i));
+  if (r === 'all') return [...new Set([...(M.data.available_months || []), cur])];
+  return [cur];
+}
+async function anEnsureMonths(mks) {
+  const missing = mks.filter(mk => !A.cache[mk]);
+  await Promise.all(missing.map(async mk => {
+    try { const r = await fetch('/api/budget/month?month=' + mk); A.cache[mk] = await r.json(); } catch (e) {}
+  }));
+}
+
+// every expense / income / paid-fixed item of the given months as one flat list
+function anFlatten(mks) {
+  const rows = [];
+  mks.forEach(mk => {
+    const d = A.cache[mk];
+    if (!d || !d.month) return;
+    const first = d.first_dow || 0;
+    Object.entries(d.month.daily_spending || {}).forEach(([ds, v]) => {
+      const day = parseInt(ds);
+      const base = { mk, jy: d.jy, jm: d.jm, day, dow: (first + day - 1) % 7, key: d.jy * 10000 + d.jm * 100 + day };
+      if (v && typeof v === 'object') {
+        (v.tags || []).forEach((t, i) => rows.push({ ...base, idx:i, uid:mk + '|' + day + '|expense|' + i, type:'expense', tag_id:t.tag_id, name:t.name, icon:t.icon, color:t.color, amount:+t.amount || 0, note:t.note || '' }));
+        (v.income || []).forEach((t, i) => rows.push({ ...base, idx:i, uid:mk + '|' + day + '|income|' + i, type:'income', tag_id:t.tag_id, name:t.name, icon:t.icon, color:t.color, amount:+t.amount || 0, note:t.note || '' }));
+        (v.fixed_payments || []).forEach(t => rows.push({ ...base, type:'settled', tag_id:'__settled__', name:t.name, icon:t.icon, color:'#6c63ff', amount:+t.amount || 0, note:'', kind:t.kind }));
+      } else if (v > 0) {
+        rows.push({ ...base, idx:0, uid:mk + '|' + day + '|expense|0', type:'expense', tag_id:'__legacy__', name:'Other', icon:'💰', color:'#a8967c', amount:v, note:'' });
+      }
+    });
   });
+  return rows;
+}
+function anFilter(rows) {
+  const f = A.f, q = f.q.trim().toLowerCase();
+  const mn = f.min === '' ? null : +f.min, mx = f.max === '' ? null : +f.max;
+  return rows.filter(r =>
+    (f.type === 'all' || r.type === f.type) &&
+    (f.tag === 'all' || r.tag_id === f.tag || (f.tag === '__legacy__' && r.tag_id === '__untagged__')) &&
+    (mn === null || r.amount >= mn) && (mx === null || r.amount <= mx) &&
+    (!q || ((r.note || '') + ' ' + (r.name || '')).toLowerCase().includes(q)));
+}
+function anStats(rows) {
+  const exp = rows.filter(r => r.type === 'expense');
+  const inc = rows.filter(r => r.type === 'income');
+  const settled = rows.filter(r => r.type === 'settled');
+  const sum = a => a.reduce((s, r) => s + r.amount, 0);
+  const byTag = {}, byIncTag = {}, byDay = {}, byDow = [0,0,0,0,0,0,0], byMonth = {};
+  const bump = (map, r) => {
+    const o = map[r.tag_id || r.name] || (map[r.tag_id || r.name] = { id:r.tag_id, name:r.name, icon:r.icon, color:r.color, total:0, count:0 });
+    o.total += r.amount; o.count++;
+  };
+  exp.forEach(r => {
+    bump(byTag, r);
+    const d = byDay[r.key] || (byDay[r.key] = { key:r.key, jm:r.jm, day:r.day, dow:r.dow, total:0 });
+    d.total += r.amount;
+    byDow[r.dow] += r.amount;
+    (byMonth[r.mk] = byMonth[r.mk] || { exp:0, inc:0 }).exp += r.amount;
+  });
+  inc.forEach(r => { bump(byIncTag, r); (byMonth[r.mk] = byMonth[r.mk] || { exp:0, inc:0 }).inc += r.amount; });
+  const byTotal = (a, b) => b.total - a.total;
+  return {
+    exp, inc, settled,
+    expTotal: sum(exp), incTotal: sum(inc), settledTotal: sum(settled),
+    tags: Object.values(byTag).sort(byTotal), incTags: Object.values(byIncTag).sort(byTotal),
+    byTag, days: Object.values(byDay).sort(byTotal), byDay, byDow, byMonth,
+    biggest: exp.reduce((m, r) => (!m || r.amount > m.amount) ? r : m, null),
+    withNote: exp.filter(r => r.note).length,
+  };
+}
+function anWords(rows) {
+  const map = {};
+  rows.filter(r => r.note && r.type !== 'settled').forEach(r => {
+    const seen = new Set();
+    r.note.toLowerCase().split(AN_SPLIT).forEach(w => {
+      if (w.length < 2 || /^[\d٠-٩۰-۹.,]+$/.test(w) || AN_STOP.has(w) || seen.has(w)) return;
+      seen.add(w);
+      const o = map[w] || (map[w] = { w, count:0, exp:0, inc:0 });
+      o.count++;
+      if (r.type === 'expense') o.exp += r.amount; else o.inc += r.amount;
+    });
+  });
+  return Object.values(map).sort((a, b) => (b.exp + b.inc) - (a.exp + a.inc) || b.count - a.count).slice(0, 16);
+}
 
-  // Filter
-  if (typeF !== 'all') rows = rows.filter(r => r.type === typeF);
-  if (tagF !== 'all') rows = rows.filter(r => r.tag_id === tagF);
+// ── HTML pieces ───────────────────────────────────
+function anSection(title, sub) {
+  return `<div style="margin:22px 0 10px;"><div style="font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.07em;">${title}</div>${sub ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">${sub}</div>` : ''}</div>`;
+}
+function anTile(label, val, sub, color) {
+  return `<div style="background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);padding:12px 14px;">
+    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">${label}</div>
+    <div style="font-family:Fraunces,serif;font-size:21px;font-weight:800;color:${color || 'var(--ink)'};line-height:1.1;">${val}</div>
+    ${sub ? `<div style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.4;">${sub}</div>` : ''}</div>`;
+}
+function anRow(r, showDate, dLabel) {
+  const inc = r.type === 'income', st = r.type === 'settled';
+  const amtColor = inc ? 'var(--sage)' : st ? 'var(--plum)' : 'var(--ink)';
+  return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:${inc ? 'var(--sageL)' : 'var(--cream2)'};border-radius:var(--r2);border:1.5px solid ${st ? 'var(--plum)' : 'var(--cream3)'};">
+    <span style="font-size:17px;line-height:1.3;">${r.icon}</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13.5px;font-weight:700;color:var(--text);">${escHtml(r.name)}</div>
+      ${noteHtml(r.note)}
+    </div>
+    ${showDate ? `<span style="font-size:11px;color:var(--text3);white-space:nowrap;padding-top:3px;">${dLabel(r)}</span>` : ''}
+    <span style="font-family:Fraunces,serif;font-size:14px;font-weight:700;color:${amtColor};white-space:nowrap;">${inc ? '+' : ''}${anFmt(r.amount)} K</span>
+    <span style="font-size:10px;padding:2px 7px;border-radius:50px;background:${inc ? 'var(--sage)' : st ? 'var(--plum)' : 'var(--text3)'};color:#fff;font-weight:700;margin-top:2px;">${st ? 'paid ' + (r.kind || '') : r.type}</span>
+    ${r.uid ? `<span style="display:flex;gap:0;flex-shrink:0;"><button onclick="anEdit('${r.uid}')" title="Edit note / amount / category / day" style="border:none;background:transparent;cursor:pointer;font-size:15px;padding:0 5px;line-height:1.5;">✏️</button><button onclick="anDelete('${r.uid}')" title="Delete this record" style="border:none;background:transparent;cursor:pointer;font-size:15px;padding:0 5px;line-height:1.5;">🗑️</button></span>` : ''}
+  </div>`;
+}
+function anTagBars(list, total, isIncome, prevByTag) {
+  return `<div style="display:flex;flex-direction:column;gap:6px;">` + list.map(t => {
+    const pct = total > 0 ? t.total / total * 100 : 0;
+    const active = A.f.tag === t.id;
+    let delta = '';
+    if (prevByTag) {
+      const p = prevByTag[t.id || t.name];
+      if (p && p.total > 0) {
+        const d = t.total - p.total, dp = Math.round(d / p.total * 100);
+        if (dp !== 0) delta = `<span style="font-size:11px;font-weight:700;color:${(d > 0) !== isIncome ? 'var(--coral)' : 'var(--sage)'};">${d > 0 ? '▲' : '▼'} ${Math.abs(dp)}% vs last month</span>`;
+      } else delta = `<span style="font-size:11px;font-weight:700;color:var(--text3);">new this month</span>`;
+    }
+    return `<div onclick="anSet('tag','${t.id}')" title="Click to filter by this" style="cursor:pointer;padding:9px 12px;border-radius:var(--r2);border:1.5px solid ${active ? 'var(--ink)' : 'var(--cream3)'};background:${isIncome ? 'var(--sageL)' : 'var(--cream2)'};">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span style="font-size:16px;">${t.icon}</span>
+        <span style="flex:1;font-size:13px;font-weight:700;color:var(--text);">${escHtml(t.name)}</span>
+        <span style="font-family:Fraunces,serif;font-size:14px;font-weight:700;color:${isIncome ? 'var(--sage)' : 'var(--ink)'};">${isIncome ? '+' : ''}${anFmt(t.total)} K</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text3);min-width:40px;text-align:right;">${Math.round(pct)}%</span>
+      </div>
+      <div style="height:6px;background:var(--cream3);border-radius:6px;overflow:hidden;"><div style="height:100%;width:${Math.max(2, pct)}%;background:${t.color};border-radius:6px;"></div></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:11px;color:var(--text3);">
+        <span>${t.count} entr${t.count === 1 ? 'y' : 'ies'} · avg ${anFmt(t.total / t.count)} K each</span>${delta}
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+function anRangeChips() {
+  const chips = [['month','This month'],['3m','Last 3 months'],['6m','Last 6 months'],['all','All time']];
+  return chips.map(([k, label]) => {
+    const on = A.f.range === k;
+    return `<button onclick="anSetRange('${k}')" style="padding:7px 14px;border-radius:50px;border:1.5px solid ${on ? 'var(--ink)' : 'var(--cream3)'};background:${on ? 'var(--ink)' : 'var(--cream2)'};color:${on ? '#fff' : 'var(--text)'};font-size:12px;font-weight:700;cursor:pointer;">${label}</button>`;
+  }).join('');
+}
+function anControlsHtml() {
+  const f = A.f, sel = (a, b) => a === b ? ' selected' : '';
+  const tagOpts = allTags.map(t => `<option value="${t.id}"${sel(t.id, f.tag)}>${t.icon} ${escHtml(t.name)}${t.type === 'income' ? ' (income)' : ''}</option>`).join('');
+  const st = 'font-size:12px;';
+  return `
+  <div id="anRangeRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${anRangeChips()}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+    <input type="text" id="anQ" class="m-input" dir="auto" value="${escHtml(f.q)}" oninput="anSetDeb('q',this.value)" placeholder="🔍 Search notes or tag names…" style="flex:3;min-width:200px;margin:0;font-size:13px;"/>
+    <select class="builder-select" id="anType" onchange="anSet('type',this.value)" style="${st}flex:1;min-width:120px;">
+      <option value="all"${sel('all', f.type)}>All types</option><option value="expense"${sel('expense', f.type)}>Expenses</option>
+      <option value="income"${sel('income', f.type)}>Income</option><option value="settled"${sel('settled', f.type)}>Paid loans/fixed</option>
+    </select>
+    <select class="builder-select" id="anTag" onchange="anSet('tag',this.value)" style="${st}flex:2;min-width:140px;">
+      <option value="all"${sel('all', f.tag)}>All tags</option>${tagOpts}<option value="__legacy__"${sel('__legacy__', f.tag)}>💰 Other (old entries)</option>
+    </select>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;align-items:center;">
+    <input type="number" id="anMin" class="m-input" value="${escHtml(f.min)}" oninput="anSetDeb('min',this.value)" placeholder="Min (K T)" style="width:110px;margin:0;${st}"/>
+    <input type="number" id="anMax" class="m-input" value="${escHtml(f.max)}" oninput="anSetDeb('max',this.value)" placeholder="Max (K T)" style="width:110px;margin:0;${st}"/>
+    <select class="builder-select" id="anSort" onchange="anSet('sort',this.value)" style="${st}flex:1;min-width:130px;">
+      <option value="date_desc"${sel('date_desc', f.sort)}>Newest first</option><option value="date_asc"${sel('date_asc', f.sort)}>Oldest first</option>
+      <option value="amount_desc"${sel('amount_desc', f.sort)}>Biggest amount</option><option value="amount_asc"${sel('amount_asc', f.sort)}>Smallest amount</option>
+    </select>
+    <select class="builder-select" id="anGroup" onchange="anSet('group',this.value)" style="${st}flex:1;min-width:130px;">
+      <option value="day"${sel('day', f.group)}>Group by day</option><option value="tag"${sel('tag', f.group)}>Group by tag</option>
+      <option value="month"${sel('month', f.group)}>Group by month</option><option value="none"${sel('none', f.group)}>No grouping</option>
+    </select>
+    <button class="m-btn" onclick="anReset()" style="padding:8px 12px;font-size:12px;">Reset filters</button>
+    <button class="m-btn sage" onclick="anExportCsv()" style="padding:8px 12px;font-size:12px;">⬇ Export CSV</button>
+  </div>`;
+}
 
-  // Sort
-  if (sort === 'date_desc') rows.sort((a,b) => b.day - a.day);
-  else if (sort === 'date_asc') rows.sort((a,b) => a.day - b.day);
-  else if (sort === 'amount_desc') rows.sort((a,b) => b.amount - a.amount);
-  else rows.sort((a,b) => a.amount - b.amount);
+// Pure builder: returns the results HTML + data for the charts
+function anBuild(all, rows, mks, prevByTag) {
+  const st = anStats(rows);
+  const multiYear = new Set(rows.map(r => r.jy)).size > 1;
+  const dLabel = r => J_MONTHS_EN[r.jm - 1] + ' ' + r.day + (multiYear ? ' ' + r.jy : '');
+  const f = A.f;
 
+  // ── insights in plain words
+  const ins = [];
+  if (st.tags.length) { const t = st.tags[0]; ins.push(`Biggest drain: <b>${t.icon} ${escHtml(t.name)}</b> — ${anFmt(t.total)} K (${Math.round(t.total / st.expTotal * 100)}% of expenses, ${t.count} entries).`); }
+  if (st.biggest) { const b = st.biggest; ins.push(`Biggest single expense: <b>${anFmt(b.amount)} K</b> on ${escHtml(b.name)}${b.note ? ' — “' + escHtml(b.note) + '”' : ''} (${dLabel(b)}).`); }
+  if (st.days.length) { const d = st.days[0]; ins.push(`Most expensive day: <b>${J_MONTHS_EN[d.jm - 1]} ${d.day}</b> (${AN_DOW_FULL[d.dow]}) — ${anFmt(d.total)} K.`); }
+  if (st.expTotal > 0) { const mx = Math.max(...st.byDow), i = st.byDow.indexOf(mx); ins.push(`You spend the most on <b>${AN_DOW_FULL[i]}s</b> — ${anFmt(mx)} K in total.`); }
+  if (st.incTotal > 0 && st.expTotal > 0) ins.push(`You spent <b>${Math.round(st.expTotal / st.incTotal * 100)}%</b> of the income logged in this period.`);
+  if (st.exp.length) { const p = Math.round(st.withNote / st.exp.length * 100); ins.push(`<b>${st.withNote}</b> of ${st.exp.length} expenses have a note (${p}%)${p < 60 ? ' — the more notes you add, the better this page explains itself' : ''}.`); }
+
+  const net = st.incTotal - st.expTotal;
+  const activeDays = st.days.length;
+  const words = anWords(rows);
+  const sortFn = {
+    date_desc: (a, b) => b.key - a.key, date_asc: (a, b) => a.key - b.key,
+    amount_desc: (a, b) => b.amount - a.amount, amount_asc: (a, b) => a.amount - b.amount,
+  }[f.sort] || ((a, b) => b.key - a.key);
+  const sorted = rows.slice().sort(sortFn);
+  const shown = sorted.slice(0, A.limit);
+
+  // ── grouping of the transaction list
+  const g = f.group, groups = [], idx = {};
+  shown.forEach(r => {
+    let k, label;
+    if (g === 'day') { k = r.key; label = AN_DOW[r.dow] + ' · ' + dLabel(r); }
+    else if (g === 'tag') { k = r.type + '|' + (r.tag_id || r.name); label = r.icon + ' ' + escHtml(r.name) + (r.type === 'income' ? ' (income)' : r.type === 'settled' ? ' (paid)' : ''); }
+    else if (g === 'month') { k = r.mk; label = J_MONTHS_EN[r.jm - 1] + ' ' + r.jy; }
+    else { k = 'all'; label = ''; }
+    if (!(k in idx)) { idx[k] = groups.length; groups.push({ label, rows: [], exp: 0, inc: 0 }); }
+    const o = groups[idx[k]]; o.rows.push(r);
+    if (r.type === 'expense') o.exp += r.amount; else if (r.type === 'income') o.inc += r.amount;
+  });
+  if (g === 'tag') groups.sort((a, b) => (b.exp + b.inc) - (a.exp + a.inc));
+  const listHtml = groups.map(o => (o.label ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 4px;margin-top:12px;font-size:12px;font-weight:800;color:var(--text);border-bottom:1.5px solid var(--cream3);">
+      <span>${o.label} <span style="font-weight:600;color:var(--text3);">· ${o.rows.length}</span></span>
+      <span style="font-weight:700;">${o.exp ? `<span style="color:var(--coral)">−${anFmt(o.exp)} K</span>` : ''} ${o.inc ? `<span style="color:var(--sage)">+${anFmt(o.inc)} K</span>` : ''}</span>
+    </div>` : '') + `<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${o.rows.map(r => anRow(r, g !== 'day', dLabel)).join('')}</div>`).join('');
+  const rest = sorted.length - shown.length;
+
+  const top = st.exp.slice().sort((a, b) => b.amount - a.amount).slice(0, 10);
+  const mksAsc = mks.slice().sort();
+  const multiMonth = mks.length > 1;
+
+  const html = `
+    ${ins.length ? `<div style="background:var(--cream2);border:1.5px solid var(--cream3);border-radius:var(--r2);padding:14px 16px;">
+      <div style="font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">💡 What happened to your money</div>
+      <ul style="margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text);line-height:1.55;">${ins.map(x => `<li>${x}</li>`).join('')}</ul></div>` : ''}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px;">
+      ${anTile('Spent', '−' + anFmt(st.expTotal) + ' K', st.exp.length + ' expenses', 'var(--coral)')}
+      ${anTile('Earned', '+' + anFmt(st.incTotal) + ' K', st.inc.length + ' income entries', 'var(--sage)')}
+      ${anTile('Net', (net >= 0 ? '+' : '−') + anFmt(Math.abs(net)) + ' K', net >= 0 ? 'you came out ahead' : 'you spent more than you earned', net >= 0 ? 'var(--sage)' : 'var(--coral)')}
+      ${anTile('Avg expense', st.exp.length ? anFmt(st.expTotal / st.exp.length) + ' K' : '—', 'per entry')}
+      ${anTile('Avg per active day', activeDays ? anFmt(st.expTotal / activeDays) + ' K' : '—', activeDays + ' day' + (activeDays === 1 ? '' : 's') + ' with spending')}
+      ${anTile('Biggest expense', st.biggest ? anFmt(st.biggest.amount) + ' K' : '—', st.biggest ? escHtml(st.biggest.name) : '')}
+      ${st.settledTotal > 0 ? anTile('Loans/fixed paid', anFmt(st.settledTotal) + ' K', 'bank only, not in "Spent"', 'var(--plum)') : ''}
+    </div>
+
+    ${anSection(multiMonth ? 'Month by month' : 'Day by day', multiMonth ? 'Expenses vs income each month' : 'Expenses vs income each day of this month')}
+    <div class="money-charts">
+      <div class="mchart-card"><div class="mchart-title">${multiMonth ? 'Income vs Expenses' : 'Daily Income vs Expenses'}</div><div class="mchart-wrap"><canvas id="anTrendChart"></canvas></div></div>
+      <div class="mchart-card"><div class="mchart-title">Spending by weekday</div><div class="mchart-sub">Which days of the week cost you the most</div><div class="mchart-wrap"><canvas id="anDowChart"></canvas></div></div>
+    </div>
+
+    ${st.tags.length ? anSection('Where the money went', 'Expenses by tag — click one to filter everything below') + anTagBars(st.tags, st.expTotal, false, prevByTag) : ''}
+    ${st.incTags.length ? anSection('Where the money came from', 'Income by source') + anTagBars(st.incTags, st.incTotal, true, null) : ''}
+
+    ${words.length ? anSection('Words in your notes', 'Entries whose note contains the word — click one to search it') +
+      `<div style="display:flex;flex-wrap:wrap;gap:8px;">${words.map((w, i) => `<button onclick="anPickWord(${i})" dir="auto" style="cursor:pointer;border:1.5px solid var(--cream3);background:var(--cream2);border-radius:50px;padding:6px 12px;font-size:13px;color:var(--text);"><b>${escHtml(w.w)}</b> <span style="color:var(--text3);font-size:11px;">×${w.count} · ${anFmt(w.exp + w.inc)} K</span></button>`).join('')}</div>` : ''}
+
+    ${top.length ? anSection('Top 10 biggest expenses') + `<div style="display:flex;flex-direction:column;gap:6px;">${top.map(r => anRow(r, true, dLabel)).join('')}</div>` : ''}
+
+    ${anSection('All transactions', sorted.length + ' matching' + (rest > 0 ? ' · showing first ' + shown.length : ''))}
+    ${listHtml}
+    ${rest > 0 ? `<div style="text-align:center;margin-top:12px;"><button class="m-btn" onclick="anMore()" style="padding:9px 18px;">Show ${Math.min(200, rest)} more (${rest} left)</button></div>` : ''}`;
+
+  // chart data
+  let trend;
+  if (multiMonth) {
+    trend = { labels: mksAsc.map(mk => { const [y, m] = mk.split('-').map(Number); return J_MONTHS_EN[m - 1] + ' ' + y; }),
+              exp: mksAsc.map(mk => (st.byMonth[mk] || {}).exp || 0), inc: mksAsc.map(mk => (st.byMonth[mk] || {}).inc || 0) };
+  } else {
+    const d = A.cache[mks[0]] || {}, n = d.today_day || d.total_days || 31, days = Array.from({ length: n }, (_, i) => i + 1);
+    const incByDay = {};
+    st.inc.forEach(r => { incByDay[r.day] = (incByDay[r.day] || 0) + r.amount; });
+    trend = { labels: days, exp: days.map(x => (st.byDay[(d.jy || 0) * 10000 + (d.jm || 0) * 100 + x] || {}).total || 0), inc: days.map(x => incByDay[x] || 0) };
+  }
+  return { html, rows: sorted, words, charts: { trend, dow: st.byDow } };
+}
+function anDrawCharts(spec) {
+  Object.values(A.charts).forEach(c => { try { c.destroy(); } catch (e) {} });
+  A.charts = {};
+  if (!spec || typeof Chart === 'undefined') return;
+  const gc = 'rgba(26,21,16,0.05)', tc = '#a8967c';
+  const scales = { x:{ grid:{ color:gc }, ticks:{ color:tc, maxTicksLimit:14 } }, y:{ grid:{ color:gc }, ticks:{ color:tc } } };
+  const legend = { display:true, labels:{ color:'#6b5c48', boxWidth:10, font:{ size:11 } } };
+  const c1 = document.getElementById('anTrendChart');
+  if (c1) A.charts.trend = new Chart(c1, { type:'bar', data:{ labels:spec.trend.labels, datasets:[
+    { label:'Expenses', data:spec.trend.exp, backgroundColor:'rgba(232,93,58,.7)', borderRadius:4 },
+    { label:'Income', data:spec.trend.inc, backgroundColor:'rgba(58,122,90,.7)', borderRadius:4 } ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend }, scales } });
+  const c2 = document.getElementById('anDowChart');
+  if (c2) A.charts.dow = new Chart(c2, { type:'bar', data:{ labels:AN_DOW, datasets:[
+    { label:'Spent (K T)', data:spec.dow, backgroundColor:'rgba(212,130,26,.7)', borderRadius:4 } ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales } });
+}
+
+// ── Edit / delete any past record ────────────────
+async function anFetchMonth(mk) {
+  const r = await fetch('/api/budget/month?month=' + mk);
+  return r.json();
+}
+// a day's entries as editable arrays (old numeric-only days become one "Other" entry)
+function anDayBucket(d, day) {
+  const raw = ((d.month || {}).daily_spending || {})[String(day)];
+  if (raw && typeof raw === 'object') return { tags: (raw.tags || []).map(t => ({ ...t })), income: (raw.income || []).map(t => ({ ...t })) };
+  if (typeof raw === 'number' && raw > 0) return { tags: [{ tag_id:'__untagged__', name:'Other', icon:'💰', color:'#a8967c', amount:raw }], income: [] };
+  return { tags: [], income: [] };
+}
+async function anSaveDay(mk, day, b) {
+  const total = b.tags.reduce((s, e) => s + (+e.amount || 0), 0);
+  const incomeTotal = b.income.reduce((s, e) => s + (+e.amount || 0), 0);
+  await fetch('/api/budget/daily', { method:'POST', headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ month_key: mk, day, total, tags: b.tags, income_total: incomeTotal, income: b.income }) });
+}
+// re-read the record from the server and make sure it is still the one the user clicked
+async function anLocate(r) {
+  const d = await anFetchMonth(r.mk);
+  const src = anDayBucket(d, r.day);
+  const list = r.type === 'income' ? src.income : src.tags;
+  const entry = list[r.idx];
+  // old numeric-only days are shown as "__legacy__" but get converted to "__untagged__" when opened
+  const sameTag = entry && (entry.tag_id === r.tag_id || (r.tag_id === '__legacy__' && entry.tag_id === '__untagged__'));
+  if (!entry || !sameTag || (+entry.amount || 0) !== r.amount) return null;
+  return { d, src, list, entry };
+}
+async function anAfterChange(msg) {
+  A.cache = {};
+  await loadMonthData();
+  showToast(msg, 'success');
+}
+function anDateText(r) { return J_MONTHS_EN[r.jm - 1] + ' ' + r.day + ' ' + r.jy; }
+
+function anEdit(uid) {
+  const r = A.uid[uid];
+  if (!r) return;
+  A.edit = r;
+  const opts = (r.type === 'income' ? incomeTags() : expenseTags());
+  const hasCur = opts.some(t => t.id === r.tag_id);
+  const catOpts = (hasCur ? '' : `<option value="${escHtml(r.tag_id)}" selected>${r.icon} ${escHtml(r.name)} (current)</option>`) +
+    opts.map(t => `<option value="${t.id}"${t.id === r.tag_id ? ' selected' : ''}>${t.icon} ${escHtml(t.name)}</option>`).join('');
+  const totalDays = (A.cache[r.mk] || {}).total_days || 31;
+  const lbl = 'font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px;';
+  let ov = document.getElementById('anEditOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'anEditOverlay';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,21,16,.5);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+    ov.addEventListener('mousedown', ev => { if (ev.target === ov) anEditClose(); });
+    document.body.appendChild(ov);
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') anEditClose(); });
+  }
+  ov.innerHTML = `
+    <div style="background:var(--cream,#fff);border-radius:var(--r2,14px);padding:20px 22px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:92vh;overflow-y:auto;">
+      <div style="font-family:Fraunces,serif;font-size:18px;font-weight:800;color:var(--ink);">✏️ Edit ${r.type === 'income' ? 'income' : 'expense'}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:3px;">${anDateText(r)}</div>
+      <div style="${lbl}">${r.type === 'income' ? 'Source' : 'Category'}</div>
+      <select id="anEdCat" class="builder-select" style="width:100%;font-size:13px;">${catOpts}</select>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+        <div><div style="${lbl}">Amount (K T)</div><input type="number" id="anEdAmt" class="m-input" value="${r.amount}" style="width:100%;margin:0;box-sizing:border-box;"/></div>
+        <div><div style="${lbl}">Day of month</div><input type="number" id="anEdDay" class="m-input" min="1" max="${totalDays}" value="${r.day}" style="width:100%;margin:0;box-sizing:border-box;"/></div>
+      </div>
+      <div style="${lbl}">Note</div>
+      <textarea id="anEdNote" class="m-input" dir="auto" maxlength="200" rows="3" placeholder="What was this for?" style="width:100%;margin:0;box-sizing:border-box;resize:vertical;font-family:inherit;">${escHtml(r.note)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:18px;">
+        <button class="m-btn sage" onclick="anEditSave()" style="flex:2;padding:11px;">Save</button>
+        <button class="m-btn" onclick="anEditClose()" style="flex:1;padding:11px;">Cancel</button>
+        <button class="m-btn" onclick="anDeleteCurrent()" title="Delete this record" style="padding:11px 14px;color:var(--coral);">🗑️</button>
+      </div>
+    </div>`;
+  ov.style.display = 'flex';
+  const n = document.getElementById('anEdNote'); if (n && n.focus) n.focus();
+}
+function anEditClose() {
+  const ov = document.getElementById('anEditOverlay');
+  if (ov) ov.style.display = 'none';
+  A.edit = null;
+}
+async function anEditSave() {
+  const r = A.edit;
+  if (!r) return;
+  const amount = parseInt(document.getElementById('anEdAmt').value) || 0;
+  const newDay = parseInt(document.getElementById('anEdDay').value) || 0;
+  const note = (document.getElementById('anEdNote').value || '').trim().slice(0, 200);
+  const catId = document.getElementById('anEdCat').value;
+  const totalDays = (A.cache[r.mk] || {}).total_days || 31;
+  if (!amount) { showToast('Enter an amount', ''); return; }
+  if (newDay < 1 || newDay > totalDays) { showToast('Day must be between 1 and ' + totalDays, ''); return; }
+  const loc = await anLocate(r);
+  if (!loc) { anEditClose(); await anAfterChange('That record changed in the meantime — list refreshed'); return; }
+  const updated = { ...loc.entry, amount, note };
+  const tag = allTags.find(t => t.id === catId);
+  if (tag) { updated.tag_id = tag.id; updated.name = tag.name; updated.icon = tag.icon; updated.color = tag.color; }
+  const key = r.type === 'income' ? 'income' : 'tags';
+  if (newDay === r.day) {
+    loc.list[r.idx] = updated;
+    await anSaveDay(r.mk, r.day, loc.src);
+  } else {
+    loc.list.splice(r.idx, 1);
+    await anSaveDay(r.mk, r.day, loc.src);
+    const dst = anDayBucket(loc.d, newDay);
+    dst[key].push(updated);
+    await anSaveDay(r.mk, newDay, dst);
+  }
+  anEditClose();
+  await anAfterChange('Record updated ✓');
+}
+async function anDelete(uid) {
+  const r = A.uid[uid];
+  if (!r) return;
+  const what = '"' + r.name + '" — ' + anFmt(r.amount) + ' K' + (r.note ? ' (' + r.note + ')' : '') + ' on ' + anDateText(r);
+  if (!confirm('Delete this record?\n\n' + what)) return;
+  const loc = await anLocate(r);
+  if (!loc) { await anAfterChange('That record changed in the meantime — list refreshed'); return; }
+  loc.list.splice(r.idx, 1);
+  await anSaveDay(r.mk, r.day, loc.src);
+  anEditClose();
+  await anAfterChange('Record deleted ✓');
+}
+function anDeleteCurrent() { if (A.edit) anDelete(A.edit.uid); }
+
+// ── Orchestration ─────────────────────────────────
+async function anRender() {
+  const out = document.getElementById('anResults');
+  if (!out || !M.data) return;
+  const seq = ++A.seq;
+  A.cache[M.viewMonth] = M.data;
+  const mks = anRangeMonths();
+  const prevMk = anShiftMonth(M.viewMonth, -1);
+  const need = A.f.range === 'month' ? [...mks, prevMk] : mks;
+  if (need.some(mk => !A.cache[mk])) out.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text3);font-size:13px;">Loading…</div>';
+  await anEnsureMonths(need);
+  if (seq !== A.seq || !document.getElementById('anResults')) return;
+  const all = anFlatten(mks);
+  A.uid = {};
+  all.forEach(r => { if (r.uid) A.uid[r.uid] = r; });
+  const rows = anFilter(all);
+  const cnt = document.getElementById('anCount');
+  if (cnt) cnt.textContent = rows.length + ' of ' + all.length + ' entries';
   if (!rows.length) {
-    el.innerHTML = '<div style="color:var(--text4);font-size:13px;padding:12px;text-align:center;font-style:italic;">No transactions match your filters</div>';
-    if (sumEl) sumEl.textContent = '';
+    A.rows = []; anDrawCharts(null);
+    out.innerHTML = `<div style="color:var(--text4);font-size:13px;padding:18px;text-align:center;font-style:italic;">${all.length ? 'Nothing matches these filters' : 'No transactions in this period yet'}</div>`;
     return;
   }
-
-  const jmName = J_MONTHS_EN ? J_MONTHS_EN[M.data.jm - 1] : '';
-  el.innerHTML = rows.map(r => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${r.type==='income'?'var(--sageL)':'var(--cream2)'};border-radius:var(--r2);border:1.5px solid ${r.type==='settled'?'var(--plum)':'var(--cream3)'};${r.type==='settled'?'opacity:.85;':''}">
-      <span style="font-size:15px">${r.icon}</span>
-      <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${r.name}</span>
-      <span style="font-size:11px;color:var(--text3);min-width:60px;text-align:center;">${jmName} ${r.day}</span>
-      <span style="font-family:Fraunces,serif;font-size:14px;font-weight:700;color:${r.type==='income'?'var(--sage)':'var(--ink)'}">${r.type==='income'?'+':''}${r.amount.toLocaleString()} K</span>
-      <span style="font-size:10px;padding:2px 7px;border-radius:50px;background:${r.type==='income'?'var(--sage)':r.type==='settled'?'var(--plum)':'var(--text3)'};color:#fff;font-weight:700;">${r.type==='settled'?'paid '+(r.kind||''):r.type}</span>
-    </div>`).join('');
-
-  const totalExp = rows.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
-  const totalInc = rows.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
-  const totalSettled = rows.filter(r=>r.type==='settled').reduce((s,r)=>s+r.amount,0);
-  if (sumEl) sumEl.innerHTML = `${rows.length} entries · <span style="color:var(--ink)">−${totalExp.toLocaleString()} K</span>${totalInc>0?' · <span style="color:var(--sage)">+'+totalInc.toLocaleString()+' K</span>':''}${totalSettled>0?' · <span style="color:var(--plum)">'+totalSettled.toLocaleString()+' K paid loans/fixed (bank only)</span>':''}`;
+  let prevByTag = null;
+  if (A.f.range === 'month' && A.cache[prevMk]) prevByTag = anStats(anFlatten([prevMk])).byTag;
+  const res = anBuild(all, rows, mks, prevByTag);
+  A.rows = res.rows; A.words = res.words;
+  out.innerHTML = res.html;
+  anDrawCharts(res.charts);
+}
+function renderTransactions() { anRender(); }
+function anSyncControls() {
+  const f = A.f, set = (id, v) => { const el = document.getElementById(id); if (el && el.value !== String(v)) el.value = v; };
+  set('anQ', f.q); set('anType', f.type); set('anTag', f.tag); set('anMin', f.min); set('anMax', f.max); set('anSort', f.sort); set('anGroup', f.group);
+}
+function anSet(key, val) { A.f[key] = val; A.limit = 200; anSyncControls(); anRender(); }
+function anSetDeb(key, val) { A.f[key] = val; A.limit = 200; clearTimeout(A.timer); A.timer = setTimeout(anRender, 220); }
+function anSetRange(r) {
+  A.f.range = r; A.limit = 200; A.cache = {};
+  const row = document.getElementById('anRangeRow'); if (row) row.innerHTML = anRangeChips();
+  anRender();
+}
+function anReset() { A.f = { ...AN_DEFAULT, range: A.f.range }; A.limit = 200; anSyncControls(); anRender(); }
+function anMore() { A.limit += 200; anRender(); }
+function anPickWord(i) { const w = A.words[i]; if (w) anSet('q', w.w); }
+function anExportCsv() {
+  if (!A.rows.length) { showToast('Nothing to export', ''); return; }
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const pad = n => String(n).padStart(2, '0');
+  const lines = ['Date (Jalali),Type,Category,Amount (K T),Note'].concat(A.rows.map(r =>
+    [r.jy + '/' + pad(r.jm) + '/' + pad(r.day), r.type, r.name, r.type === 'income' ? r.amount : -r.amount, r.note].map(esc).join(',')));
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'money-' + A.f.range + '-' + (M.viewMonth || 'export') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 // All amounts in K Tomans (1 unit = 1,000 T). No rounding, exact figures with commas.
@@ -314,6 +796,8 @@ function rebuildTagSelect() {
 // ── Day modal ─────────────────────────────────────
 function openDayModal(day) {
   M.editingDay = day;
+  ensureNoteInputs();
+  ['dayTagNote','dayIncomeNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const d = M.data;
   const spending = d.month.daily_spending || {};
   const existing = spending[String(day)];
@@ -348,10 +832,11 @@ function addDayTagEntry() {
   if (!sel.value || !amount) { showToast('Pick a tag and enter amount',''); return; }
   const tag = allTags.find(t => t.id === sel.value);
   if (!tag) return;
-  // If tag already in list, add to it
-  const existing = M.dayEntries.find(e => e.tag_id === tag.id);
-  if (existing) { existing.amount += amount; }
-  else { M.dayEntries.push({ tag_id: tag.id, name: tag.name, icon: tag.icon, color: tag.color, amount }); }
+  // Every record stays separate so each one keeps its own note
+  const noteEl = document.getElementById('dayTagNote');
+  const note = noteEl ? noteEl.value.trim() : '';
+  M.dayEntries.push({ tag_id: tag.id, name: tag.name, icon: tag.icon, color: tag.color, amount, note });
+  if (noteEl) noteEl.value = '';
   amtInput.value = '';
   document.querySelectorAll('#dayAmtPresets .preset').forEach(b => b.classList.remove('active'));
   renderDayEntries();
@@ -369,9 +854,10 @@ function addDayIncomeEntry() {
   if (!sel.value || !amount) { showToast('Pick a source and enter amount',''); return; }
   const tag = allTags.find(t => t.id === sel.value);
   if (!tag) return;
-  const existing = M.dayIncomeEntries.find(e => e.tag_id === tag.id);
-  if (existing) { existing.amount += amount; }
-  else { M.dayIncomeEntries.push({ tag_id: tag.id, name: tag.name, icon: tag.icon, color: tag.color, amount }); }
+  const noteEl = document.getElementById('dayIncomeNote');
+  const note = noteEl ? noteEl.value.trim() : '';
+  M.dayIncomeEntries.push({ tag_id: tag.id, name: tag.name, icon: tag.icon, color: tag.color, amount, note });
+  if (noteEl) noteEl.value = '';
   amtInput.value = '';
   document.querySelectorAll('#dayIncomeAmtPresets .preset').forEach(b => b.classList.remove('active'));
   renderDayIncomeEntries();
@@ -391,8 +877,12 @@ function renderDayEntries() {
   el.innerHTML = M.dayEntries.map((e, i) => `
     <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--cream2);border-radius:var(--r2);border:1.5px solid var(--cream3);">
       <span style="font-size:16px">${e.icon}</span>
-      <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${e.name}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${e.name}</div>
+        ${noteHtml(e.note)}
+      </div>
       <span style="font-family:Fraunces,serif;font-size:15px;font-weight:700;color:var(--ink)">${e.amount.toLocaleString()} K</span>
+      <button onclick="editDayEntryNote('expense',${i})" title="Edit note" style="border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px;">✏️</button>
       <button onclick="removeDayEntry(${i})" style="border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:16px;padding:0 2px;">×</button>
     </div>`).join('');
 }
@@ -406,8 +896,12 @@ function renderDayIncomeEntries() {
   el.innerHTML = M.dayIncomeEntries.map((e, i) => `
     <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--sageL);border-radius:var(--r2);border:1.5px solid var(--cream3);">
       <span style="font-size:16px">${e.icon}</span>
-      <span style="flex:1;font-size:13px;font-weight:600;color:var(--text)">${e.name}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${e.name}</div>
+        ${noteHtml(e.note)}
+      </div>
       <span style="font-family:Fraunces,serif;font-size:15px;font-weight:700;color:var(--sage)">+${e.amount.toLocaleString()} K</span>
+      <button onclick="editDayEntryNote('income',${i})" title="Edit note" style="border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:13px;padding:0 2px;">✏️</button>
       <button onclick="removeDayIncomeEntry(${i})" style="border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:16px;padding:0 2px;">×</button>
     </div>`).join('');
 }
@@ -819,27 +1313,9 @@ function renderMoney() {
       </div>
 
       <div class="mcard" style="grid-column:1/-1">
-        <div class="mcard-title">Transactions Explorer <span>${txCount} entries this month</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-          <select class="builder-select" id="txTypeFilter" onchange="renderTransactions()" style="font-size:12px;flex:1;min-width:120px;">
-            <option value="all">All types</option>
-            <option value="expense">Expenses only</option>
-            <option value="income">Income only</option>
-            <option value="settled">Paid loans/fixed</option>
-          </select>
-          <select class="builder-select" id="txTagFilter" onchange="renderTransactions()" style="font-size:12px;flex:2;min-width:140px;">
-            <option value="all">All tags</option>
-            ${allTags.map(t=>`<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}
-          </select>
-          <select class="builder-select" id="txSort" onchange="renderTransactions()" style="font-size:12px;flex:1;min-width:120px;">
-            <option value="date_desc">Date ↓</option>
-            <option value="date_asc">Date ↑</option>
-            <option value="amount_desc">Amount ↓</option>
-            <option value="amount_asc">Amount ↑</option>
-          </select>
-        </div>
-        <div id="txList" style="display:flex;flex-direction:column;gap:5px;max-height:400px;overflow-y:auto;"></div>
-        <div id="txSummaryRow" style="margin-top:10px;font-size:12px;color:var(--text3);text-align:right;"></div>
+        <div class="mcard-title">📊 Money Analyzer <span id="anCount"></span></div>
+        ${anControlsHtml()}
+        <div id="anResults"></div>
       </div>
 
     </div>
@@ -945,7 +1421,12 @@ function renderDayGrid(d) {
     const click = isFuture ? '' : 'openDayModal('+day+')';
     const loanDot = loans.length ? `<div style="display:flex;gap:2px;justify-content:center;flex-wrap:wrap;margin-top:2px;">${loans.map(l=>`<span title="${l.name} · ${l.monthly_payment.toLocaleString()} K" style="font-size:9px;background:var(--plumL);color:var(--plum);border-radius:50px;padding:1px 4px;font-weight:700;line-height:1.4;">${l.icon}</span>`).join('')}</div>` : '';
     const settledDot = settledList.length ? `<div title="${settledList.map(s=>s.name+' paid').join(' · ')}" style="font-size:9px;color:var(--plum);margin-top:2px;font-weight:700;">🔒 ${settledList.length}</div>` : '';
-    html += '<div class="'+cls+'" onclick="'+click+'"><div class="day-num">'+day+'</div>'
+    const noteLines = raw && typeof raw === 'object'
+      ? [...(raw.tags||[]).map(t => ['−', t]), ...(raw.income||[]).map(t => ['+', t])]
+          .map(([sg, t]) => sg + t.amount.toLocaleString() + ' K ' + t.name + (t.note ? ' — ' + t.note : ''))
+      : [];
+    const cellTitle = noteLines.length ? ' title="' + escHtml(noteLines.join('\n')) + '"' : '';
+    html += '<div class="'+cls+'"'+cellTitle+' onclick="'+click+'"><div class="day-num">'+day+'</div>'
       + (amt>0?'<div class="day-spend">'+amt.toLocaleString()+' K</div>':'')
       + (inc>0?'<div class="day-spend" style="color:var(--sage)">+'+inc.toLocaleString()+' K</div>':'')
       + loanDot

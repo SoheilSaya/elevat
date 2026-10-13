@@ -1922,6 +1922,231 @@ def _default_business_profile():
 
 RETURN_REASONS = ["کالای معیوب", "ارسال اشتباه", "انصراف مشتری", "کیفیت پایین", "اندازه/مدل نامناسب", "سایر"]
 
+# When the customer collects the goods in person there is no shipment, so no
+# shipping cost can exist — enforced here as well as in the UI so a stale form,
+# an import or a direct API call can never leave a phantom cost on the books.
+PICKUP_METHOD = "تحویل حضوری"
+# Paying VAT to the tax office settles a liability — it is cash out but NOT an operating expense.
+TAX_PAYMENT_CATEGORY = "پرداخت مالیات (تسویه)"
+
+def _is_pickup(method):
+    return (method or "").strip() == PICKUP_METHOD
+
+def _clean_report_ranges(raw):
+    out = []
+    for r in (raw or []):
+        if not isinstance(r, dict):
+            continue
+        name = str(r.get("name") or "").strip()
+        d_from, d_to = str(r.get("from") or "").strip(), str(r.get("to") or "").strip()
+        if not name or len(d_from) != 10 or len(d_to) != 10 or d_from > d_to:
+            continue
+        out.append({"id": str(r.get("id") or _new_id()), "name": name[:60], "from": d_from, "to": d_to})
+    return out
+
+def _clean_report_presets(raw):
+    out = []
+    for r in (raw or []):
+        if not isinstance(r, dict) or not isinstance(r.get("config"), dict):
+            continue
+        name = str(r.get("name") or "").strip()
+        if not name:
+            continue
+        out.append({"id": str(r.get("id") or _new_id()), "name": name[:80], "config": r["config"]})
+    return out
+
+def _clean_dashboard_widgets(raw, presets):
+    # Pinned report-builder reports shown on the reports dashboard. A widget points at a
+    # saved preset (so editing the preset updates the widget); widgets whose preset is gone are dropped.
+    valid = {p["id"] for p in (presets or [])}
+    out, seen = [], set()
+    for w in (raw or []):
+        if not isinstance(w, dict):
+            continue
+        pid = str(w.get("preset_id") or "")
+        if pid not in valid:
+            continue
+        wid = str(w.get("id") or _new_id())
+        if wid in seen:
+            continue
+        seen.add(wid)
+        size = w.get("size") if w.get("size") in ("s", "m", "l") else "m"
+        out.append({"id": wid, "preset_id": pid, "title": str(w.get("title") or "").strip()[:80], "size": size})
+    return out
+
+def _clean_product_groups(raw):
+    # Product taxonomy tree: [{id, name, parent}] — parent "" = root; no cycles, depth <= 8, <= 800 nodes
+    items, seen = [], set()
+    for g in (raw or [])[:800]:
+        if not isinstance(g, dict):
+            continue
+        name = str(g.get("name") or "").strip()[:80]
+        gid = str(g.get("id") or "")
+        if not name or not gid or gid in seen or len(gid) > 40:
+            continue
+        seen.add(gid)
+        items.append({"id": gid, "name": name, "parent": str(g.get("parent") or ""),
+                      "image": str(g.get("image") or "")[:300000]})
+    byid = {g["id"]: g for g in items}
+    out = []
+    for g in items:
+        # parent must exist and the chain must reach a root without looping
+        par, hops, ok = g["parent"], 0, True
+        while par:
+            if par not in byid or hops > 8 or par == g["id"]:
+                ok = False
+                break
+            par = byid[par]["parent"]
+            hops += 1
+        if not ok:
+            g["parent"] = ""
+        out.append(g)
+    # a second pass removes any remaining cycle by detaching the node
+    for g in out:
+        seen_chain, cur = set(), g
+        while cur["parent"]:
+            if cur["id"] in seen_chain:
+                cur["parent"] = ""
+                break
+            seen_chain.add(cur["id"])
+            cur = byid.get(cur["parent"]) or {"parent": "", "id": ""}
+    return out
+
+
+def _valid_group_id(data, gid):
+    gid = str(gid or "")
+    return gid if gid and any(g["id"] == gid for g in data.get("product_groups", [])) else ""
+
+
+def _clean_bundles(raw, product_ids=None):
+    # Bundles: required items (+qty) with a % discount on their total, plus optional rewards (extra items, per-reward % off, 100 = free gift)
+    def num(v, lo, hi, dflt=0.0):
+        try:
+            x = float(v)
+        except Exception:
+            return dflt
+        return max(lo, min(hi, x))
+    out, seen = [], set()
+    for b in (raw or [])[:300]:
+        if not isinstance(b, dict):
+            continue
+        bid = str(b.get("id") or "")
+        name = str(b.get("name") or "").strip()[:100]
+        if not bid or bid in seen or len(bid) > 40 or not name:
+            continue
+        def lines(src, with_pct):
+            res = []
+            for it in (src or [])[:30]:
+                if not isinstance(it, dict):
+                    continue
+                pid = str(it.get("product_id") or "")
+                if not pid or (product_ids is not None and pid not in product_ids):
+                    continue
+                q = num(it.get("qty"), 0, 100000, 1)
+                if q <= 0:
+                    continue
+                row = {"product_id": pid, "qty": q}
+                if with_pct:
+                    row["discount_pct"] = round(num(it.get("discount_pct"), 0, 100, 0), 4)
+                res.append(row)
+            return res
+        req = lines(b.get("items"), False)
+        if not req:
+            continue
+        seen.add(bid)
+        out.append({"id": bid, "name": name, "active": bool(b.get("active", True)),
+                    "items": req, "discount_pct": round(num(b.get("discount_pct"), 0, 100, 0), 4),
+                    "rewards": lines(b.get("rewards"), True),
+                    "note": str(b.get("note") or "").strip()[:300],
+                    "created_at": str(b.get("created_at") or date.today())[:10]})
+    return out
+
+
+def _clean_sale_items(raw_items):
+    res = []
+    for it in raw_items or []:
+        row = {"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
+               "unit_price": float(it.get("unit_price") or 0),
+               "discount": float(it.get("discount") or 0)}
+        # bundle tags: which bundle applied this line (required part or reward) and which instance of it
+        if it.get("bundle_id"):
+            row["bundle_id"] = str(it.get("bundle_id"))[:40]
+            row["bundle_role"] = "reward" if it.get("bundle_role") == "reward" else "req"
+            try:
+                row["bundle_inst"] = int(it.get("bundle_inst") or 1)
+            except Exception:
+                row["bundle_inst"] = 1
+        res.append(row)
+    return res
+
+
+_CAL_COLORS = ("sage", "sky", "coral", "amber", "plum", "rose", "ink")
+_CAL_ICONS = ("📌", "🎯", "🚚", "🤝", "📞", "💰", "🛠️", "🎉", "⚠️", "📦", "🏷️", "🕌")
+
+
+def _clean_calendar_events(raw):
+    # User-defined calendar events (dates only; Gregorian ISO stored, shown as Jalali)
+    import re as _re
+    out, seen = [], set()
+    for e in (raw or [])[:1500]:
+        if not isinstance(e, dict):
+            continue
+        title = str(e.get("title") or "").strip()[:80]
+        date = str(e.get("date") or "").strip()
+        if not title or not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            continue
+        end = str(e.get("end") or "").strip()
+        if not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", end) or end < date:
+            end = ""
+        eid = str(e.get("id") or "")
+        if not eid.startswith("ev_") or eid in seen or len(eid) > 40:
+            eid = "ev_" + _new_id()
+        seen.add(eid)
+        out.append({"id": eid, "title": title, "date": date, "end": end,
+                    "note": str(e.get("note") or "").strip()[:400],
+                    "color": e.get("color") if e.get("color") in _CAL_COLORS else "plum",
+                    "icon": e.get("icon") if e.get("icon") in _CAL_ICONS else "📌",
+                    "done": bool(e.get("done"))})
+    return out
+
+
+def _clean_custom_metrics(raw):
+    # User-defined report-builder measures:  A ÷ B  |  A × B  |  A − B  |  A + B  |  A per day/week/month/year
+    out, seen = [], set()
+    for m in (raw or []):
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name") or "").strip()[:60]
+        a = str(m.get("a") or "").strip()
+        b_type = m.get("b_type") if m.get("b_type") in ("metric", "const", "per") else ""
+        if not name or not a or not b_type:
+            continue
+        mid = str(m.get("id") or "")
+        if not mid.startswith("c_") or mid in seen or len(mid) > 40:
+            mid = "c_" + _new_id()
+        seen.add(mid)
+        item = {"id": mid, "name": name, "a": a[:60], "b_type": b_type,
+                "op": m.get("op") if m.get("op") in ("div", "mul", "sub", "add") else "div",
+                "b": "", "const": "", "per": "",
+                "unit": m.get("unit") if m.get("unit") in ("auto", "money", "num", "pct") else "auto",
+                "as_pct": bool(m.get("as_pct"))}
+        if b_type == "metric":
+            item["b"] = str(m.get("b") or "").strip()[:60]
+            if not item["b"]:
+                continue
+        elif b_type == "const":
+            try:
+                item["const"] = str(float(str(m.get("const")).replace(",", "")))
+            except (TypeError, ValueError):
+                continue
+        else:
+            item["per"] = m.get("per") if m.get("per") in ("day", "week", "month", "year") else "day"
+            item["op"] = "div"
+        out.append(item)
+        if len(out) >= 80:
+            break
+    return out
+
 def _default_pricing_settings():
     # Global assumptions for the per-product "what should I sell it for" calculator
     return {"shipping_cost": 0, "shipping_payer": "business", "shipping_split_ratio": 0.5,
@@ -1936,6 +2161,7 @@ def _parts_defaults():
             "customers": [], "sale_returns": [], "quotations": [], "agent_payouts": [],
             "pricing_settings": _default_pricing_settings(),
             "business_profile": _default_business_profile(),
+            "report_ranges": [], "report_presets": [], "dashboard_widgets": [], "custom_metrics": [], "calendar_events": [], "product_groups": [], "bundles": [],
             "low_stock_threshold": 2, "unit_migrated_v1": True}
 
 def load_parts():
@@ -1964,6 +2190,13 @@ def load_parts():
             r.setdefault("reason", "سایر")
         d.setdefault("quotations", [])
         d.setdefault("agent_payouts", [])
+        d.setdefault("report_ranges", [])
+        d.setdefault("report_presets", [])
+        d.setdefault("dashboard_widgets", [])
+        d.setdefault("custom_metrics", [])
+        d.setdefault("calendar_events", [])
+        d.setdefault("product_groups", [])
+        d.setdefault("bundles", [])
         d.setdefault("pricing_settings", _default_pricing_settings())
         for k, v in _default_pricing_settings().items():
             d["pricing_settings"].setdefault(k, v)
@@ -2183,6 +2416,8 @@ def compute_parts_analytics(data):
     # tie stock arrives before it's sold that same day.
     events.sort(key=lambda e: e["date"])
 
+    oversold_units = oversold_cost = 0.0   # sold beyond any recorded purchase (cost is only an estimate)
+    oversold_pids = set()
     lots = {}          # product_id -> [[remaining_qty, unit_cost], ...]  oldest first
     sale_cogs = {}      # (sale_id, idx) -> cost
     ret_qty, ret_revenue, ret_cogs = {}, {}, {}   # (sale_id, idx) -> returned qty / refunded revenue / cost put back
@@ -2231,12 +2466,17 @@ def compute_parts_analytics(data):
                 tq = total_qty.get(pid, 0)
                 avg = (total_cost.get(pid, 0) / tq) if tq > 0 else 0
                 cost += remaining * avg
+                oversold_units += remaining
+                oversold_cost += remaining * avg
+                oversold_pids.add(pid)
             sale_cogs[(e["sale_id"], e["idx"])] = cost
 
     stock, avg_cost_remaining = {}, {}
+    inventory_value_exact = 0.0
     for pid, queue in lots.items():
         tq = sum(l[0] for l in queue)
         tc = sum(l[0] * l[1] for l in queue)
+        inventory_value_exact += tc
         stock[pid] = round(tq, 3)
         avg_cost_remaining[pid] = round(tc / tq, 2) if tq > 0 else 0
     for p in data["products"]:
@@ -2278,8 +2518,8 @@ def compute_parts_analytics(data):
         else:
             paid = min(float(pur.get("amount_paid") or 0), pur_spend)
         total_paid_to_suppliers += paid
-        outstanding = round(pur_spend - paid, 2)
-        if outstanding > 0.01:
+        outstanding = pur_spend - paid
+        if outstanding > 0.005:
             accounts_payable += outstanding
             b = ap_by_store.setdefault(sid, {"outstanding": 0.0, "count": 0})
             b["outstanding"] += outstanding
@@ -2289,7 +2529,7 @@ def compute_parts_analytics(data):
             ledger_events.append({
                 "date": pur.get("order_date"), "type": "purchase_payment",
                 "description": f"خرید از {store_name}" + (f" (PO#{pur.get('po_no')})" if pur.get("po_no") else ""),
-                "amount": -round(paid, 2), "ref_id": pur["id"],
+                "amount": -paid, "ref_id": pur["id"],
             })
 
     # ── Returns & agents: prepare what the sales loop needs ──
@@ -2299,6 +2539,7 @@ def compute_parts_analytics(data):
     total_agent_commission = total_cash_refunds = total_shipping_paid = 0.0
     returns_value = 0.0
     returns_count = 0
+    total_tax_net = 0.0   # VAT billed to customers, net of returns — owed onward to the tax office
     returns_by_reason = {}
     refunds_by_sale = {}
     for ret in data.get("sale_returns", []):
@@ -2317,7 +2558,7 @@ def compute_parts_analytics(data):
             ledger_events.append({
                 "date": max(ret.get("date") or sl.get("date") or "", sl.get("date") or ""), "type": "sale_refund",
                 "description": f"مرجوعی به {sl.get('customer_name') or 'مشتری بدون نام'}",
-                "amount": -round(cash, 2), "ref_id": ret["id"],
+                "amount": -cash, "ref_id": ret["id"],
             })
 
     for sale in data["sales"]:
@@ -2383,6 +2624,7 @@ def compute_parts_analytics(data):
         # and collected (invoice_total / AR), but excluded from revenue/profit.
         invoice_total = net_revenue + shipping_charged_to_customer + tax_amount
         returned_tax = returned_revenue_net * tax_pct / 100
+        total_tax_net += tax_amount - returned_tax
         returned_value_total = returned_revenue_net + returned_tax
         net_invoice_total = invoice_total - returned_value_total
         returns_value += returned_value_total
@@ -2401,8 +2643,8 @@ def compute_parts_analytics(data):
         total_received_from_customers += received
         # What the customer still owes: the invoice as reduced by returns, minus
         # what they actually kept paying after any cash was handed back to them.
-        outstanding = round(max(net_invoice_total - (received - cash_refunded), 0.0), 2)
-        if outstanding > 0.01:
+        outstanding = max(net_invoice_total - (received - cash_refunded), 0.0)
+        if outstanding > 0.005:
             accounts_receivable += outstanding
             cust = sale.get("customer_name") or "بدون نام"
             b = ar_by_customer.setdefault(cust, {"outstanding": 0.0, "count": 0})
@@ -2413,7 +2655,7 @@ def compute_parts_analytics(data):
             ledger_events.append({
                 "date": sale.get("date"), "type": "sale_receipt",
                 "description": f"فروش به {cust_label}" + (f" (فاکتور #{sale.get('invoice_no')})" if sale.get("invoice_no") else ""),
-                "amount": round(received, 2), "ref_id": sale["id"],
+                "amount": received, "ref_id": sale["id"],
             })
         if shipping > 0.01:
             # The courier is paid the FULL shipping cost regardless of who the
@@ -2422,7 +2664,7 @@ def compute_parts_analytics(data):
             ledger_events.append({
                 "date": sale.get("date"), "type": "shipping_paid",
                 "description": f"هزینه ارسال فروش به {cust_label}",
-                "amount": -round(shipping, 2), "ref_id": sale["id"],
+                "amount": -shipping, "ref_id": sale["id"],
             })
 
         agent = agents_by_id.get(sale.get("agent_id"))
@@ -2456,7 +2698,7 @@ def compute_parts_analytics(data):
         s["cash_refunded"] = round(cash_refunded, 2)
         s["agent_commission"] = round(commission, 2)
         s["amount_received"] = round(received, 2)
-        s["amount_outstanding"] = outstanding
+        s["amount_outstanding"] = round(outstanding, 2)
         sales_out.append(s)
         total_revenue += sale_revenue
         total_cogs += sale_cogs_total
@@ -2465,7 +2707,7 @@ def compute_parts_analytics(data):
     low_stock = [pid for pid, q in stock.items() if pid in products
                  and q <= (products[pid].get("reorder_point") if products[pid].get("reorder_point") not in (None, "") else low_stock_threshold)]
 
-    inventory_value = sum(stock[pid] * avg_cost_remaining[pid] for pid in stock)
+    inventory_value = inventory_value_exact
 
     # ── Cash / capital ledger ────────────────────────
     # Cash balance is fully derived, never stored: what the owner put in,
@@ -2475,7 +2717,10 @@ def compute_parts_analytics(data):
     total_deposits = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "deposit")
     total_withdrawals = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "withdrawal")
     total_adjustments = sum(float(t.get("amount") or 0) for t in data.get("capital_transactions", []) if t.get("type") == "adjustment")
-    total_expenses = sum(float(x.get("amount") or 0) for x in data.get("business_expenses", []))
+    total_expenses_all = sum(float(x.get("amount") or 0) for x in data.get("business_expenses", []))
+    total_tax_payments = sum(float(x.get("amount") or 0) for x in data.get("business_expenses", []) if x.get("category") == TAX_PAYMENT_CATEGORY)
+    total_expenses = total_expenses_all - total_tax_payments      # operating expenses only (hit profit)
+    tax_payable = total_tax_net - total_tax_payments               # VAT still owed
 
     # Agent commission: accrued per sale above, settled here by recorded payouts.
     # A payout moves cash but is NOT another expense — the cost was already
@@ -2490,7 +2735,7 @@ def compute_parts_analytics(data):
         ledger_events.append({
             "date": p.get("date"), "type": "agent_payout",
             "description": f"پرداخت پورسانت به {agent_name}" + (f" — {p.get('note')}" if p.get("note") else ""),
-            "amount": -round(amt, 2), "ref_id": p["id"],
+            "amount": -amt, "ref_id": p["id"],
         })
     for aid in agents_by_id:
         agent_summary.setdefault(aid, _zero_agent())
@@ -2498,9 +2743,9 @@ def compute_parts_analytics(data):
         summ["payable"] = summ["accrued"] - summ["paid"]
     agent_commission_payable = total_agent_commission - total_agent_payouts
 
-    cash_balance = (total_deposits - total_withdrawals + total_adjustments - total_paid_to_suppliers - total_expenses
+    cash_balance = (total_deposits - total_withdrawals + total_adjustments - total_paid_to_suppliers - total_expenses_all
                     + total_received_from_customers - total_cash_refunds - total_shipping_paid - total_agent_payouts)
-    business_value = cash_balance + inventory_value + accounts_receivable - accounts_payable - agent_commission_payable
+    business_value = cash_balance + inventory_value + accounts_receivable - accounts_payable - agent_commission_payable - tax_payable
     net_capital = total_deposits - total_withdrawals + total_adjustments
 
     # ── Unified account ledger ("گردش حساب") — every event that ever moved
@@ -2514,24 +2759,26 @@ def compute_parts_analytics(data):
         ledger_events.append({
             "date": t.get("date"), "type": "capital_" + str(ttype),
             "description": label + (f" — {t.get('note')}" if t.get("note") else ""),
-            "amount": round(signed, 2), "ref_id": t["id"],
+            "amount": signed, "ref_id": t["id"],
         })
     for x in data.get("business_expenses", []):
         ledger_events.append({
             "date": x.get("date"), "type": "expense",
             "description": f"هزینه: {x.get('title') or x.get('category')}",
-            "amount": -round(float(x.get("amount") or 0), 2), "ref_id": x["id"],
+            "amount": -float(x.get("amount") or 0), "ref_id": x["id"],
         })
     ledger_events.sort(key=lambda e: (e.get("date") or "", e.get("type") or ""))
     running = 0.0
     cash_ledger = []
     for e in ledger_events:
         running += e["amount"]
-        cash_ledger.append({**e, "running_balance": round(running, 2)})
+        cash_ledger.append({**e, "amount": round(e["amount"], 2), "running_balance": round(running, 2)})
 
     # ── Expenses by category, for the reports dashboard ──
     expenses_by_category = {}
     for x in data.get("business_expenses", []):
+        if x.get("category") == TAX_PAYMENT_CATEGORY:
+            continue
         cat = x.get("category") or "سایر"
         b = expenses_by_category.setdefault(cat, {"amount": 0.0, "count": 0})
         b["amount"] += float(x.get("amount") or 0)
@@ -2562,6 +2809,12 @@ def compute_parts_analytics(data):
             "cash_balance": round(cash_balance, 2),
             "business_value": round(business_value, 2),
             "total_expenses": round(total_expenses, 2),
+            "total_tax_collected": round(total_tax_net, 2),
+            "total_tax_payments": round(total_tax_payments, 2),
+            "tax_payable": round(tax_payable, 2),
+            "oversold_units": round(oversold_units, 3),
+            "oversold_cost": round(oversold_cost, 2),
+            "oversold_product_count": len(oversold_pids),
             "net_profit_after_expenses": net_profit_after_expenses,
             "gross_margin_pct": round((total_revenue - total_cogs) / total_revenue * 100, 2) if total_revenue > 0 else 0,
             "accounts_receivable": round(accounts_receivable, 2),
@@ -2601,6 +2854,13 @@ def _parts_payload(data, analytics):
         "customers": data["customers"], "sale_returns": data["sale_returns"],
         "quotations": annotate_quotations(data), "agent_payouts": data["agent_payouts"],
         "pricing_settings": data["pricing_settings"],
+        "report_ranges": data.get("report_ranges", []), "report_presets": data.get("report_presets", []),
+        "dashboard_widgets": data.get("dashboard_widgets", []), "custom_metrics": data.get("custom_metrics", []),
+        "calendar_events": data.get("calendar_events", []),
+        "product_groups": data.get("product_groups", []),
+        "bundles": data.get("bundles", []),
+        "legacy_groups_migrated": bool(data.get("legacy_groups_migrated")),
+        "legacy_generics_migrated": bool(data.get("legacy_generics_migrated")),
         "stock": analytics["stock"], "avg_cost": analytics["avg_cost"],
         "by_product": analytics["by_product"], "by_store": analytics["by_store"],
         "totals": analytics["totals"], "expenses_by_category": analytics["expenses_by_category"],
@@ -2640,6 +2900,7 @@ def parts_api():
             "notes": body.get("notes", "").strip(),
             "torob_link": body.get("torob_link", "").strip(),
             "image": body.get("image", ""),
+            "group_id": _valid_group_id(data, body.get("group_id")),
             "sale_price": (float(sp) if sp not in (None, "") else None),
             "reorder_point": (float(rp) if rp not in (None, "") else None),
             "calc_shipping_payer": body.get("calc_shipping_payer") if body.get("calc_shipping_payer") in ("customer", "business", "split") else None,
@@ -2658,6 +2919,8 @@ def parts_api():
                         p[k] = (body.get(k) or "").strip()
                 if "image" in body:
                     p["image"] = body.get("image", "")
+                if "group_id" in body:
+                    p["group_id"] = _valid_group_id(data, body.get("group_id"))
                 if "sale_price" in body:
                     sp = body.get("sale_price", None)
                     p["sale_price"] = (float(sp) if sp not in (None, "") else None)
@@ -2681,6 +2944,8 @@ def parts_api():
     elif action == "delete_product":
         pid = body.get("id")
         data["products"] = [p for p in data["products"] if p["id"] != pid]
+        # bundles lose the deleted product; a bundle left with no required items is dropped
+        data["bundles"] = _clean_bundles(data.get("bundles"), {p["id"] for p in data["products"]})
 
     # ── BULK PRODUCT EDITS — sale price and agent-share, applied to a chosen
     # set of products (or every product) in one shot ──
@@ -2933,9 +3198,7 @@ def parts_api():
 
     # ── SALES (one customer/visit, many line items) ──
     elif action == "add_sale":
-        items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
-                   "unit_price": float(it.get("unit_price") or 0),
-                   "discount": float(it.get("discount") or 0)} for it in body.get("items", [])]
+        items = _clean_sale_items(body.get("items", []))
         disc = body.get("discount", None)
         taxp = body.get("tax_percent", None)
         ship = body.get("shipping_cost", None)
@@ -2945,6 +3208,8 @@ def parts_api():
         samt = body.get("amount_paid", None)
         agent_id = body.get("agent_id") or None
         commission_pct, commission_basis = _resolve_sale_commission(data, agent_id, body)
+        if _is_pickup(body.get("delivery_method")):
+            ship, ship_payer, ship_ratio = 0, "customer", None
         data["sales"].append({
             "id": _new_id(),
             "date": body.get("date"),
@@ -2998,6 +3263,10 @@ def parts_api():
                     sr_ = body.get("shipping_split_ratio", None)
                     sale["shipping_split_ratio"] = (float(sr_) if sr_ not in (None, "") else 0.5)
                 if "delivery_method" in body: sale["delivery_method"] = (body.get("delivery_method") or "").strip()
+                if _is_pickup(sale.get("delivery_method")) and ("delivery_method" in body or "shipping_cost" in body):
+                    sale["shipping_cost"] = 0
+                    sale["shipping_payer"] = "customer"
+                    sale["shipping_split_ratio"] = 0.5
                 if "customer_id" in body: sale["customer_id"] = body.get("customer_id") or None
                 if "agent_id" in body: sale["agent_id"] = body.get("agent_id") or None
                 if "agent_id" in body or "commission_percent" in body:
@@ -3012,9 +3281,7 @@ def parts_api():
                     sale["amount_paid"] = (float(samt) if samt not in (None, "") else 0)
                 if "notes" in body: sale["notes"] = (body.get("notes") or "").strip()
                 if "items" in body:
-                    new_items = [{"product_id": it.get("product_id"), "qty": float(it.get("qty") or 0),
-                                  "unit_price": float(it.get("unit_price") or 0),
-                                  "discount": float(it.get("discount") or 0)} for it in body.get("items", [])]
+                    new_items = _clean_sale_items(body.get("items", []))
                     has_returns = any(r.get("sale_id") == sale["id"] for r in data["sale_returns"])
                     if has_returns and [i["product_id"] for i in new_items] != [i.get("product_id") for i in sale.get("items", [])]:
                         return jsonify({"ok": False, "error": "این فروش مرجوعی دارد؛ ردیف‌های کالا را نمی‌شود کم/زیاد یا جابه‌جا کرد. اول مرجوعی‌ها را حذف کن."}), 400
@@ -3119,6 +3386,10 @@ def parts_api():
             "show_agent_on_invoice": bool(body.get("show_agent_on_invoice", False)),
             "notes": body.get("notes", "").strip(),
         }
+        if _is_pickup(fields["delivery_method"]):
+            fields["shipping_cost"] = 0.0
+            fields["shipping_payer"] = "customer"
+            fields["shipping_split_ratio"] = 0.5
         if action == "add_quotation":
             bp = data["business_profile"]
             qno = bp.get("next_quote_no", 1)
@@ -3255,13 +3526,16 @@ def parts_api():
     # ── SUPPLIER PRICE LIST ENTRIES (one price, from one store, for one item,
     # on one date — the raw material for price comparison + the cart optimizer) ──
     elif action == "add_price_entry":
-        ref_type = body.get("ref_type") if body.get("ref_type") in ("product", "generic") else "product"
+        ref_type = body.get("ref_type") if body.get("ref_type") in ("product", "generic", "group") else "product"
+        if ref_type == "group" and not _valid_group_id(data, body.get("group_id")):
+            return jsonify({"ok": False, "error": "گروه انتخاب‌شده وجود ندارد"}), 400
         data["price_entries"].append({
             "id": _new_id(),
             "store_id": body.get("store_id"),
             "ref_type": ref_type,
             "product_id": body.get("product_id") if ref_type == "product" else None,
             "generic_id": body.get("generic_id") if ref_type == "generic" else None,
+            "group_id": body.get("group_id") if ref_type == "group" else None,
             "price": float(body.get("price") or 0),
             "date": body.get("date") or str(date.today()),
             "notes": body.get("notes", "").strip(),
@@ -3271,10 +3545,11 @@ def parts_api():
         for e in data["price_entries"]:
             if e["id"] == body.get("id"):
                 if "store_id" in body: e["store_id"] = body.get("store_id")
-                if "ref_type" in body and body.get("ref_type") in ("product", "generic"):
+                if "ref_type" in body and body.get("ref_type") in ("product", "generic", "group"):
                     e["ref_type"] = body.get("ref_type")
                 if "product_id" in body: e["product_id"] = body.get("product_id")
                 if "generic_id" in body: e["generic_id"] = body.get("generic_id")
+                if "group_id" in body: e["group_id"] = body.get("group_id") if _valid_group_id(data, body.get("group_id")) else None
                 if "price" in body: e["price"] = float(body.get("price") or 0)
                 if "date" in body: e["date"] = body.get("date")
                 if "notes" in body: e["notes"] = (body.get("notes") or "").strip()
@@ -3318,6 +3593,74 @@ def parts_api():
             bp["logo"] = body.get("logo", "")
         if "invoice_theme" in body and body.get("invoice_theme") in ("classic", "minimal"):
             bp["invoice_theme"] = body.get("invoice_theme")
+
+    # ── REPORT BUILDER: named custom date ranges + saved report presets ──
+    elif action == "save_report_ranges":
+        data["report_ranges"] = _clean_report_ranges(body.get("ranges"))
+    elif action == "save_report_presets":
+        data["report_presets"] = _clean_report_presets(body.get("presets"))
+        data["dashboard_widgets"] = _clean_dashboard_widgets(data.get("dashboard_widgets"), data["report_presets"])
+    elif action == "save_product_groups":
+        # optional {assign:{product_id: group_id}} is applied first, then the whole tree is replaced
+        pmap = {p["id"]: p for p in data["products"]}
+        new_groups = _clean_product_groups(body.get("groups"))
+        ids = {g["id"] for g in new_groups}
+        for pid, gid in (body.get("assign") or {}).items():
+            if pid in pmap:
+                pmap[pid]["group_id"] = gid if gid in ids else ""
+        data["product_groups"] = new_groups
+        for p in data["products"]:
+            if p.get("group_id") and p["group_id"] not in ids:
+                p["group_id"] = ""
+    elif action == "migrate_legacy_groups":
+        # One-time: «دسته‌بندی» and «نوع قطعه» become nodes of the product tree; ungrouped products are placed on them
+        if not data.get("legacy_groups_migrated"):
+            groups = data.setdefault("product_groups", [])
+            byname = {g["name"]: g for g in groups if not g.get("parent")}
+            def node(nm):
+                nm = str(nm or "").strip()[:80]
+                if not nm:
+                    return ""
+                if nm not in byname:
+                    g = {"id": "pg_" + _new_id() + str(len(groups)), "name": nm, "parent": "", "image": ""}
+                    groups.append(g); byname[nm] = g
+                return byname[nm]["id"]
+            for p in data["products"]:
+                if p.get("group_id"):
+                    continue
+                gid = node(p.get("part_type")) or node(p.get("category"))
+                if gid:
+                    p["group_id"] = gid
+            data["product_groups"] = _clean_product_groups(groups)
+            data["legacy_groups_migrated"] = True
+    elif action == "migrate_legacy_generics":
+        # One-time: every «کالای کلی» becomes a node of the product tree; its price quotes follow it
+        if not data.get("legacy_generics_migrated"):
+            groups = data.setdefault("product_groups", [])
+            byname = {g["name"]: g for g in groups if not g.get("parent")}
+            gmap = {}
+            for gp in data.get("generic_products", []):
+                nm = str(gp.get("name") or "").strip()[:80]
+                if not nm:
+                    continue
+                if nm not in byname:
+                    g = {"id": "pg_" + _new_id() + str(len(groups)), "name": nm, "parent": "", "image": ""}
+                    groups.append(g); byname[nm] = g
+                gmap[gp["id"]] = byname[nm]["id"]
+            data["product_groups"] = _clean_product_groups(groups)
+            ok_ids = {g["id"] for g in data["product_groups"]}
+            for e in data["price_entries"]:
+                if e.get("ref_type") == "generic" and gmap.get(e.get("generic_id")) in ok_ids:
+                    e["ref_type"] = "group"; e["group_id"] = gmap[e["generic_id"]]; e["generic_id"] = None
+            data["legacy_generics_migrated"] = True
+    elif action == "save_bundles":
+        data["bundles"] = _clean_bundles(body.get("bundles"), {p["id"] for p in data["products"]})
+    elif action == "save_calendar_events":
+        data["calendar_events"] = _clean_calendar_events(body.get("events"))
+    elif action == "save_custom_metrics":
+        data["custom_metrics"] = _clean_custom_metrics(body.get("metrics"))
+    elif action == "save_dashboard_widgets":
+        data["dashboard_widgets"] = _clean_dashboard_widgets(body.get("widgets"), data.get("report_presets"))
 
     # ── INVOICES (formal, numbered — generated from an existing sale) ──
     elif action == "generate_invoice":

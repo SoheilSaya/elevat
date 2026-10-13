@@ -1,3 +1,4 @@
+<div class="parts-modals">
 <!-- Parts Biz: Product modal -->
 <style>
 .part-img-upload{width:100%;height:140px;border:2px dashed var(--cream3);border-radius:var(--r2);background:var(--cream2);
@@ -29,6 +30,7 @@
 #purchaseModalOverlay,#saleModalOverlay{z-index:9000;}
 #productModalOverlay,#storeModalOverlay,#agentModalOverlay,#customerModalOverlay,#quoteModalOverlay,#pricingSettingsModalOverlay,#agentPayoutModalOverlay,#bulkEditModalOverlay{z-index:9500;}
 #carModelModalOverlay,#brandModalOverlay,#partTypeModalOverlay,#categoryModalOverlay{z-index:9800;}
+#rbRangesModalOverlay,#rbPresetModalOverlay,#rbCmModalOverlay{z-index:9500;}
 #partImgCropOverlay{z-index:99999;}
 #docViewerOverlay{z-index:99997;}
 
@@ -66,82 +68,159 @@
 .ss-option:hover,.ss-option.sel{background:var(--cream2);color:var(--text);}
 .ss-empty{padding:10px;font-size:12px;color:var(--text4);font-style:italic;text-align:center;}
 .tx-item-row .ss-wrap{width:100%;}
+
+/* ── «نحوه محاسبه» ── */
+.xi-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;min-width:20px;border-radius:50%;border:1px solid transparent;color:inherit;opacity:.5;background:transparent;
+  cursor:pointer;padding:0;margin:0 4px;vertical-align:middle;transition:opacity .15s,background .15s,color .15s,transform .15s;line-height:0;flex-shrink:0;}
+.xi-btn svg{width:16px;height:16px;display:block;pointer-events:none;}
+.xi-btn:hover,.xi-btn:focus-visible{opacity:1;background:var(--coralL,#fdece7);color:var(--coral,#e85d3a);border-color:var(--coral,#e85d3a);outline:none;transform:scale(1.08);}
+.xi-btn:active{transform:scale(.95);}
+.xi-mini{width:18px;height:18px;min-width:18px;margin:0 3px;} .xi-mini svg{width:14px;height:14px;}
+.parts-kpi-card{position:relative;}
+.xi-corner{position:absolute;top:8px;left:10px;margin:0;opacity:.45;}
+.parts-kpi-card:has(.xi-corner) .parts-kpi-label,.parts-kpi-card:has(.xi-corner) .kpi-en{padding-left:26px;}
+.parts-kpi-card:has(.xi-corner) .parts-kpi-icon{padding-left:26px;}
+th .xi-btn{opacity:.6;} .parts-table td .xi-mini{opacity:.38;} .parts-table tr:hover td .xi-mini{opacity:.8;}
+.phs-lbl .xi-btn{opacity:.6;}
+.kpi-en{display:block;font-size:9.5px;font-weight:400;color:var(--text4);letter-spacing:.2px;text-align:left;direction:ltr;margin-top:1px;}
+.rb-th-main{display:inline;}
+#xplOverlay{z-index:9600;}
+.xpl-modal{position:relative;background:var(--cream,#fff);border-radius:18px;box-shadow:0 20px 60px #0004;max-width:760px;width:94vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0!important;}
+.xpl-close{position:absolute;top:10px;left:12px;z-index:2;width:30px;height:30px;border-radius:50%;border:none;background:var(--cream2);color:var(--text2);cursor:pointer;font-size:14px;}
+#xplBody{overflow-y:auto;padding:18px 20px 22px;-webkit-overflow-scrolling:touch;}
+.xpl-crumbs{font-size:11.5px;color:var(--text3);margin:0 34px 10px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.xpl-back{border:1px solid var(--cream3);background:var(--cream2);border-radius:14px;padding:2px 10px;font-size:11.5px;cursor:pointer;margin-left:6px;color:var(--text2);}
+a.xl{color:var(--sky);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;cursor:pointer;}
+a.xl:hover{text-decoration-style:solid;}
+.xpl-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px;}
+.xpl-title{font-size:18px;font-weight:800;color:var(--ink);}
+.xpl-term{margin-top:3px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;} .xpl-term-fa{font-size:12.5px;color:var(--plum);font-weight:700;}
+.xpl-term-en{font-size:11px;color:var(--text4);} .xpl-badge{display:inline-block;margin-top:6px;font-size:10.5px;background:var(--cream2);border:1px solid var(--cream3);border-radius:10px;padding:1px 9px;color:var(--text3);}
+.xpl-val{font-size:22px;font-weight:800;color:var(--sage);direction:ltr;text-align:left;white-space:nowrap;} .xpl-val-sub{font-size:10.5px;font-weight:500;color:var(--text4);}
+.xpl-sec{margin-top:14px;} .xpl-sec-t{font-size:12.5px;font-weight:800;color:var(--text2);margin-bottom:6px;} .xpl-hint{font-weight:400;color:var(--text4);font-size:11px;}
+.xpl-formula{background:var(--cream2);border-right:3px solid var(--coral);border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;line-height:1.9;}
+.xpl-tbl{width:100%;border-collapse:collapse;font-size:12.5px;} .xpl-tbl td,.xpl-tbl th{padding:6px 8px;border-bottom:1px solid var(--cream3);text-align:right;}
+.xpl-tbl th{background:var(--cream2);font-size:11.5px;} .xpl-num{direction:ltr;text-align:left!important;white-space:nowrap;font-weight:700;} .xpl-op{width:26px;color:var(--coral);font-weight:800;text-align:center!important;}
+.xpl-res td{border-top:2px solid var(--ink);font-weight:800;background:var(--cream);}
+.xpl-rec tr.clk{cursor:pointer;} .xpl-rec tr.clk:hover td{background:var(--cream2);}
+.xpl-scroll{max-height:300px;overflow:auto;border:1px solid var(--cream3);border-radius:8px;}
+.xpl-chk{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;font-size:12px;margin-bottom:4px;}
+.xpl-chk.ok{background:var(--sageL);} .xpl-chk.bad{background:var(--coralL);}
+.xpl-warn{background:var(--amberL);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:6px;}
+.xpl-note{margin-top:14px;background:var(--amberL);border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.9;}
+.xpl-src{font-size:12.5px;} .xpl-code{margin-top:12px;font-size:11.5px;} .xpl-code pre{background:#1f2430;color:#d6deeb;border-radius:8px;padding:10px;overflow:auto;max-height:200px;font-size:11px;white-space:pre-wrap;}
+.pdf-bar{display:flex;justify-content:flex-start;margin:0 0 10px;}
+.pdf-btn{border:1px solid var(--cream3);background:#fff;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text2);} .pdf-btn:hover{background:var(--cream2);}
+@media(max-width:600px){.xpl-modal{width:100vw;max-height:94vh;border-radius:16px 16px 0 0;} .xpl-val{font-size:18px;}}
+@media print{#xplOverlay,.xi-btn,.pdf-bar{display:none!important;}}
+/* ── Jalali popup date picker ── */
+input[data-pjdp]{cursor:pointer;caret-color:transparent;padding-left:34px !important;text-align:right;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3 10h18'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:10px center;}
+input[data-pjdp]:focus{border-color:var(--sage);}
+.pjdp{position:fixed;z-index:10050;width:292px;background:#fff;border:1.5px solid var(--cream3,#e6dccf);border-radius:16px;box-shadow:0 18px 50px rgba(40,30,20,.22);padding:12px;font-family:'Vazirmatn',Tahoma,sans-serif;animation:jdpIn .14s ease-out;}
+@keyframes jdpIn{from{opacity:0;transform:translateY(-4px) scale(.98);}to{opacity:1;transform:none;}}
+.pjdp-h{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.pjdp-nav{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--cream3,#e6dccf);background:var(--cream2,#faf6f0);font-size:18px;line-height:1;cursor:pointer;color:var(--ink,#333);flex:none;}
+.pjdp-nav:hover{background:var(--sageL);border-color:var(--sage);color:var(--sage);}
+.pjdp-sel{flex:1;min-width:0;height:30px;border-radius:9px;border:1.5px solid var(--cream3,#e6dccf);background:#fff;font-family:inherit;font-size:12.5px;font-weight:700;padding:0 4px;color:var(--ink,#333);}
+.pjdp-w,.pjdp-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.pjdp-w span{text-align:center;font-size:11px;font-weight:700;color:var(--ink3,#999);padding:3px 0;}
+.pjdp-w span:last-child{color:var(--coral);}
+.pjdp-c{height:34px;border-radius:10px;border:1.5px solid transparent;background:transparent;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink,#333);}
+.pjdp-c.off{cursor:default;}
+button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
+.pjdp-c.fri{color:var(--coral);}
+.pjdp-c.today{border-color:var(--sky);}
+.pjdp-c.sel{background:var(--sage);color:#fff;border-color:var(--sage);}
+.pjdp-f{display:flex;justify-content:space-between;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--cream3,#e6dccf);}
+.pjdp-f button{flex:1;height:30px;border-radius:9px;border:1.5px solid var(--cream3,#e6dccf);background:var(--cream2,#faf6f0);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink2,#555);}
+.pjdp-f button:hover{border-color:var(--sage);color:var(--sage);background:var(--sageL);}
 </style>
 <div class="overlay" id="productModalOverlay">
   <div class="modal" style="max-width:480px;">
-    <h3 id="productModalTitle">Add Product</h3>
+    <h3 id="productModalTitle">افزودن محصول</h3>
     <input type="hidden" id="productModalId"/>
 
     <div class="part-img-upload" id="partImgUploadBox" onclick="document.getElementById('partImgFileInput').click()">
       <img id="partImgPreview" style="display:none;"/>
       <div class="hint-icon" id="partImgHintIcon">🖼️</div>
-      <div class="hint" id="partImgHintText">Click to add a photo</div>
+      <div class="hint" id="partImgHintText">برای افزودن عکس کلیک کن</div>
       <button type="button" class="part-img-remove" id="partImgRemoveBtn" onclick="event.stopPropagation();removeProductImage()">✕</button>
     </div>
     <input type="file" accept="image/*" id="partImgFileInput" style="display:none;" onchange="onProductImageSelected(event)"/>
 
     <div class="pmodal-row">
-      <div>
+      <div style="display:none">
         <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Part type</span>
-          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openPartTypeModal(null,'product')">+ New</button>
+          <span>نوع قطعه</span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openPartTypeModal(null,'product')">+ جدید</button>
         </div>
         <select class="builder-select" id="pfPartType" style="width:100%;margin:0;" onchange="suggestProductName()"></select>
       </div>
       <div>
         <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Brand</span>
-          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openBrandModal(null,'product')">+ New</button>
+          <span>برند</span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openBrandModal(null,'product')">+ جدید</button>
         </div>
         <select class="builder-select" id="pfBrand" style="width:100%;margin:0;" onchange="suggestProductName()"></select>
       </div>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label" style="margin-bottom:8px;">Car model <span style="font-weight:400;color:var(--text4);">(tap to select, multiple allowed)</span></div>
+      <div class="builder-label" style="margin-bottom:8px;">مدل خودرو <span style="font-weight:400;color:var(--text4);">(روی هرکدوم بزنی انتخاب می‌شه، چندتایی مجازه)</span></div>
       <input type="hidden" id="pfCarModel"/>
       <input type="text" class="modal-input" id="pfCarModelSearch" placeholder="🔍 جستجوی مدل ماشین..." dir="auto" style="width:100%;margin-bottom:8px;font-size:12px;padding:8px 12px;" oninput="filterCarModelTags(this.value)"/>
       <div class="cm-tagwrap" id="pfCarModelTags"></div>
     </div>
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Variant / type</div>
-        <input type="text" class="modal-input" id="pfVariant" placeholder="e.g. Khari" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
+        <div class="builder-label">تیپ / نوع</div>
+        <input type="text" class="modal-input" id="pfVariant" placeholder="مثلاً خاری" dir="auto" style="width:100%;margin:0;" oninput="suggestProductName()"/>
       </div>
       <div>
-        <div class="builder-label">OEM / part code <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">کد فنی / شماره قطعه <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="text" class="modal-input" id="pfOemCode" placeholder="e.g. 405-1308100" dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div class="pmodal-row">
-      <div>
+      <div style="display:none">
         <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Category <span style="font-weight:400;color:var(--text4);">(optional)</span></span>
-          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openCategoryModal(null,'product')">+ New</button>
+          <span>دسته‌بندی <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></span>
+          <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="openCategoryModal(null,'product')">+ جدید</button>
         </div>
         <select class="builder-select" id="pfCategory" style="width:100%;margin:0;"></select>
       </div>
       <div>
-        <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">لینک ترب <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="text" class="modal-input" id="pfTorob" placeholder="torob.com/p/..." dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Product name <span style="font-weight:400;color:var(--text4);">(auto-filled, editable)</span></div>
-      <input type="text" class="modal-input" id="pfName" placeholder="Product display name" dir="auto" style="width:100%;margin:0;"/>
+      <div class="builder-label" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>گروه کالا (درختی) <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></span>
+        <button type="button" class="preset" style="padding:2px 10px;font-size:11px;" onclick="closeProductModal();pickSubnavItem('productgroups')">مدیریت گروه‌ها</button>
+      </div>
+      <input type="hidden" id="pfGroup"/>
+      <div id="pfGroupBox"></div>
+      <div id="pfGroupPath" style="font-size:11px;color:var(--text4);"></div>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Sale price (K T) <span style="font-weight:400;color:var(--text4);">(optional — default price used when you record a sale; overridable per sale)</span></div>
-      <input type="number" class="modal-input" id="pfSalePrice" placeholder="e.g. 1200" min="0" style="width:100%;margin:0;"/>
+      <div class="builder-label">نام محصول <span style="font-weight:400;color:var(--text4);">(خودکار پر می‌شه، قابل ویرایش)</span></div>
+      <input type="text" class="modal-input" id="pfName" placeholder="نام نمایشی محصول" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Reorder point <span style="font-weight:400;color:var(--text4);">(optional — overrides the global low-stock threshold for just this product)</span></div>
-      <input type="number" class="modal-input" id="pfReorderPoint" placeholder="e.g. 5" min="0" style="width:100%;margin:0;"/>
+      <div class="builder-label">قیمت فروش (KT) <span style="font-weight:400;color:var(--text4);">(اختیاری — موقع ثبت فروش به‌عنوان قیمت پیش‌فرض می‌آید و هر بار قابل تغییر است)</span></div>
+      <input type="number" class="modal-input" id="pfSalePrice" placeholder="مثلاً ۱۲۰۰" min="0" style="width:100%;margin:0;"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="builder-label">نقطه سفارش مجدد <span style="font-weight:400;color:var(--text4);">(اختیاری — فقط برای همین محصول، جای آستانه‌ی سراسری موجودی کم می‌نشیند)</span></div>
+      <input type="number" class="modal-input" id="pfReorderPoint" placeholder="مثلاً ۵" min="0" style="width:100%;margin:0;"/>
     </div>
     <button type="button" class="parts-header-btn" style="width:100%;margin-bottom:10px;" onclick="togglePfCalcSection()">🧮 تنظیمات قیمت‌گذاری این محصول (اختیاری) <span id="pfCalcToggleArrow">▾</span></button>
     <div id="pfCalcSection" style="display:none;background:var(--cream2);border-radius:var(--r2);padding:10px;margin-bottom:10px;">
       <div class="pe-form-desc" style="margin-top:0;">هر کدوم رو خالی بذاری، همون تنظیم سراسری (⚙️ تنظیمات قیمت‌گذاری در بالای صفحه محصولات) استفاده می‌شه.</div>
       <div style="margin-bottom:10px;">
-        <div class="builder-label">هزینه ارسال این محصول (K T) <span style="font-weight:400;color:var(--text4);">(خالی = پیش‌فرض سراسری)</span></div>
+        <div class="builder-label">هزینه ارسال این محصول (KT) <span style="font-weight:400;color:var(--text4);">(خالی = پیش‌فرض سراسری)</span></div>
         <input type="number" class="modal-input" id="pfCalcShippingCost" min="0" style="width:100%;margin:0;"/>
       </div>
       <div style="margin-bottom:10px;">
@@ -176,13 +255,13 @@
     </div>
 
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-      <input type="text" class="modal-input" id="pfNotes" placeholder="Anything else worth remembering" dir="auto" style="width:100%;margin:0;"/>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <input type="text" class="modal-input" id="pfNotes" placeholder="هر چیز دیگه‌ای که لازمه یادت بمونه" dir="auto" style="width:100%;margin:0;"/>
     </div>
 
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeProductModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveProductModal()">Save Product</button>
+      <button class="btn-cancel" onclick="closeProductModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveProductModal()">ذخیره محصول</button>
     </div>
   </div>
 </div>
@@ -191,19 +270,19 @@
      like picking a profile photo. Opens on top of the product modal. -->
 <div class="overlay" id="partImgCropOverlay">
   <div class="modal" style="max-width:440px;">
-    <h3>🖼️ Position the Photo</h3>
+    <h3>🖼️ تنظیم عکس</h3>
     <div class="crop-frame" id="cropFrame">
       <img id="cropImg" draggable="false"/>
     </div>
-    <div class="crop-hint">Drag to reposition · use the slider to zoom</div>
+    <div class="crop-hint">برای جابه‌جایی بکش · برای بزرگ‌نمایی از لغزنده استفاده کن</div>
     <div class="crop-zoom-row">
       <span class="cz-icon">🔍</span>
       <input type="range" id="cropZoomSlider" min="0" max="100" value="0" oninput="onCropZoomInput(this.value)"/>
       <span class="cz-icon" style="font-size:17px;">🔍</span>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="cancelImageCrop()">Cancel</button>
-      <button class="btn-ok" onclick="confirmImageCrop()">Use Photo</button>
+      <button class="btn-cancel" onclick="cancelImageCrop()">انصراف</button>
+      <button class="btn-ok" onclick="confirmImageCrop()">استفاده از عکس</button>
     </div>
   </div>
 </div>
@@ -211,56 +290,56 @@
 <!-- Parts Biz: Store/Supplier modal -->
 <div class="overlay" id="storeModalOverlay">
   <div class="modal" style="max-width:440px;">
-    <h3 id="storeModalTitle">Add Store</h3>
+    <h3 id="storeModalTitle">افزودن تامین‌کننده</h3>
     <input type="hidden" id="storeModalId"/>
 
     <div class="part-img-upload" id="storeImgUploadBox" onclick="document.getElementById('storeImgFileInput').click()">
       <img id="storeImgPreview" style="display:none;"/>
       <div class="hint-icon" id="storeImgHintIcon">🏬</div>
-      <div class="hint" id="storeImgHintText">Click to add a photo</div>
+      <div class="hint" id="storeImgHintText">برای افزودن عکس کلیک کن</div>
       <button type="button" class="part-img-remove" id="storeImgRemoveBtn" onclick="event.stopPropagation();removeStoreImage()">✕</button>
     </div>
     <input type="file" accept="image/*" id="storeImgFileInput" style="display:none;" onchange="onStoreImageSelected(event)"/>
 
     <div style="margin-bottom:10px;">
       <div class="builder-label">نام تامین‌کننده</div>
-      <input type="text" class="modal-input" id="sfName" placeholder="e.g. Yadaksara Auto Parts" dir="auto" style="width:100%;margin:0;"/>
+      <input type="text" class="modal-input" id="sfName" placeholder="مثلاً لوازم یدکی آرایش" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Address <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-      <input type="text" class="modal-input" id="sfAddress" placeholder="Store address" dir="auto" style="width:100%;margin:0;"/>
+      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <input type="text" class="modal-input" id="sfAddress" placeholder="آدرس فروشگاه" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="pmodal-row">
       <div>
-        <div class="builder-label">Phone <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">تلفن <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="text" class="modal-input" id="sfPhone" placeholder="09xx xxx xxxx" style="width:100%;margin:0;"/>
       </div>
       <div>
-        <div class="builder-label">Torob link <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">لینک ترب <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="text" class="modal-input" id="sfTorob" placeholder="torob.com/shop/..." style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Website <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">وب‌سایت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="sfWebsite" placeholder="https://..." style="width:100%;margin:0;"/>
     </div>
     <div class="pmodal-row" style="margin-bottom:10px;">
       <div>
-        <div class="builder-label">Shipping cost (K T) <span style="font-weight:400;color:var(--text4);">(optional — used by the cart optimizer)</span></div>
-        <input type="number" class="modal-input" id="sfShipping" placeholder="e.g. 150" min="0" style="width:100%;margin:0;"/>
+        <div class="builder-label">هزینه ارسال (KT) <span style="font-weight:400;color:var(--text4);">(اختیاری — در بهینه‌ساز سبد خرید استفاده می‌شود)</span></div>
+        <input type="number" class="modal-input" id="sfShipping" placeholder="مثلاً ۱۵۰" min="0" style="width:100%;margin:0;"/>
       </div>
       <div>
-        <div class="builder-label">Free shipping over (K T) <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="number" class="modal-input" id="sfFreeShipMin" placeholder="e.g. 2000" min="0" style="width:100%;margin:0;"/>
+        <div class="builder-label">ارسال رایگان برای خرید بالای (KT) <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+        <input type="number" class="modal-input" id="sfFreeShipMin" placeholder="مثلاً ۲۰۰۰" min="0" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-      <input type="text" class="modal-input" id="sfNotes" placeholder="Anything else" dir="auto" style="width:100%;margin:0;"/>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <input type="text" class="modal-input" id="sfNotes" placeholder="توضیحات دیگر" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeStoreModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveStoreModal()">Save Store</button>
+      <button class="btn-cancel" onclick="closeStoreModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveStoreModal()">ذخیره تامین‌کننده</button>
     </div>
   </div>
 </div>
@@ -268,15 +347,15 @@
 <!-- Parts Biz: Car Model modal (managed list, used by the product's multi-select) -->
 <div class="overlay" id="carModelModalOverlay">
   <div class="modal" style="max-width:380px;">
-    <h3 id="carModelModalTitle">Add Car Model</h3>
+    <h3 id="carModelModalTitle">افزودن مدل خودرو</h3>
     <input type="hidden" id="carModelModalId"/>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Name</div>
-      <input type="text" class="modal-input" id="cmfName" placeholder="e.g. Peugeot 405" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCarModelModal();}"/>
+      <div class="builder-label">نام</div>
+      <input type="text" class="modal-input" id="cmfName" placeholder="مثلاً پژو ۴۰۵" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCarModelModal();}"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeCarModelModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveCarModelModal()">Save Car Model</button>
+      <button class="btn-cancel" onclick="closeCarModelModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveCarModelModal()">ذخیره مدل خودرو</button>
     </div>
   </div>
 </div>
@@ -284,15 +363,15 @@
 <!-- Parts Biz: Brand modal (managed list, used by the product's brand picker) -->
 <div class="overlay" id="brandModalOverlay">
   <div class="modal" style="max-width:380px;">
-    <h3 id="brandModalTitle">Add Brand</h3>
+    <h3 id="brandModalTitle">افزودن برند</h3>
     <input type="hidden" id="brandModalId"/>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Name</div>
-      <input type="text" class="modal-input" id="bfName" placeholder="e.g. Azam" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveBrandModal();}"/>
+      <div class="builder-label">نام</div>
+      <input type="text" class="modal-input" id="bfName" placeholder="مثلاً اعظم" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveBrandModal();}"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeBrandModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveBrandModal()">Save Brand</button>
+      <button class="btn-cancel" onclick="closeBrandModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveBrandModal()">ذخیره برند</button>
     </div>
   </div>
 </div>
@@ -300,15 +379,15 @@
 <!-- Parts Biz: Part Type modal (managed list, used by the product's part-type picker) -->
 <div class="overlay" id="partTypeModalOverlay">
   <div class="modal" style="max-width:380px;">
-    <h3 id="partTypeModalTitle">Add Part Type</h3>
+    <h3 id="partTypeModalTitle">افزودن نوع قطعه</h3>
     <input type="hidden" id="partTypeModalId"/>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Name</div>
-      <input type="text" class="modal-input" id="ptfName" placeholder="e.g. Fan Motor" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();savePartTypeModal();}"/>
+      <div class="builder-label">نام</div>
+      <input type="text" class="modal-input" id="ptfName" placeholder="مثلاً موتور فن" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();savePartTypeModal();}"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closePartTypeModal()">Cancel</button>
-      <button class="btn-ok" onclick="savePartTypeModal()">Save Part Type</button>
+      <button class="btn-cancel" onclick="closePartTypeModal()">انصراف</button>
+      <button class="btn-ok" onclick="savePartTypeModal()">ذخیره نوع قطعه</button>
     </div>
   </div>
 </div>
@@ -316,15 +395,15 @@
 <!-- Parts Biz: Category modal (managed list, used by the product's category picker) -->
 <div class="overlay" id="categoryModalOverlay">
   <div class="modal" style="max-width:380px;">
-    <h3 id="categoryModalTitle">Add Category</h3>
+    <h3 id="categoryModalTitle">افزودن دسته‌بندی</h3>
     <input type="hidden" id="categoryModalId"/>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Name</div>
-      <input type="text" class="modal-input" id="ctfName" placeholder="e.g. Cooling" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCategoryModal();}"/>
+      <div class="builder-label">نام</div>
+      <input type="text" class="modal-input" id="ctfName" placeholder="مثلاً سیستم خنک‌کننده" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCategoryModal();}"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeCategoryModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveCategoryModal()">Save Category</button>
+      <button class="btn-cancel" onclick="closeCategoryModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveCategoryModal()">ذخیره دسته‌بندی</button>
     </div>
   </div>
 </div>
@@ -334,7 +413,7 @@
   <div class="modal" style="max-width:520px;padding:16px;">
     <img id="docViewerImg" style="width:100%;max-height:70vh;object-fit:contain;border-radius:var(--r2);display:block;background:var(--cream2);"/>
     <div class="modal-btns" style="margin-top:14px;">
-      <button class="btn-cancel" onclick="closeDocViewer()">Close</button>
+      <button class="btn-cancel" onclick="closeDocViewer()">بستن</button>
     </div>
   </div>
 </div>
@@ -342,45 +421,45 @@
 <!-- Parts Biz: New/Edit Purchase modal -->
 <div class="overlay" id="purchaseModalOverlay" style="z-index:9000;">
   <div class="modal" style="max-width:640px;">
-    <h3 id="purchaseModalTitle">🧾 Record a Purchase</h3>
+    <h3 id="purchaseModalTitle">🧾 ثبت سفارش خرید</h3>
     <div class="tx-row">
       <div>
         <div class="builder-label">تامین‌کننده</div>
         <select class="builder-select" id="purchaseStoreSelect" style="width:100%;"></select>
       </div>
       <div>
-        <div class="builder-label">Order date</div>
+        <div class="builder-label">تاریخ سفارش</div>
         <div class="jalali-picker-wrap" id="purchaseOrderDatePicker"></div>
         <input type="hidden" id="purchaseOrderDateHidden"/>
       </div>
     </div>
     <label class="tx-samedaywrap">
       <input type="checkbox" id="purchaseSameDay" checked onchange="togglePurchaseSameDay()"/>
-      Picked up in person (order date = receipt date)
+      تحویل حضوری گرفتم (تاریخ سفارش = تاریخ دریافت)
     </label>
     <div id="purchaseReceiptDateWrap" style="display:none;margin-bottom:14px;">
-      <div class="builder-label">Received date (from post/courier)</div>
+      <div class="builder-label">تاریخ دریافت کالا (پست/پیک)</div>
       <div class="jalali-picker-wrap" id="purchaseReceiptDatePicker"></div>
       <input type="hidden" id="purchaseReceiptDateHidden"/>
     </div>
 
     <div class="pmodal-row" style="margin-bottom:4px;">
       <div>
-        <div class="builder-label">🧾 Invoice photo <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">🧾 عکس فاکتور <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <div class="part-img-upload" id="purInvoiceUploadBox" style="height:110px;margin-bottom:0;" onclick="document.getElementById('purInvoiceFileInput').click()">
           <img id="purInvoicePreview" style="display:none;"/>
           <div class="hint-icon" id="purInvoiceHintIcon" style="font-size:20px;">🧾</div>
-          <div class="hint" id="purInvoiceHintText">Add invoice photo</div>
+          <div class="hint" id="purInvoiceHintText">افزودن عکس فاکتور</div>
           <button type="button" class="part-img-remove" id="purInvoiceRemoveBtn" onclick="event.stopPropagation();removePurchaseDoc('invoice')">✕</button>
         </div>
         <input type="file" accept="image/*" id="purInvoiceFileInput" style="display:none;" onchange="onPurchaseDocSelected(event,'invoice')"/>
       </div>
       <div>
-        <div class="builder-label">🧾 Receipt photo <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">🧾 عکس رسید <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <div class="part-img-upload" id="purReceiptUploadBox" style="height:110px;margin-bottom:0;" onclick="document.getElementById('purReceiptFileInput').click()">
           <img id="purReceiptPreview" style="display:none;"/>
           <div class="hint-icon" id="purReceiptHintIcon" style="font-size:20px;">🧾</div>
-          <div class="hint" id="purReceiptHintText">Add receipt photo</div>
+          <div class="hint" id="purReceiptHintText">افزودن عکس رسید</div>
           <button type="button" class="part-img-remove" id="purReceiptRemoveBtn" onclick="event.stopPropagation();removePurchaseDoc('receipt')">✕</button>
         </div>
         <input type="file" accept="image/*" id="purReceiptFileInput" style="display:none;" onchange="onPurchaseDocSelected(event,'receipt')"/>
@@ -401,7 +480,7 @@
             <input type="number" class="modal-input" id="purchaseItemQty" placeholder="1" min="0" step="1" value="1"/>
           </div>
           <div>
-            <div class="builder-label">قیمت خرید (هزار تومان)</div>
+            <div class="builder-label">قیمت خرید (KT)</div>
             <input type="number" class="modal-input" id="purchaseItemPrice" placeholder="0" min="0"/>
           </div>
           <button class="tx-additem-btn" onclick="addPurchaseCartItem()">+ افزودن</button>
@@ -414,9 +493,9 @@
     </div>
 
     <div class="tx-cart" id="purchaseCart"></div>
-    <div class="tx-total-row"><span class="lbl">Purchase total</span><span class="val" id="purchaseTotalVal">0 T</span></div>
+    <div class="tx-total-row"><span class="lbl">جمع سفارش خرید</span><span class="val" id="purchaseTotalVal">0 T</span></div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">روش ارسال / تحویل <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">روش ارسال / تحویل <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <select class="modal-input" id="purchaseDeliveryMethod" style="width:100%;margin:0;"></select>
     </div>
     <div style="margin-bottom:14px;">
@@ -427,14 +506,14 @@
         <button type="button" class="withdrawal" data-status="unpaid" onclick="setPurchasePaymentStatus('unpaid')">🔴 پرداخت‌نشده (نسیه)</button>
       </div>
       <div id="purchasePartialAmountWrap" style="display:none;margin-top:8px;">
-        <div class="builder-label">مبلغی که تا الان پرداخت کردی (K T)</div>
+        <div class="builder-label">مبلغی که تا الان پرداخت کردی (KT)</div>
         <input type="number" class="modal-input" id="purchaseAmountPaid" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
     </div>
-    <input type="text" class="modal-input" id="purchaseNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+    <input type="text" class="modal-input" id="purchaseNotes" placeholder="یادداشت (اختیاری)" dir="auto" style="width:100%;margin-bottom:14px;"/>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closePurchaseModal()">Cancel</button>
-      <button class="btn-ok" id="purchaseModalSaveBtn" onclick="savePurchase()">Save Purchase</button>
+      <button class="btn-cancel" onclick="closePurchaseModal()">انصراف</button>
+      <button class="btn-ok" id="purchaseModalSaveBtn" onclick="savePurchase()">ثبت سفارش خرید</button>
     </div>
   </div>
 </div>
@@ -442,29 +521,29 @@
 <!-- Parts Biz: New/Edit Sale modal -->
 <div class="overlay" id="saleModalOverlay" style="z-index:9000;">
   <div class="modal" style="max-width:640px;">
-    <h3 id="saleModalTitle">💵 Record a Sale</h3>
+    <h3 id="saleModalTitle">💵 ثبت فاکتور فروش</h3>
     <div style="margin-bottom:14px;">
       <div class="builder-label">مشتری از باشگاه <span style="font-weight:400;color:var(--text4);">(اختیاری — انتخاب کنی خودکار پر می‌شه)</span></div>
       <select class="modal-input" id="saleCustomerSelect" style="width:100%;margin:0;" onchange="onSaleCustomerPick()"></select>
     </div>
     <div class="tx-row">
       <div>
-        <div class="builder-label">Date</div>
+        <div class="builder-label">تاریخ</div>
         <div class="jalali-picker-wrap" id="saleDatePicker"></div>
         <input type="hidden" id="saleDateHidden"/>
       </div>
       <div>
-        <div class="builder-label">Customer name <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <input type="text" class="modal-input" id="saleCustomerName" placeholder="e.g. Mr. Ahmadi" dir="auto" style="width:100%;margin:0;"/>
+        <div class="builder-label">نام مشتری <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+        <input type="text" class="modal-input" id="saleCustomerName" placeholder="مثلاً آقای احمدی" dir="auto" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div class="tx-row">
       <div>
-        <div class="builder-label">Customer phone <span style="font-weight:400;color:var(--text4);">(optional — for the invoice)</span></div>
+        <div class="builder-label">تلفن مشتری <span style="font-weight:400;color:var(--text4);">(اختیاری — برای فاکتور)</span></div>
         <input type="text" class="modal-input" id="saleCustomerPhone" placeholder="09..." dir="ltr" style="width:100%;margin:0;"/>
       </div>
       <div>
-        <div class="builder-label">Customer address <span style="font-weight:400;color:var(--text4);">(optional — for the invoice)</span></div>
+        <div class="builder-label">آدرس مشتری <span style="font-weight:400;color:var(--text4);">(اختیاری — برای فاکتور)</span></div>
         <input type="text" class="modal-input" id="saleCustomerAddress" placeholder="آدرس مشتری" dir="auto" style="width:100%;margin:0;"/>
       </div>
     </div>
@@ -482,11 +561,11 @@
             <input type="number" class="modal-input" id="saleItemQty" placeholder="1" min="0" step="1" value="1"/>
           </div>
           <div>
-            <div class="builder-label">قیمت فروش (هزار تومان)</div>
+            <div class="builder-label">قیمت فروش (KT)</div>
             <input type="number" class="modal-input" id="saleItemPrice" placeholder="0" min="0"/>
           </div>
           <div>
-            <div class="builder-label">تخفیف (هزار تومان)</div>
+            <div class="builder-label">تخفیف (KT)</div>
             <input type="number" class="modal-input" id="saleItemDiscount" placeholder="0" min="0"/>
           </div>
           <button class="tx-additem-btn" onclick="addSaleCartItem()">+ افزودن</button>
@@ -495,46 +574,48 @@
       <div class="qty-presets" id="saleQtyPresets" style="margin-top:8px;"></div>
       <div id="saleStockHint" style="font-size:11px;color:var(--text3);margin-top:6px;"></div>
       <div style="margin-top:8px;">
-        <button class="preset" onclick="openProductModal(null,'sale')">+ New product…</button>
+        <button class="preset" onclick="openProductModal(null,'sale')">+ محصول جدید…</button>
       </div>
     </div>
 
+    <div id="bndSalePanel"></div>
     <div class="tx-cart" id="saleCart"></div>
-    <div class="tx-total-row"><span class="lbl">Sale total</span><span class="val" id="saleTotalVal">0 T</span></div>
+    <div class="tx-total-row"><span class="lbl">جمع فروش</span><span class="val" id="saleTotalVal">0 T</span></div>
     <div class="tx-row">
       <div>
-        <div class="builder-label">Extra discount on total (K T) <span style="font-weight:400;color:var(--text4);">(on top of any per-item discounts — invoice only)</span></div>
+        <div class="builder-label">تخفیف کلی فاکتور (KT) <span style="font-weight:400;color:var(--text4);">(علاوه بر تخفیف هر ردیف)</span></div>
         <input type="number" class="modal-input" id="saleDiscount" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
       <div>
-        <div class="builder-label">Tax % <span style="font-weight:400;color:var(--text4);">(optional — shown on invoice only)</span></div>
+        <div class="builder-label">مالیات ٪ <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="number" class="modal-input" id="saleTaxPercent" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
     </div>
-    <div class="tx-row">
-      <div>
-        <div class="builder-label">Shipping cost (K T) <span style="font-weight:400;color:var(--text4);">(what shipping actually costs — e.g. what you pay the courier)</span></div>
+    <div style="margin-bottom:14px;">
+      <div class="builder-label">روش تحویل / ارسال <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <select class="modal-input" id="saleDeliveryMethod" style="width:100%;margin:0;" onchange="onSaleDeliveryChange()"></select>
+      <div class="pf-inline-note" id="salePickupNote" style="display:none;color:var(--sage);font-weight:700;">✓ تحویل حضوری: مشتری خودش کالا را می‌برد، پس هزینه ارسالی ثبت نمی‌شود.</div>
+    </div>
+    <div id="saleShippingBlock">
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">هزینه ارسال (KT) <span style="font-weight:400;color:var(--text4);">(چقدر به پیک/باربری می‌دهی)</span></div>
         <input type="number" class="modal-input" id="saleShippingCost" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
-      <div>
-        <div class="builder-label">روش ارسال <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-        <select class="modal-input" id="saleDeliveryMethod" style="width:100%;margin:0;"></select>
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">هزینه ارسال رو کی می‌ده؟</div>
+        <div class="cash-toggle" id="saleShippingPayerToggle">
+          <button type="button" class="active deposit" data-payer="customer" onclick="setSaleShippingPayer('customer')">🧑 مشتری کامل</button>
+          <button type="button" class="partial" data-payer="split" onclick="setSaleShippingPayer('split')">🤝 نصف‌نصف</button>
+          <button type="button" class="withdrawal" data-payer="business" onclick="setSaleShippingPayer('business')">🏪 خودم کامل</button>
+        </div>
+        <div id="saleShippingRatioWrap" style="display:none;margin-top:8px;">
+          <div class="builder-label">سهم مشتری از هزینه ارسال (%)</div>
+          <input type="number" class="modal-input" id="saleShippingRatio" placeholder="50" min="0" max="100" style="width:100%;margin:0;"/>
+        </div>
       </div>
     </div>
     <div style="margin-bottom:14px;">
-      <div class="builder-label">هزینه ارسال رو کی می‌ده؟</div>
-      <div class="cash-toggle" id="saleShippingPayerToggle">
-        <button type="button" class="active deposit" data-payer="customer" onclick="setSaleShippingPayer('customer')">🧑 مشتری کامل</button>
-        <button type="button" class="partial" data-payer="split" onclick="setSaleShippingPayer('split')">🤝 نصف‌نصف</button>
-        <button type="button" class="withdrawal" data-payer="business" onclick="setSaleShippingPayer('business')">🏪 خودم کامل</button>
-      </div>
-      <div id="saleShippingRatioWrap" style="display:none;margin-top:8px;">
-        <div class="builder-label">سهم مشتری از هزینه ارسال (%)</div>
-        <input type="number" class="modal-input" id="saleShippingRatio" placeholder="50" min="0" max="100" style="width:100%;margin:0;"/>
-      </div>
-    </div>
-    <div style="margin-bottom:14px;">
-      <div class="builder-label">نماینده فروش <span style="font-weight:400;color:var(--text4);">(optional — کی این فروش رو برات انجام داده؟)</span></div>
+      <div class="builder-label">نماینده فروش <span style="font-weight:400;color:var(--text4);">(اختیاری — کی این فروش رو برات انجام داده؟)</span></div>
       <select class="modal-input" id="saleAgentSelect" style="width:100%;margin:0;" onchange="onSaleAgentPick()"></select>
       <div id="saleCommissionWrap" style="display:none;margin-top:8px;">
         <div class="tx-row">
@@ -565,14 +646,14 @@
         <button type="button" class="withdrawal" data-status="unpaid" onclick="setSalePaymentStatus('unpaid')">🔴 پرداخت‌نشده (نسیه)</button>
       </div>
       <div id="salePartialAmountWrap" style="display:none;margin-top:8px;">
-        <div class="builder-label">مبلغ دریافت‌شده تا الان (K T)</div>
+        <div class="builder-label">مبلغ دریافت‌شده تا الان (KT)</div>
         <input type="number" class="modal-input" id="saleAmountPaid" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
     </div>
-    <input type="text" class="modal-input" id="saleNotes" placeholder="Notes (optional)" dir="auto" style="width:100%;margin-bottom:14px;"/>
+    <input type="text" class="modal-input" id="saleNotes" placeholder="یادداشت (اختیاری)" dir="auto" style="width:100%;margin-bottom:14px;"/>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeSaleModal()">Cancel</button>
-      <button class="btn-ok" id="saleModalSaveBtn" onclick="saveSale()">Save Sale</button>
+      <button class="btn-cancel" onclick="closeSaleModal()">انصراف</button>
+      <button class="btn-ok" id="saleModalSaveBtn" onclick="saveSale()">ثبت فروش</button>
     </div>
   </div>
 </div>
@@ -580,19 +661,19 @@
 <!-- Parts Biz: Generic Item modal (managed list — loose comparison labels like "رله کولر پراید") -->
 <div class="overlay" id="genericModalOverlay">
   <div class="modal" style="max-width:420px;">
-    <h3 id="genericModalTitle">Add Generic Item</h3>
+    <h3 id="genericModalTitle">افزودن کالای کلی</h3>
     <input type="hidden" id="genericModalId"/>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Name</div>
+      <div class="builder-label">نام</div>
       <input type="text" class="modal-input" id="gfName" placeholder="مثلاً: رله کولر پراید" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();saveGenericModal();}"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Notes <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
-      <input type="text" class="modal-input" id="gfNotes" placeholder="Anything else worth remembering" dir="auto" style="width:100%;margin:0;"/>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <input type="text" class="modal-input" id="gfNotes" placeholder="هر چیز دیگه‌ای که لازمه یادت بمونه" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeGenericModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveGenericModal()">Save Generic Item</button>
+      <button class="btn-cancel" onclick="closeGenericModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveGenericModal()">ذخیره کالای کلی</button>
     </div>
   </div>
 </div>
@@ -600,27 +681,27 @@
 <!-- Parts Biz: Business Profile modal (name/address/phone/logo shown on printed invoices) -->
 <div class="overlay" id="businessProfileModalOverlay">
   <div class="modal" style="max-width:440px;">
-    <h3>⚙️ Business Info (for invoices)</h3>
+    <h3>⚙️ مشخصات کسب‌وکار (برای فاکتورها)</h3>
     <div class="part-img-upload" id="bpLogoUploadBox" onclick="document.getElementById('bpLogoFileInput').click()" style="height:140px;">
       <img id="bpLogoPreview" style="display:none;max-height:120px;object-fit:contain;"/>
       <div class="hint-icon">🖼️</div>
-      <div class="hint">Click to add a logo (optional)</div>
+      <div class="hint">برای افزودن لوگو کلیک کن (اختیاری)</div>
     </div>
     <input type="file" accept="image/*" id="bpLogoFileInput" style="display:none;" onchange="onBusinessLogoSelected(this)"/>
     <div style="margin:10px 0;">
-      <div class="builder-label">Business name</div>
+      <div class="builder-label">نام کسب‌وکار</div>
       <input type="text" class="modal-input" id="bpName" placeholder="نام کسب‌وکار" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Address <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="bpAddress" placeholder="آدرس" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">Phone <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">تلفن <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="bpPhone" placeholder="09..." dir="ltr" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">Invoice footer note <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">متن پایین فاکتور <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="bpFooter" placeholder="مثلاً: با تشکر از خرید شما" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
@@ -631,8 +712,8 @@
       </div>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeBusinessProfileModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveBusinessProfile()">Save</button>
+      <button class="btn-cancel" onclick="closeBusinessProfileModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveBusinessProfile()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -642,8 +723,8 @@
   <div class="modal" style="max-width:560px;">
     <div id="invoicePrintArea"></div>
     <div class="modal-btns" style="margin-top:16px;">
-      <button class="btn-cancel" onclick="closeInvoiceModal()">Close</button>
-      <button class="btn-ok" onclick="printInvoice()">🖨 Print / Save as PDF</button>
+      <button class="btn-cancel" onclick="closeInvoiceModal()">بستن</button>
+      <button class="btn-ok" onclick="printInvoice()">🖨 چاپ / ذخیره PDF</button>
     </div>
   </div>
 </div>
@@ -657,7 +738,7 @@
     <div class="part-img-upload" id="agentImgUploadBox" onclick="document.getElementById('agentImgFileInput').click()">
       <img id="agentImgPreview" style="display:none;"/>
       <div class="hint-icon" id="agentImgHintIcon">🧑‍💼</div>
-      <div class="hint" id="agentImgHintText">Click to add a photo</div>
+      <div class="hint" id="agentImgHintText">برای افزودن عکس کلیک کن</div>
       <button type="button" class="part-img-remove" id="agentImgRemoveBtn" onclick="event.stopPropagation();removeAgentImage()">✕</button>
     </div>
     <input type="file" accept="image/*" id="agentImgFileInput" style="display:none;" onchange="onAgentImageSelected(event)"/>
@@ -667,24 +748,24 @@
       <input type="text" class="modal-input" id="agfName" placeholder="مثلاً: آقای رحیمی (مکانیک)" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">شماره تماس <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">شماره تماس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="agfPhone" placeholder="09..." dir="ltr" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="agfAddress" placeholder="آدرس تعمیرگاه / محل کار" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">درصد پورسانت <span style="font-weight:400;color:var(--text4);">(optional — از درآمد فروش‌هایی که این نماینده انجام داده)</span></div>
+      <div class="builder-label">درصد پورسانت <span style="font-weight:400;color:var(--text4);">(اختیاری — از درآمد فروش‌هایی که این نماینده انجام داده)</span></div>
       <input type="number" class="modal-input" id="agfCommission" placeholder="مثلاً 5" min="0" max="100" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="agfNotes" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeAgentModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveAgentModal()">Save</button>
+      <button class="btn-cancel" onclick="closeAgentModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveAgentModal()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -699,20 +780,20 @@
       <input type="text" class="modal-input" id="cufName" placeholder="نام مشتری" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">شماره تماس <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">شماره تماس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="cufPhone" placeholder="09..." dir="ltr" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">آدرس <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="cufAddress" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="cufNotes" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeCustomerModal()">Cancel</button>
-      <button class="btn-ok" onclick="saveCustomerModal()">Save</button>
+      <button class="btn-cancel" onclick="closeCustomerModal()">انصراف</button>
+      <button class="btn-ok" onclick="saveCustomerModal()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -740,12 +821,12 @@
         <input type="text" class="modal-input" id="quoteCustomerName" dir="auto" style="width:100%;margin:0;"/>
       </div>
       <div>
-        <div class="builder-label">تلفن <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+        <div class="builder-label">تلفن <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
         <input type="text" class="modal-input" id="quoteCustomerPhone" dir="ltr" style="width:100%;margin:0;"/>
       </div>
     </div>
     <div style="margin-bottom:14px;">
-      <div class="builder-label">اعتبار تا <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">اعتبار تا <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <div class="jalali-picker-wrap" id="quoteValidUntilPicker"></div>
       <input type="hidden" id="quoteValidUntilHidden"/>
     </div>
@@ -763,11 +844,11 @@
             <input type="number" class="modal-input" id="quoteItemQty" placeholder="1" min="0" step="1" value="1"/>
           </div>
           <div>
-            <div class="builder-label">قیمت (هزار تومان)</div>
+            <div class="builder-label">قیمت (KT)</div>
             <input type="number" class="modal-input" id="quoteItemPrice" placeholder="0" min="0"/>
           </div>
           <div>
-            <div class="builder-label">تخفیف (هزار تومان)</div>
+            <div class="builder-label">تخفیف (KT)</div>
             <input type="number" class="modal-input" id="quoteItemDiscount" placeholder="0" min="0"/>
           </div>
           <button class="tx-additem-btn" onclick="addQuoteCartItem()">+ افزودن</button>
@@ -779,7 +860,7 @@
 
     <div class="tx-row">
       <div>
-        <div class="builder-label">تخفیف کل (K T)</div>
+        <div class="builder-label">تخفیف کل (KT)</div>
         <input type="number" class="modal-input" id="quoteDiscount" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
       <div>
@@ -787,26 +868,27 @@
         <input type="number" class="modal-input" id="quoteTaxPercent" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
     </div>
-    <div class="tx-row">
-      <div>
-        <div class="builder-label">هزینه ارسال (K T)</div>
+    <div style="margin-bottom:14px;">
+      <div class="builder-label">روش تحویل / ارسال</div>
+      <select class="modal-input" id="quoteDeliveryMethod" style="width:100%;margin:0;" onchange="onQuoteDeliveryChange()"></select>
+      <div class="pf-inline-note" id="quotePickupNote" style="display:none;color:var(--sage);font-weight:700;">✓ تحویل حضوری: هزینه ارسالی ندارد.</div>
+    </div>
+    <div id="quoteShippingBlock">
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">هزینه ارسال (KT)</div>
         <input type="number" class="modal-input" id="quoteShippingCost" placeholder="0" min="0" style="width:100%;margin:0;"/>
       </div>
-      <div>
-        <div class="builder-label">روش ارسال</div>
-        <select class="modal-input" id="quoteDeliveryMethod" style="width:100%;margin:0;"></select>
+      <div style="margin-bottom:14px;">
+        <div class="builder-label">هزینه ارسال رو کی می‌ده؟</div>
+        <div class="cash-toggle" id="quoteShippingPayerToggle">
+          <button type="button" class="active deposit" data-payer="customer" onclick="setQuoteShippingPayer('customer')">🧑 مشتری کامل</button>
+          <button type="button" class="partial" data-payer="split" onclick="setQuoteShippingPayer('split')">🤝 نصف‌نصف</button>
+          <button type="button" class="withdrawal" data-payer="business" onclick="setQuoteShippingPayer('business')">🏪 خودم کامل</button>
+        </div>
       </div>
     </div>
     <div style="margin-bottom:14px;">
-      <div class="builder-label">هزینه ارسال رو کی می‌ده؟</div>
-      <div class="cash-toggle" id="quoteShippingPayerToggle">
-        <button type="button" class="active deposit" data-payer="customer" onclick="setQuoteShippingPayer('customer')">🧑 مشتری کامل</button>
-        <button type="button" class="partial" data-payer="split" onclick="setQuoteShippingPayer('split')">🤝 نصف‌نصف</button>
-        <button type="button" class="withdrawal" data-payer="business" onclick="setQuoteShippingPayer('business')">🏪 خودم کامل</button>
-      </div>
-    </div>
-    <div style="margin-bottom:14px;">
-      <div class="builder-label">نماینده فروش <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">نماینده فروش <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <select class="modal-input" id="quoteAgentSelect" style="width:100%;margin:0;"></select>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--text2);cursor:pointer;">
         <input type="checkbox" id="quoteShowAgent" style="width:16px;height:16px;"/>
@@ -816,7 +898,7 @@
     <input type="text" class="modal-input" id="quoteNotes" placeholder="یادداشت (اختیاری)" dir="auto" style="width:100%;margin-bottom:14px;"/>
 
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeQuoteModal()">Cancel</button>
+      <button class="btn-cancel" onclick="closeQuoteModal()">انصراف</button>
       <button class="btn-ok" id="quoteModalSaveBtn" onclick="saveQuoteModal()">ثبت پیش‌فاکتور</button>
     </div>
   </div>
@@ -829,7 +911,7 @@
     <h3>⚙️ تنظیمات قیمت‌گذاری</h3>
     <div class="pe-form-desc" style="margin-top:-4px;">این فرض‌ها روی کارت هر محصول یه قیمت فروش پیشنهادی نشون می‌ده — بر اساس قیمت خرید واقعی همون محصول.</div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">هزینه ارسال هر مرسوله (K T)</div>
+      <div class="builder-label">هزینه ارسال هر مرسوله (KT)</div>
       <input type="number" class="modal-input" id="psShippingCost" placeholder="0" min="0" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
@@ -857,12 +939,12 @@
       <input type="number" class="modal-input" id="psAgentSharePct" placeholder="33.33" min="0" max="100" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">رند کردن قیمت پیشنهادی تا نزدیک‌ترین <span style="font-weight:400;color:var(--text4);">(K T)</span></div>
+      <div class="builder-label">رند کردن قیمت پیشنهادی تا نزدیک‌ترین <span style="font-weight:400;color:var(--text4);">(KT)</span></div>
       <input type="number" class="modal-input" id="psRoundStep" placeholder="1" min="1" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closePricingSettingsModal()">Cancel</button>
-      <button class="btn-ok" onclick="savePricingSettings()">Save</button>
+      <button class="btn-cancel" onclick="closePricingSettingsModal()">انصراف</button>
+      <button class="btn-ok" onclick="savePricingSettings()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -875,7 +957,7 @@
     <input type="hidden" id="apyAgentId"/>
     <div style="font-weight:700;margin-bottom:12px;" id="apyAgentName"></div>
     <div style="margin-bottom:10px;">
-      <div class="builder-label">مبلغ پرداختی (K T)</div>
+      <div class="builder-label">مبلغ پرداختی (KT)</div>
       <input type="number" class="modal-input" id="apyAmount" min="0" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:10px;">
@@ -884,11 +966,11 @@
       <input type="hidden" id="apyDateHidden"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(optional)</span></div>
+      <div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
       <input type="text" class="modal-input" id="apyNote" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeAgentPayoutModal()">Cancel</button>
+      <button class="btn-cancel" onclick="closeAgentPayoutModal()">انصراف</button>
       <button class="btn-ok" onclick="saveAgentPayout()">ثبت پرداخت</button>
     </div>
   </div>
@@ -913,7 +995,7 @@
       <div style="margin-bottom:10px;">
         <div class="builder-label">نحوه‌ی تغییر</div>
         <select class="modal-input" id="bulkOpPrice" style="width:100%;margin:0;" onchange="renderBulkValueHint()">
-          <option value="markup_from_cost">مارکاپ ثابت روی قیمت خرید (٪) — یعنی قیمت فروش = خرید × (۱ + درصد)</option>
+          <option value="markup_from_cost">مارکاپ ثابت روی قیمت خرید (٪)</option>
           <option value="set_flat">یه عدد ثابت برای همه</option>
           <option value="adjust_relative">افزایش/کاهش درصدی نسبت به قیمت فعلی</option>
           <option value="adjust_flat">افزایش/کاهش یه مبلغ ثابت</option>
@@ -943,8 +1025,156 @@
     <div id="bulkPreview" style="margin-bottom:10px;"></div>
 
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeBulkEditModal()">Cancel</button>
+      <button class="btn-cancel" onclick="closeBulkEditModal()">انصراف</button>
       <button class="btn-ok" onclick="applyBulkEdit()">اعمال کن</button>
     </div>
   </div>
+</div>
+
+<!-- Parts Biz: Report builder — named custom date ranges ("بازه‌های سفارشی") -->
+<div class="overlay" id="rbRangesModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <h3>📆 بازه‌های زمانی سفارشی</h3>
+    <div class="pe-form-desc" style="margin-top:-4px;">هر بازه یه اسم و یه تاریخ شروع و پایان داره (مثلاً «تعطیلات نوروز» یا «فصل پاییز»). توی گزارش‌ساز با انتخاب «بازه‌های سفارشی من» می‌تونی فروش، سود و هر متغیر دیگه رو به تفکیک همین بازه‌ها ببینی. بازه‌ها می‌تونن هم‌پوشانی داشته باشن.</div>
+    <div id="rbRangesList" style="margin-bottom:14px;"></div>
+    <div class="rb-box" style="margin-bottom:10px;">
+      <div class="builder-label" style="margin-bottom:8px;">➕ بازه‌ی جدید</div>
+      <div style="margin-bottom:8px;">
+        <input type="text" class="modal-input" id="rbrName" placeholder="نام بازه، مثلاً: تعطیلات نوروز" dir="auto" style="width:100%;margin:0;"/>
+      </div>
+      <div class="tx-row" style="margin-bottom:8px;">
+        <div><div class="builder-label">از تاریخ</div>
+          <input type="text" readonly data-pjdp class="modal-input" id="rbrFrom" dir="ltr" placeholder="انتخاب تاریخ…" style="width:100%;margin:0;text-align:right;"/></div>
+        <div><div class="builder-label">تا تاریخ</div>
+          <input type="text" readonly data-pjdp class="modal-input" id="rbrTo" dir="ltr" placeholder="انتخاب تاریخ…" style="width:100%;margin:0;text-align:right;"/></div>
+      </div>
+      <button class="tx-save-btn" type="button" style="margin:0;" onclick="rbAddRange()">افزودن بازه</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-ok" type="button" onclick="closeRbRangesModal()">بستن</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Parts Biz: Report builder — custom (user-defined) measures -->
+<div class="overlay" id="rbCmModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <h3>🧮 متغیر جدید <span class="rbx-en" dir="ltr">Custom measure</span></h3>
+    <div class="pe-form-desc" style="margin-top:-4px;">یک متغیر تازه بر اساس متغیرهای موجود بساز؛ مثلاً «فروش در هر روز» یا «سود ÷ فروش». بعد مثل بقیه‌ی متغیرها در گزارش‌ساز، شرط‌ها و داشبورد قابل استفاده است. (فقط تاریخ ثبت می‌شود، ساعت نه؛ پس کوچک‌ترین واحد زمانی «روز» است.)</div>
+    <div class="builder-label">نام متغیر</div>
+    <input type="text" class="modal-input" id="rbCmName" placeholder="مثلاً: فروش روزانه" dir="auto" style="width:100%;margin:0 0 10px;" oninput="rbCmPreview()"/>
+    <div class="builder-label">متغیر اول (A)</div>
+    <select class="modal-input" id="rbCmA" style="width:100%;margin:0 0 10px;" onchange="rbCmChange()"></select>
+    <div class="builder-label">با چه چیزی ترکیب شود؟</div>
+    <select class="modal-input" id="rbCmBType" style="width:100%;margin:0 0 10px;" onchange="rbCmChange()">
+      <option value="per">در هر واحد زمان (روز، هفته، ماه، سال)</option><option value="metric">متغیر دیگر (B)</option><option value="const">یک عدد ثابت</option></select>
+    <div id="rbCmOpWrap" style="margin-bottom:10px;"><div class="builder-label">عمل</div><select class="modal-input" id="rbCmOp" style="width:100%;margin:0;" onchange="rbCmPreview()"></select></div>
+    <div id="rbCmBMetricWrap" style="margin-bottom:10px;"><div class="builder-label">متغیر دوم (B) <span class="rb-muted">— فقط متغیرهای هم‌نوع</span></div><select class="modal-input" id="rbCmB" style="width:100%;margin:0;" onchange="rbCmPreview()"></select></div>
+    <div id="rbCmConstWrap" style="margin-bottom:10px;"><div class="builder-label">عدد ثابت</div><input type="text" class="modal-input" id="rbCmConst" dir="ltr" inputmode="decimal" style="width:100%;margin:0;text-align:right;" oninput="rbCmPreview()"/></div>
+    <div id="rbCmPerWrap" style="margin-bottom:10px;"><div class="builder-label">در هر…</div><select class="modal-input" id="rbCmPer" style="width:100%;margin:0;" onchange="rbCmPreview()"></select>
+      <div class="rb-muted" style="margin-top:4px;">یعنی A ÷ (تعداد روزهای همان ردیف ÷ طول واحد). برای ردیف‌های ماهانه، طول ماه همان ماه است.</div></div>
+    <div class="tx-row">
+      <div><div class="builder-label">نمایش نتیجه</div><select class="modal-input" id="rbCmUnit" style="width:100%;margin:0;" onchange="rbCmPreview()"><option value="auto">خودکار</option><option value="money">مبلغ (KT)</option><option value="num">عدد</option><option value="pct">درصد</option></select></div>
+      <div style="display:flex;align-items:flex-end;"><label class="rb-check" style="margin:0 0 10px;"><input type="checkbox" id="rbCmPct" onchange="rbCmPreview()"/> <span>در ۱۰۰ ضرب شود (درصد)</span></label></div>
+    </div>
+    <div class="rb-cond-sum" id="rbCmPreview" style="margin-top:6px;"></div>
+    <div class="modal-btns"><button class="btn-cancel" type="button" onclick="rbCmClose()">بستن</button><button class="btn-ok" type="button" onclick="rbCmSave()">ذخیره‌ی متغیر</button></div>
+    <div class="builder-label" style="margin-top:14px;">متغیرهای ساخته‌شده</div>
+    <div id="rbCmList"></div>
+  </div>
+</div>
+<!-- Parts Biz: Report builder — save current report as a preset -->
+<div class="overlay" id="rbPresetModalOverlay">
+  <div class="modal" style="max-width:400px;">
+    <h3>💾 ذخیره گزارش</h3>
+    <div class="pe-form-desc" style="margin-top:-4px;">همین تنظیمات (بُعد، متغیرها، نوع نمایش، فیلترها و...) با اسمی که بدی ذخیره می‌شه تا بعداً با یه کلیک باز کنی.</div>
+    <div style="margin-bottom:6px;">
+      <div class="builder-label">نام گزارش</div>
+      <input type="text" class="modal-input" id="rbPresetName" placeholder="مثلاً: سود ماهانه به تفکیک برند" dir="auto" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();rbSavePreset();}"/>
+    </div>
+    <label class="rb-check" style="margin:2px 0 12px;"><input type="checkbox" id="rbPresetPin"/> <span>📌 هم‌زمان روی داشبورد گزارشات هم سنجاق شود <span class="rb-muted" id="rbPresetPinNote"></span></span></label>
+    <div class="modal-btns">
+      <button class="btn-cancel" type="button" onclick="rbClosePresetModal()">انصراف</button>
+      <button class="btn-ok" type="button" onclick="rbSavePreset()">ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- «نحوه محاسبه» -->
+<div class="overlay" id="xplOverlay" onclick="if(event.target===this)xClose()">
+  <div class="modal xpl-modal" role="dialog" aria-modal="true" aria-label="نحوه محاسبه">
+    <button type="button" class="xpl-close" onclick="xClose()" aria-label="بستن">✕</button>
+    <div id="xplBody"></div>
+  </div>
+</div>
+
+<!-- تقویم: رویداد دلخواه -->
+<div class="overlay" id="pcalEvOverlay" onclick="if(event.target===this)pcalEvClose()">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="pcalEvHead">📌 رویداد جدید</h3>
+    <div style="margin-bottom:10px;"><div class="builder-label">عنوان</div>
+      <input type="text" class="modal-input" id="pcalEvTitle" dir="auto" placeholder="مثلاً: تحویل بار از غفاری، یادآوری چک…" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();pcalEvSave();}"/></div>
+    <div class="tx-row" style="margin-bottom:10px;">
+      <div><div class="builder-label">تاریخ</div><input type="text" readonly data-pjdp class="modal-input" id="pcalEvDate" dir="ltr" placeholder="انتخاب تاریخ…" style="width:100%;margin:0;"/></div>
+      <div><div class="builder-label">تا تاریخ <span class="rb-muted">(اختیاری، رویداد چندروزه)</span></div><input type="text" readonly data-pjdp class="modal-input" id="pcalEvEnd" dir="ltr" placeholder="—" style="width:100%;margin:0;"/></div>
+    </div>
+    <div style="margin-bottom:10px;"><div class="builder-label">رنگ</div><div id="pcalEvColors" style="display:flex;gap:8px;flex-wrap:wrap;"></div></div>
+    <div style="margin-bottom:10px;"><div class="builder-label">نماد</div><div id="pcalEvIcons" style="display:flex;gap:6px;flex-wrap:wrap;"></div></div>
+    <div style="margin-bottom:10px;"><div class="builder-label">یادداشت</div><textarea class="modal-input" id="pcalEvNote" rows="2" dir="auto" style="width:100%;margin:0;"></textarea></div>
+    <label class="rb-check" style="margin:0 0 12px;"><input type="checkbox" id="pcalEvDone"/> <span>انجام شد</span></label>
+    <div class="modal-btns">
+      <button class="btn-cancel" type="button" id="pcalEvDel" style="display:none;color:var(--coral);" onclick="pcalEvDelete()">🗑 حذف</button>
+      <button class="btn-cancel" type="button" onclick="pcalEvClose()">انصراف</button>
+      <button class="btn-ok" type="button" onclick="pcalEvSave()">ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<!-- گروه‌بندی کالاها -->
+<div class="overlay" id="ptgNodeOverlay" onclick="if(event.target===this)ptgNodeClose()">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="ptgNodeHead">🌿 گروه جدید</h3>
+    <div style="margin-bottom:10px;"><div class="builder-label">نام گروه</div>
+      <input type="text" class="modal-input" id="ptgNodeName" dir="auto" placeholder="مثلاً: قطعات دینام" style="width:100%;margin:0;" onkeydown="if(event.key==='Enter'){event.preventDefault();ptgNodeSave();}"/></div>
+    <div style="margin-bottom:10px;"><div class="builder-label">زیرِ کدام گروه؟ <span style="font-weight:400;color:var(--text4);">(برای انتقال، گروه دیگری را انتخاب کن)</span></div>
+      <select class="builder-select" id="ptgNodeParent" style="width:100%;margin:0;"></select></div>
+    <div id="ptgNodeMultiWrap" style="margin-bottom:10px;"><div class="builder-label">زیرگروه‌های این گروه را یکجا بنویس <span style="font-weight:400;color:var(--text4);">(اختیاری، هر خط یکی؛ با «-» اول خط، یک سطح عمیق‌تر)</span></div>
+      <textarea class="modal-input" id="ptgNodeMulti" rows="5" dir="auto" placeholder="آفتامات دینام&#10;- آفتامات دینام پژو ۲۰۶&#10;- آفتامات دینام پراید&#10;تسمه دینام" style="width:100%;margin:0;"></textarea></div>
+    <div class="modal-btns"><button class="btn-cancel" type="button" onclick="ptgNodeClose()">انصراف</button><button class="btn-ok" type="button" onclick="ptgNodeSave()">ذخیره</button></div>
+  </div>
+</div>
+<div class="overlay" id="ptgAssignOverlay" onclick="if(event.target===this)ptgAssignClose()">
+  <div class="modal" style="max-width:520px;">
+    <h3>📦 انتساب کالا به گروه</h3>
+    <div class="builder-label">گروه مقصد</div>
+    <select class="builder-select" id="ptgAsTarget" style="width:100%;margin:0 0 8px;"></select>
+    <input type="text" class="modal-input" id="ptgAsSearch" placeholder="🔍 جستجوی کالا…" dir="auto" style="width:100%;margin:0;" oninput="ptgAssignRender()"/>
+    <div id="ptgAsList"></div>
+    <div id="ptgAsCount" class="rb-muted" style="margin-bottom:8px;"></div>
+    <div class="modal-btns"><button class="btn-cancel" type="button" onclick="ptgAssignClose()">انصراف</button><button class="btn-ok" type="button" onclick="ptgAssignApply()">انتقال کالاهای انتخاب‌شده</button></div>
+  </div>
+</div>
+
+<!-- باندل و جایزه خرید -->
+<div class="overlay" id="bndEdOverlay" onclick="if(event.target===this)bndEdClose()">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow:auto;">
+    <h3 id="bndEdHead">🎁 باندل جدید</h3>
+    <div style="margin-bottom:10px;"><div class="builder-label">نام باندل</div>
+      <input type="text" class="modal-input" id="bndEdName" dir="auto" placeholder="مثلاً: پکیج موتور فن + پروانه" style="width:100%;margin:0;" oninput="bndEdPreview()"/></div>
+    <div class="builder-label">کالاهایی که باید بخرد <span style="font-weight:400;color:var(--text4);">(کالا و تعداد)</span></div>
+    <div id="bndEdItems"></div>
+    <button type="button" class="bnd-mini" onclick="BND.edit.items.push({product_id:'',qty:1});bndEdRows()">+ کالای دیگر</button>
+    <div style="margin:12px 0 10px;"><div class="builder-label">تخفیف روی مجموعِ قیمت این کالاها (٪)</div>
+      <input type="number" class="modal-input" id="bndEdPct" min="0" max="100" placeholder="0" style="width:120px;margin:0;" oninput="bndEdPreview()"/></div>
+    <div class="builder-label">🎁 جایزه‌ی خرید <span style="font-weight:400;color:var(--text4);">(اختیاری — کالا، تعداد، درصد تخفیف؛ ۱۰۰٪ یعنی رایگان)</span></div>
+    <div id="bndEdRewards"></div>
+    <button type="button" class="bnd-mini" onclick="BND.edit.rewards.push({product_id:'',qty:1,discount_pct:100});bndEdRows()">+ جایزه</button>
+    <div style="margin:12px 0;"><div class="builder-label">یادداشت <span style="font-weight:400;color:var(--text4);">(اختیاری)</span></div>
+      <input type="text" class="modal-input" id="bndEdNote" dir="auto" style="width:100%;margin:0;"/></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:8px;"><input type="checkbox" id="bndEdActive" checked/> فعال (در فاکتور فروش پیشنهاد شود)</label>
+    <div id="bndEdPrev"></div>
+    <div class="modal-btns"><button class="btn-cancel" type="button" onclick="bndEdClose()">انصراف</button><button class="btn-ok" type="button" onclick="bndEdSave()">ذخیره</button></div>
+  </div>
+</div>
 </div>
