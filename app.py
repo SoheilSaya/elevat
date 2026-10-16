@@ -1955,6 +1955,29 @@ def _clean_report_presets(raw):
         out.append({"id": str(r.get("id") or _new_id()), "name": name[:80], "config": r["config"]})
     return out
 
+def _clean_dash_settings(raw):
+    """Home-dashboard preferences: default period, monthly revenue goal (K Toman), donut dimension."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    if raw.get("period") in ("today", "7d", "30d", "month", "year", "all"):
+        out["period"] = raw["period"]
+    try:
+        g = float(raw.get("goal") or 0)
+        out["goal"] = round(g, 2) if 0 <= g < 1e12 else 0
+    except (TypeError, ValueError):
+        out["goal"] = 0
+    if raw.get("donut") in ("group_leaf", "brand", "car_model", "delivery", "pay_status", "cust_status"):
+        out["donut"] = raw["donut"]
+    if raw.get("theme") in ("sunset", "ocean", "forest", "graphite", "plum"):
+        out["theme"] = raw["theme"]
+    out["icon_style"] = raw.get("icon_style") if raw.get("icon_style") in ("emoji", "3d", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12") else "3d"
+    out["app_theme"] = raw.get("app_theme") if raw.get("app_theme") in ("classic", "sunset", "gold", "coffee", "rose", "burgundy", "plum", "lavender", "indigo", "ocean", "sky", "teal", "mint", "forest", "olive", "graphite", "night", "night-ocean", "night-forest", "night-violet", "night-gold", "night-rose", "night-teal") else "classic"
+    out["user_name"] = str(raw.get("user_name") or "").strip()[:40]
+    hid = raw.get("hidden")
+    out["hidden"] = sorted({str(x)[:30] for x in hid if isinstance(x, str) and x.replace("_", "").isalnum()})[:40] if isinstance(hid, list) else []
+    return out
+
+
 def _clean_dashboard_widgets(raw, presets):
     # Pinned report-builder reports shown on the reports dashboard. A widget points at a
     # saved preset (so editing the preset updates the widget); widgets whose preset is gone are dropped.
@@ -2161,7 +2184,7 @@ def _parts_defaults():
             "customers": [], "sale_returns": [], "quotations": [], "agent_payouts": [],
             "pricing_settings": _default_pricing_settings(),
             "business_profile": _default_business_profile(),
-            "report_ranges": [], "report_presets": [], "dashboard_widgets": [], "custom_metrics": [], "calendar_events": [], "product_groups": [], "bundles": [],
+            "report_ranges": [], "report_presets": [], "dashboard_widgets": [], "custom_metrics": [], "calendar_events": [], "product_groups": [], "bundles": [], "dash_settings": {},
             "low_stock_threshold": 2, "unit_migrated_v1": True}
 
 def load_parts():
@@ -2193,6 +2216,7 @@ def load_parts():
         d.setdefault("report_ranges", [])
         d.setdefault("report_presets", [])
         d.setdefault("dashboard_widgets", [])
+        d.setdefault("dash_settings", {})
         d.setdefault("custom_metrics", [])
         d.setdefault("calendar_events", [])
         d.setdefault("product_groups", [])
@@ -2471,12 +2495,13 @@ def compute_parts_analytics(data):
                 oversold_pids.add(pid)
             sale_cogs[(e["sale_id"], e["idx"])] = cost
 
-    stock, avg_cost_remaining = {}, {}
+    stock, avg_cost_remaining, stock_value_exact = {}, {}, {}
     inventory_value_exact = 0.0
     for pid, queue in lots.items():
         tq = sum(l[0] for l in queue)
         tc = sum(l[0] * l[1] for l in queue)
         inventory_value_exact += tc
+        stock_value_exact[pid] = round(tc, 6)
         stock[pid] = round(tq, 3)
         avg_cost_remaining[pid] = round(tc / tq, 2) if tq > 0 else 0
     for p in data["products"]:
@@ -2789,6 +2814,7 @@ def compute_parts_analytics(data):
         "sales": sales_out,
         "stock": stock,
         "avg_cost": avg_cost_remaining,
+        "stock_value": stock_value_exact,
         "by_product": {pid: {**v, "qty_sold": round(v["qty_sold"], 3), "revenue": round(v["revenue"], 2),
                               "cogs": round(v["cogs"], 2), "profit": round(v["profit"], 2),
                               "qty_purchased": round(v["qty_purchased"], 3), "spend": round(v["spend"], 2)}
@@ -2855,13 +2881,13 @@ def _parts_payload(data, analytics):
         "quotations": annotate_quotations(data), "agent_payouts": data["agent_payouts"],
         "pricing_settings": data["pricing_settings"],
         "report_ranges": data.get("report_ranges", []), "report_presets": data.get("report_presets", []),
-        "dashboard_widgets": data.get("dashboard_widgets", []), "custom_metrics": data.get("custom_metrics", []),
+        "dashboard_widgets": data.get("dashboard_widgets", []), "dash_settings": data.get("dash_settings", {}), "custom_metrics": data.get("custom_metrics", []),
         "calendar_events": data.get("calendar_events", []),
         "product_groups": data.get("product_groups", []),
         "bundles": data.get("bundles", []),
         "legacy_groups_migrated": bool(data.get("legacy_groups_migrated")),
         "legacy_generics_migrated": bool(data.get("legacy_generics_migrated")),
-        "stock": analytics["stock"], "avg_cost": analytics["avg_cost"],
+        "stock": analytics["stock"], "avg_cost": analytics["avg_cost"], "stock_value": analytics.get("stock_value", {}),
         "by_product": analytics["by_product"], "by_store": analytics["by_store"],
         "totals": analytics["totals"], "expenses_by_category": analytics["expenses_by_category"],
         "ar_by_customer": analytics["ar_by_customer"], "ap_by_store": analytics["ap_by_store"],
@@ -3593,6 +3619,14 @@ def parts_api():
             bp["logo"] = body.get("logo", "")
         if "invoice_theme" in body and body.get("invoice_theme") in ("classic", "minimal"):
             bp["invoice_theme"] = body.get("invoice_theme")
+        for k in ("next_invoice_no", "next_quote_no", "next_po_no"):
+            if k in body:
+                try:
+                    v = int(float(body.get(k)))
+                    if 1 <= v < 10**9:
+                        bp[k] = v
+                except (TypeError, ValueError):
+                    pass
 
     # ── REPORT BUILDER: named custom date ranges + saved report presets ──
     elif action == "save_report_ranges":
@@ -3659,6 +3693,8 @@ def parts_api():
         data["calendar_events"] = _clean_calendar_events(body.get("events"))
     elif action == "save_custom_metrics":
         data["custom_metrics"] = _clean_custom_metrics(body.get("metrics"))
+    elif action == "save_dash_settings":
+        data["dash_settings"] = _clean_dash_settings(body.get("settings"))
     elif action == "save_dashboard_widgets":
         data["dashboard_widgets"] = _clean_dashboard_widgets(body.get("widgets"), data.get("report_presets"))
 

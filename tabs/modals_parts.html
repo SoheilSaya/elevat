@@ -73,7 +73,7 @@
 .xi-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;min-width:20px;border-radius:50%;border:1px solid transparent;color:inherit;opacity:.5;background:transparent;
   cursor:pointer;padding:0;margin:0 4px;vertical-align:middle;transition:opacity .15s,background .15s,color .15s,transform .15s;line-height:0;flex-shrink:0;}
 .xi-btn svg{width:16px;height:16px;display:block;pointer-events:none;}
-.xi-btn:hover,.xi-btn:focus-visible{opacity:1;background:var(--coralL,#fdece7);color:var(--coral,#e85d3a);border-color:var(--coral,#e85d3a);outline:none;transform:scale(1.08);}
+.xi-btn:hover,.xi-btn:focus-visible{opacity:1;background:var(--coralL,#fdece7);color:var(--coral,var(--coral));border-color:var(--coral,var(--coral));outline:none;transform:scale(1.08);}
 .xi-btn:active{transform:scale(.95);}
 .xi-mini{width:18px;height:18px;min-width:18px;margin:0 3px;} .xi-mini svg{width:14px;height:14px;}
 .parts-kpi-card{position:relative;}
@@ -1104,10 +1104,58 @@ button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
 <!-- «نحوه محاسبه» -->
 <div class="overlay" id="xplOverlay" onclick="if(event.target===this)xClose()">
   <div class="modal xpl-modal" role="dialog" aria-modal="true" aria-label="نحوه محاسبه">
-    <button type="button" class="xpl-close" onclick="xClose()" aria-label="بستن">✕</button>
+    <div class="xpl-bar"><div class="xpl-nav" id="xplNav"></div><button type="button" class="xpl-close" onclick="xClose()" aria-label="بستن">✕</button></div>
     <div id="xplBody"></div>
   </div>
 </div>
+<style>
+.xpl-modal{max-width:900px!important;width:95vw!important;border-radius:22px!important;background:#f7f3ea!important;}
+.xpl-bar{direction:rtl;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--cream3);background:linear-gradient(180deg,#fff,#faf6ee);flex:none;}
+.xpl-nav{flex:1;min-width:0;display:flex;align-items:center;gap:8px;}
+.xpl-close{position:static!important;flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--cream3);background:#fff;color:var(--text2);font-size:14px;line-height:1;cursor:pointer;transition:all .15s;}
+.xpl-close:hover{background:var(--coralL);color:var(--coral);border-color:var(--coral);}
+.xpl-crumbs{margin:0!important;flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;font-size:12px;}
+.xpl-crumbs::-webkit-scrollbar{display:none;}
+.xpl-crumbs b{color:var(--ink);font-weight:800;max-width:38ch;overflow:hidden;text-overflow:ellipsis;} .xpl-crumbs a{max-width:22ch;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom;} .xpl-sep{color:var(--text4);}
+.xpl-back{flex:none;margin:0!important;border:1px solid var(--cream3);background:#fff;border-radius:18px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text2);white-space:nowrap;font-family:inherit;}
+.xpl-back:hover{border-color:var(--coral);color:var(--coral);}
+#xplBody{direction:rtl;padding:16px 18px 24px!important;}
+.xpl-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:16px 18px;border-radius:18px;background:linear-gradient(135deg,#ffffff,#fff5ea);border:1px solid #f1dcc3;box-shadow:0 4px 14px #7a4a1a14;}
+.xpl-hero-main{min-width:0;flex:1 1 280px;}
+.xpl-title{font-size:19px!important;line-height:1.6;margin-top:6px;}
+.xpl-val{font-size:26px!important;line-height:1.3;} .xpl-val-sub{margin-top:2px;}
+.xpl-badge{margin-top:0!important;font-weight:700;background:#fff!important;}
+.xpl-sec{background:#fff;border:1px solid var(--cream3);border-radius:16px;padding:13px 15px;margin-top:12px!important;box-shadow:0 1px 4px #0000000a;}
+.xpl-sec-t{font-size:13.5px!important;margin-bottom:9px!important;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;}
+.xpl-formula{background:linear-gradient(90deg,#fff3ea,#fffaf5)!important;border-right:4px solid var(--coral)!important;border-radius:10px!important;font-size:13.5px!important;}
+.xpl-eq{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:2px 0 12px;padding:11px;border-radius:14px;background:linear-gradient(180deg,#fffaf2,#fff3e2);border:1px dashed #f0c999;}
+.xpl-chip{display:inline-flex;flex-direction:column;gap:2px;padding:6px 11px;border-radius:11px;background:#fff;border:1px solid var(--cream3);min-width:96px;max-width:230px;box-shadow:0 1px 3px #0000000d;}
+.xpl-chip i{font-style:normal;font-size:10.5px;color:var(--text3);line-height:1.5;} .xpl-chip b{font-size:13.5px;direction:ltr;text-align:right;}
+.xpl-chip.res{background:var(--sageL);border-color:#9ccdb3;} .xpl-chip.res b{color:var(--sage);}
+.xpl-eq-op{font-size:18px;font-weight:900;color:var(--coral);padding:0 1px;}
+.xpl-tbl td{vertical-align:middle;} .xpl-tbl th{position:sticky;top:0;z-index:1;}
+.xpl-parts td{padding:9px 8px!important;}
+.xpl-bar2{height:3px;background:var(--cream2);border-radius:3px;margin-top:5px;max-width:260px;} .xpl-bar2 i{display:block;height:100%;background:linear-gradient(90deg,#f5b928,#e8761a);border-radius:3px;}
+.xpl-w{width:70px;text-align:left!important;} .xpl-more{font-size:10.5px;color:var(--coral);font-weight:700;white-space:nowrap;}
+tr.xexp{cursor:pointer;} tr.xexp:hover>td{background:#fff6ee!important;} tr.xexp.open>td{background:#fff1e2!important;}
+.xpl-car{display:inline-block;width:0;height:0;border-style:solid;border-width:5px 7px 5px 0;border-color:transparent var(--coral) transparent transparent;margin-inline-end:7px;vertical-align:middle;transition:transform .15s;}
+tr.open>td>.xpl-car,tr.open>td .xpl-car{transform:rotate(-90deg);}
+.xpl-scroll:has(.xpl-sub){max-height:none;overflow:visible;}
+.xpl-empty{padding:10px 12px;border-radius:10px;background:#f4f1ea;color:#6b6456;font-size:12.5px;line-height:1.8;}
+.xpl-sub>td{padding:0!important;background:#fffdf9;border-bottom:none!important;}
+.xpl-nest{margin:6px 6px 12px;padding:11px 13px;border-radius:14px;border:1px solid #f1d9bd;border-right:5px solid var(--coral);background:#fffaf3;animation:xplIn .18s ease;}
+.xpl-nest.xd1{border-right-color:var(--sky);background:#f6fafe;border-color:#cfe2f3;} .xpl-nest.xd2{border-right-color:var(--sage);background:#f5fbf8;border-color:#cfe7da;}
+.xpl-nest.xd3{border-right-color:var(--plum);background:#fbf6fa;border-color:#e6d2e1;} .xpl-nest.xd4,.xpl-nest.xd5{border-right-color:var(--amber);background:#fffaf0;border-color:#f1deb8;}
+.xpl-nest .xpl-sec{background:transparent;border:none;border-top:1px dashed var(--cream3);border-radius:0;box-shadow:none;padding:9px 0 2px;margin-top:9px!important;}
+.xpl-nest .xpl-sec:first-of-type{border-top:none;margin-top:4px!important;}
+.xpl-nest-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;} .xpl-nest-t{font-weight:800;font-size:13px;color:var(--ink);flex:1 1 160px;} .xpl-nest-v{font-weight:800;color:var(--sage);direction:ltr;font-size:14px;}
+.xpl-full{border:1px solid var(--cream3);background:#fff;border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--text2);font-family:inherit;} .xpl-full:hover{border-color:var(--coral);color:var(--coral);}
+.xpl-src{display:flex;flex-wrap:wrap;gap:7px;} .xpl-srcchip{display:inline-block;padding:5px 12px;border-radius:16px;background:var(--cream2);border:1px solid var(--cream3);font-size:12px;} a.xl:hover .xpl-srcchip{background:var(--coralL);border-color:var(--coral);}
+.xpl-go{font-size:11px;margin-inline-start:6px;}
+.xpl-note{border-radius:14px!important;padding:11px 14px!important;}
+@keyframes xplIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.xpl-hero{padding:12px}.xpl-val{font-size:21px!important}.xpl-chip{min-width:84px}}
+</style>
 
 <!-- تقویم: رویداد دلخواه -->
 <div class="overlay" id="pcalEvOverlay" onclick="if(event.target===this)pcalEvClose()">
