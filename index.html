@@ -3856,10 +3856,18 @@ nav{display:flex;flex-direction:column;gap:16px;padding:0 0 28px;border-bottom:2
 .inv-theme-minimal .inv-table td{border-bottom:1px solid #ddd;color:#000;}
 .inv-theme-minimal .inv-customer{background:#fff;border:1px solid #ddd;}
 .inv-theme-minimal .inv-grand{border-top:1px solid #000;color:#000;}
-@media print{
-  body *{visibility:hidden;}
-  #invoicePrintArea,#invoicePrintArea *{visibility:visible;}
-  #invoicePrintArea{position:absolute;top:0;left:0;width:100%;padding:20px;}
+.inv-modal{max-width:880px;width:96vw;background:#fff;border-radius:18px;padding:16px;box-sizing:border-box;}
+.inv-pick{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.inv-pick-l{font-size:12px;font-weight:700;color:var(--text3);min-width:42px;}
+.inv-pick-row{display:flex;flex-wrap:wrap;gap:6px;min-width:0;}
+.inv-chip{border:1.5px solid var(--cream3);background:#fff;border-radius:20px;padding:5px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);}
+.inv-chip.on{background:var(--coral);border-color:var(--coral);color:#fff;}
+.inv-dot{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--cream3);background:#fff;border-radius:20px;padding:4px 11px 4px 9px;font:inherit;font-size:11.5px;cursor:pointer;color:var(--text2);}
+.inv-dot i{width:14px;height:14px;border-radius:50%;background:var(--dc);display:inline-block;}
+.inv-dot.on{border-color:var(--dc);box-shadow:0 0 0 2px var(--dc);font-weight:700;}
+#invStage{background:#e6e3dc;border-radius:12px;padding:10px;overflow:auto;max-height:62vh;margin-top:4px;}
+#invWrap{position:relative;margin:0 auto;box-shadow:0 4px 18px rgba(0,0,0,.18);background:#fff;overflow:hidden;}
+#invFrame{position:absolute;top:0;left:0;border:0;background:#fff;transform-origin:top left;}
 }
 .tx-total-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--sageL);border-radius:var(--r2);margin-bottom:16px;}
 .tx-total-row .lbl{font-size:13px;font-weight:600;color:var(--sage);}
@@ -5759,6 +5767,7 @@ textarea.stg-in{min-height:64px;resize:vertical;}
 .sl-fb:hover{background:color-mix(in srgb,var(--coral) 16%,transparent);color:var(--coral);}.sl-pill.on .sl-fb{color:#fff;}.sl-pill.on .sl-fb:hover{background:#fff3;}
 .sl-fi{width:11px;height:11px;}
 .sl-count{font-size:11.5px;color:var(--text3);margin-inline-start:auto;white-space:nowrap;}
+.sl-csv{border:1px solid var(--cream3);background:#fff;color:var(--text2);border-radius:999px;padding:3px 11px;font-family:inherit;font-size:11.5px;cursor:pointer;}.sl-csv:hover{border-color:var(--coral);color:var(--coral);}
 .sl-clear{border:0;background:color-mix(in srgb,var(--coral) 12%,transparent);color:var(--coral);border-radius:999px;padding:3px 10px;font-family:inherit;font-size:11.5px;cursor:pointer;}
 .sl-tb-t{margin-bottom:6px;padding:6px 8px;}
 th.sl-th{cursor:pointer;user-select:none;white-space:nowrap;position:relative;}
@@ -7016,11 +7025,7 @@ button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
       <input type="text" class="modal-input" id="bpFooter" placeholder="مثلاً: با تشکر از خرید شما" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">قالب ظاهری فاکتور</div>
-      <div class="cash-toggle">
-        <button type="button" id="bpThemeClassicBtn" class="active deposit" onclick="setBpTheme('classic')">📜 کلاسیک</button>
-        <button type="button" id="bpThemeMinimalBtn" class="withdrawal" onclick="setBpTheme('minimal')">◽ ساده</button>
-      </div>
+      <div class="builder-label">قالب ظاهری فاکتور</div><div style="font-size:12px;color:var(--text3);">ساختار و رنگ (۲۵ قالب) را موقع باز کردن هر فاکتور می‌توانی زنده امتحان و انتخاب کنی.</div>
     </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeBusinessProfileModal()">انصراف</button>
@@ -7031,9 +7036,11 @@ button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
 
 <!-- Parts Biz: Invoice preview modal — formal, numbered, printable -->
 <div class="overlay" id="invoiceModalOverlay" style="z-index:9500;">
-  <div class="modal" style="max-width:560px;">
-    <div id="invoicePrintArea"></div>
-    <div class="modal-btns" style="margin-top:16px;">
+  <div class="modal inv-modal">
+    <div class="inv-pick"><div class="inv-pick-l">ساختار</div><div class="inv-pick-row" id="invStyleRow"></div></div>
+    <div class="inv-pick"><div class="inv-pick-l">رنگ</div><div class="inv-pick-row" id="invColorRow"></div></div>
+    <div id="invStage"><div id="invWrap"><iframe id="invFrame" title="فاکتور"></iframe></div></div>
+    <div class="modal-btns" style="margin-top:14px;">
       <button class="btn-cancel" onclick="closeInvoiceModal()">بستن</button>
       <button class="btn-ok" onclick="printInvoice()">🖨 چاپ / ذخیره PDF</button>
     </div>
@@ -16214,7 +16221,7 @@ function renderBusinessProfileCard(){
   const el = document.getElementById('bpSummary'); if(!el) return;
   const bp = PARTS.business_profile || {}, v = (t,x)=>`<div><small>${t}</small>${x ? escHtml(String(x)) : '<span style="color:var(--text4)">— ثبت نشده —</span>'}</div>`;
   el.innerHTML = `<div class="bp-sum">${bp.logo ? `<img src="${escHtml(bp.logo)}" alt="">` : '<div style="width:72px;height:72px;border-radius:12px;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:30px;">🏢</div>'}
-    <div class="bp-sum-l">${v('نام کسب‌وکار',bp.name)}${v('تلفن',bp.phone)}${v('آدرس',bp.address)}${v('متن پایین فاکتور',bp.footer_note)}${v('قالب فاکتور',bp.invoice_theme==='minimal'?'مینیمال':'کلاسیک')}${v('شماره‌ی فاکتور بعدی',faDigits(bp.next_invoice_no||1))}${v('شماره‌ی پیش‌فاکتور بعدی',faDigits(bp.next_quote_no||1))}</div></div>`;
+    <div class="bp-sum-l">${v('نام کسب‌وکار',bp.name)}${v('تلفن',bp.phone)}${v('آدرس',bp.address)}${v('متن پایین فاکتور',bp.footer_note)}${v('قالب فاکتور',((INV_STYLES.find(x=>x[0]===bp.invoice_theme)||INV_STYLES[0])[1]).replace(/^\S+\s/,'')+' · '+((INV_COLORS.find(x=>x[0]===bp.invoice_color)||INV_COLORS[2])[1]))}${v('شماره‌ی فاکتور بعدی',faDigits(bp.next_invoice_no||1))}${v('شماره‌ی پیش‌فاکتور بعدی',faDigits(bp.next_quote_no||1))}</div></div>`;
 }
 function renderVariablesTab(){
   renderSettingsHub();
@@ -17557,6 +17564,14 @@ function rbParseNum(s){
   if(t==='' || !/^-?\d*\.?\d+$/.test(t)) return null;
   const v = parseFloat(t); return isFinite(v) ? v : null;
 }
+// میانگینِ مجموعه‌ی خالی تعریف‌نشده است (نه صفر): کالای بدون قیمت، «قیمت فروش < ۳۰۰» نیست
+function rbCondDefined(mid, rows){
+  if(!/^avg_/.test(mid)) return true;
+  if(!rows.length) return false;
+  if(mid==='avg_list_price') return rows.some(x=>x.v.has_price);
+  if(mid==='avg_customer_debt') return rows.some(x=>x.v.outstanding>0.0001);
+  return true;
+}
 function rbNumPass(v, op, a, b){
   switch(op){
     case 'gt': return v > a; case 'ge': return v >= a-1e-9; case 'lt': return v < a; case 'le': return v <= a+1e-9;
@@ -17673,6 +17688,13 @@ const RB_NUM_ENT = {
   purchase:{label:'سفارش خرید', noun:'سفارشی', ex:'مثلاً «سفارش‌هایی که مبلغشان بیش از KT ۵۰۰ است»', vars:{
     '📥 سفارش':[['purchase_spend','مبلغ سفارش'],['units_purchased','تعداد کالا'],['paid_to_suppliers','پرداخت‌شده'],['purchase_outstanding','پرداخت‌نشده']]}},
 };
+// متغیرهای قیمت و موجودی که به‌طور مشترک برای همه‌ی موجودیت‌های عددی (کالا، برند، مدل خودرو، …) قابل استفاده‌اند
+Object.values(RB_NUM_ENT).forEach(E=>{
+  const g = E.vars['📦 موجودی']; if(!g) return;
+  const have = new Set(g.map(x=>x[0]));
+  [['avg_list_price','قیمت فروشِ تعیین‌شده (میانگین)'],['avg_stock_cost','میانگین قیمت خریدِ موجودی'],['potential_sales','ارزش بالقوه‌ی فروشِ موجودی'],['potential_profit','سود بالقوه‌ی موجودی']].forEach(x=>{ if(!have.has(x[0]) && RB_METRICS[x[0]]) g.push(x); });
+});
+
 const RB_NUM_DIMS = Object.keys(RB_NUM_ENT);
 // metrics that are really valid for an entity (also compatible with the engine's fact kinds)
 function rbNumVars(dim){
@@ -17715,7 +17737,7 @@ function rbEntitySet(n, env){
       new Set(ks.map(String)).forEach(k=>{ let g = groups.get(k); if(!g){ g = []; groups.set(k, g); } g.push(f); });
     });
     out = new Set();
-    groups.forEach((rows, k)=>{ const v = rbEval(m, rows, {pool:rows, base:rows, end:to, days:rbDays(from, to)}); if(rbNumPass(v, n.op, a, b)) out.add(k); });
+    groups.forEach((rows, k)=>{ const v = rbEval(m, rows, {pool:rows, base:rows, end:to, days:rbDays(from, to)}); if(rbCondDefined(n.mid, rows) && rbNumPass(v, n.op, a, b)) out.add(k); });
   }
   env.sets.set(n, out); return out;
 }
@@ -20344,53 +20366,6 @@ async function convertQuoteToSale(id){
   showToast('فروش ثبت شد — حالا می‌تونی وضعیت پرداختش رو عوض کنی','success');
   showPartsSub('sales');
 }
-function printQuote(id){
-  const q = PARTS.quotations.find(x=>x.id===id);
-  if(!q) return;
-  renderQuoteDocument(q);
-  document.getElementById('invoiceModalOverlay').classList.add('open');
-}
-function renderQuoteDocument(q){
-  const bp = PARTS.business_profile || {};
-  const theme = bp.invoice_theme === 'minimal' ? 'minimal' : 'classic';
-  const itemDiscountTotal = q.items.reduce((s,it)=>s+(Number(it.discount)||0),0);
-  const el = document.getElementById('invoicePrintArea');
-  el.className = 'inv-theme-'+theme;
-  el.innerHTML = `
-    <div class="inv-header">
-      ${bp.logo ? `<img src="${bp.logo}" class="inv-logo">` : ''}
-      <div class="inv-biz-name">${escHtml(bp.name || 'کسب و کار من')}</div>
-      <div class="inv-biz-meta">${[bp.address, bp.phone].filter(Boolean).map(escHtml).join(' · ')}</div>
-    </div>
-    <div class="inv-meta-row">
-      <div>پیش‌فاکتور: <b>${faDigits(q.quote_no)}</b></div>
-      <div>تاریخ: <b>${jalaliDateFa(q.date)}</b></div>
-    </div>
-    ${q.valid_until ? `<div class="inv-meta-row" style="border-top:none;"><div>اعتبار تا: <b>${jalaliDateFa(q.valid_until)}</b></div><div></div></div>` : ''}
-    ${(q.customer_name||q.customer_phone) ? `<div class="inv-customer"><b>مشتری:</b> ${escHtml(q.customer_name||'-')}${q.customer_phone?' · '+escHtml(q.customer_phone):''}</div>` : ''}
-    <table class="inv-table">
-      <colgroup><col style="width:8%"><col style="width:34%"><col style="width:10%"><col style="width:16%"><col style="width:14%"><col style="width:18%"></colgroup>
-      <thead><tr><th>ردیف</th><th>شرح کالا</th><th>تعداد</th><th>قیمت واحد</th><th>تخفیف</th><th>جمع</th></tr></thead>
-      <tbody>${q.items.map((it,i)=>{
-        const d = Number(it.discount)||0;
-        return `<tr><td>${faDigits(i+1)}</td><td class="inv-td-desc">${escHtml(productLabel(productById(it.product_id)))}</td>
-          <td>${faDigits(it.qty)}</td><td>${fmtToman(it.unit_price)}</td>
-          <td>${d>0?'− '+fmtToman(d):'—'}</td><td>${fmtToman(it.qty*it.unit_price-d)}</td></tr>`;
-      }).join('')}</tbody>
-    </table>
-    <div class="inv-totals">
-      <div class="inv-total-row"><span>جمع کل (بعد از تخفیف هر ردیف)</span><span>${fmtToman(q.subtotal - itemDiscountTotal)}</span></div>
-      ${Number(q.discount)>0 ? `<div class="inv-total-row"><span>تخفیف کلی</span><span>− ${fmtToman(q.discount)}</span></div>` : ''}
-      ${q.shipping_charged_to_customer>0 ? `<div class="inv-total-row"><span>هزینه ارسال</span><span>+ ${fmtToman(q.shipping_charged_to_customer)}</span></div>` : ''}
-      ${Number(q.tax_percent)>0 ? `<div class="inv-total-row"><span>مالیات (${faDigits(q.tax_percent)}%)</span><span>${fmtToman(q.tax_amount)}</span></div>` : ''}
-      <div class="inv-total-row inv-grand"><span>جمع قابل پرداخت</span><span>${fmtToman(q.invoice_total)}</span></div>
-    </div>
-    ${(q.agent_id && q.show_agent_on_invoice && agentById(q.agent_id)) ? `<div class="inv-customer"><b>نماینده فروش:</b> ${escHtml(agentById(q.agent_id).name)}</div>` : ''}
-    ${q.notes ? `<div class="inv-note">📝 ${escHtml(q.notes)}</div>` : ''}
-    <div class="inv-footer">این یک پیش‌فاکتوره و قیمت‌ها تا ${q.valid_until?jalaliDateFa(q.valid_until):'اطلاع ثانوی'} معتبره.</div>
-  `;
-}
-
 // ─── SALE RETURNS (مرجوعی) ───────────────────────────
 let returnItemsCache = [];  // the picked sale's items, enriched, while the return form is open
 function renderReturnSaleSelect(){
@@ -22017,8 +21992,7 @@ let businessLogoData = null;
 let bpSelectedTheme = 'classic';
 function setBpTheme(t){
   bpSelectedTheme = t;
-  document.getElementById('bpThemeClassicBtn').classList.toggle('active', t==='classic');
-  document.getElementById('bpThemeMinimalBtn').classList.toggle('active', t==='minimal');
+
 }
 function onBusinessLogoSelected(input){
   const file = input.files && input.files[0];
@@ -22044,6 +22018,230 @@ async function saveBusinessProfile(){
   showToast('اطلاعات کسب‌وکار ذخیره شد','success');
   closeBusinessProfileModal();
 }
+// ══════════════════════════════════════════════════════════════════
+//  فاکتور / پیش‌فاکتور نسخه‌ی ۲ — ۵ ساختار × ۵ رنگ = ۲۵ قالب، چاپ از داخل iframe (فقط یک صفحه)
+// ══════════════════════════════════════════════════════════════════
+const INV_STYLES = [['classic','📜 کلاسیک'],['modern','🟦 مدرن'],['minimal','◽ مینیمال'],['elegant','✨ زرین'],['bold','🔶 پررنگ']];
+const INV_COLORS = [
+  ['ocean','آبی اقیانوسی','#1f6feb','#e8f1fe','#0b3d91'],
+  ['emerald','سبز زمردی','#12a06a','#e4f6ed','#0a5c3d'],
+  ['sunset','مرجانی غروب','#e85d3a','#fdede8','#8f2f14'],
+  ['violet','بنفش سلطنتی','#7c4dde','#efe9fc','#46268f'],
+  ['graphite','ذغالی','#374151','#eceef2','#111827']
+];
+let INV = {kind:'sale', id:null, style:'classic', color:'sunset'};
+let invSaveT = null;
+const invFa = n => faDigits(String(n));
+const invMoney = k => invFa((Math.round((Number(k)||0)*1000)).toLocaleString('en-US'));   // KT → تومان کامل
+function invItems(items){
+  return (items||[]).map((it,i)=>{
+    const p = productById(it.product_id) || {};
+    const qty = Number(it.qty)||0, unit = Number(it.unit_price)||0, disc = Number(it.discount)||0;
+    return {n:i+1, img:p.image||'', code:p.oem_code||'', name:productLabel(p), spec:productShortSpec(p), qty, unit, gross:qty*unit, disc, net:qty*unit-disc};
+  });
+}
+function invData(kind, id){
+  const bp = PARTS.business_profile || {};
+  const base = {bp, kind};
+  if(kind==='quote'){
+    const q = PARTS.quotations.find(x=>x.id===id); if(!q) return null;
+    const items = invItems(q.items), itemDisc = items.reduce((s,r)=>s+r.disc,0), sub = items.reduce((s,r)=>s+r.net,0);
+    const ag = (q.agent_id && q.show_agent_on_invoice) ? agentById(q.agent_id) : null;
+    const rows = [['جمع ردیف‌ها', items.reduce((s,r)=>s+r.gross,0)]];
+    if(itemDisc>0) rows.push(['تخفیف ردیف‌ها', -itemDisc, 'neg']);
+    rows.push(['جمع پس از تخفیف ردیف‌ها', sub, 'sub']);
+    if(Number(q.discount)>0) rows.push(['تخفیف کلی', -Number(q.discount), 'neg']);
+    if(Number(q.shipping_charged_to_customer)>0) rows.push(['هزینه ارسال', Number(q.shipping_charged_to_customer)]);
+    if(Number(q.tax_percent)>0) rows.push(['مالیات ('+invFa(q.tax_percent)+'٪)', Number(q.tax_amount)||0]);
+    return Object.assign(base,{title:'پیش‌فاکتور', noLabel:'شماره پیش‌فاکتور', no:q.quote_no, date:q.date, valid:q.valid_until,
+      cust:{name:q.customer_name, phone:q.customer_phone, address:q.customer_address}, agent:ag, items, rows, grand:Number(q.invoice_total)||0, grandLabel:'جمع قابل پرداخت',
+      delivery:'', notes:q.notes, pay:null, foot:'این یک پیش‌فاکتور است و قیمت‌ها تا '+(q.valid_until?jalaliDateFa(q.valid_until):'اطلاع ثانوی')+' معتبرند.'});
+  }
+  const s = PARTS.sales.find(x=>x.id===id); if(!s) return null;
+  const items = invItems(s.items), itemDisc = items.reduce((r,x)=>r+x.disc,0), sub = items.reduce((r,x)=>r+x.net,0);
+  const extra = Number(s.discount)||0, taxPct = Number(s.tax_percent)||0;
+  const shC = Number(s.shipping_charged_to_customer), ship = isNaN(shC) ? (Number(s.shipping_cost)||0) : shC;
+  const grand = Number(s.invoice_total)||0;
+  const ag = (s.agent_id && s.show_agent_on_invoice) ? agentById(s.agent_id) : null;
+  const rows = [['جمع ردیف‌ها', items.reduce((r,x)=>r+x.gross,0)]];
+  if(itemDisc>0) rows.push(['تخفیف ردیف‌ها', -itemDisc, 'neg']);
+  rows.push(['جمع پس از تخفیف ردیف‌ها', sub, 'sub']);
+  if(extra>0) rows.push(['تخفیف کلی فاکتور', -extra, 'neg']);
+  if(ship>0) rows.push(['هزینه ارسال', ship]);
+  if(taxPct>0) rows.push(['مالیات ('+invFa(taxPct)+'٪)', Number(s.tax_amount)||0]);
+  let pay = null;
+  const st = s.payment_status;
+  if(st==='unpaid') pay = {paid:0, due:grand};
+  else if(st==='partial'){ const pd = Math.min(Number(s.amount_paid)||0, grand); pay = {paid:pd, due:grand-pd}; }
+  const dm = s.delivery_method ? ('روش تحویل: '+s.delivery_method+(isPickupMethod(s.delivery_method)?'':s.shipping_payer==='split'?' (هزینه ارسال بین طرفین تقسیم شده)':(s.shipping_payer==='business'?' (ارسال رایگان)':''))) : '';
+  return Object.assign(base,{title:'فاکتور فروش', noLabel:'شماره فاکتور', no:s.invoice_no, date:s.date, valid:'',
+    cust:{name:s.customer_name, phone:s.customer_phone, address:s.customer_address}, agent:ag, items, rows, grand, grandLabel:'مبلغ نهایی قابل پرداخت',
+    delivery:dm, notes:s.notes, pay, foot:''});
+}
+function invCss(color){
+  const c = INV_COLORS.find(x=>x[0]===color) || INV_COLORS[2];
+  return `:root{--c:${c[2]};--t:${c[3]};--d:${c[4]};}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#fff;}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;color:#1d2330;font-size:11.5px;line-height:1.65;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.page{width:794px;margin:0 auto;padding:30px 34px 26px;background:#fff;min-height:1123px;display:flex;flex-direction:column;}
+.grow{flex:1;}
+img.logo{max-width:92px;max-height:72px;object-fit:contain;display:block;}
+.biz-n{font-weight:800;font-size:19px;}
+.biz-m{font-size:10.5px;opacity:.85;}
+.ttl{font-weight:800;font-size:24px;}
+.parties{display:flex;gap:12px;margin:14px 0 12px;}
+.party{flex:1;min-width:0;border:1px solid #e3e6ec;border-radius:10px;padding:9px 12px;}
+.party h4{font-size:10.5px;font-weight:700;color:var(--c);margin-bottom:3px;letter-spacing:0;}
+.party b{font-size:12.5px;display:block;}
+.party span{display:block;color:#566074;font-size:10.5px;word-break:break-word;}
+table.items{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:12px;}
+table.items th{background:var(--c);color:#fff;font-weight:700;font-size:10.5px;padding:7px 4px;text-align:center;}
+table.items td{padding:6px 4px;text-align:center;border-bottom:1px solid #e6e9ef;vertical-align:middle;font-size:11px;word-break:break-word;}
+table.items td.nm{text-align:right;}
+table.items td.nm small{display:block;color:#7a8498;font-size:9.5px;}
+table.items td.num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+table.items td.fin{font-weight:800;}
+table.items thead{display:table-header-group;}
+table.items tr{page-break-inside:avoid;break-inside:avoid;}
+.ph{width:38px;height:38px;border-radius:8px;object-fit:cover;border:1px solid #e3e6ec;display:block;margin:0 auto;}
+.ph0{width:38px;height:38px;border-radius:8px;background:#f1f3f7;color:#b3bac8;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:15px;}
+.lower{display:flex;gap:14px;align-items:flex-start;}
+.notes{flex:1;min-width:0;font-size:10.5px;color:#566074;}
+.notes .nb{border:1px dashed #cfd5e0;border-radius:10px;padding:8px 12px;margin-bottom:8px;}
+.tot{width:318px;flex:none;}
+.tr{display:flex;justify-content:space-between;gap:10px;padding:4px 10px;font-size:11.5px;border-bottom:1px solid #eef0f4;}
+.tr.neg b{color:#c0392b;} .tr.sub{font-weight:700;background:#f7f8fa;}
+.tr b{font-variant-numeric:tabular-nums;font-weight:700;}
+.grand{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;margin-top:6px;background:var(--c);color:#fff;border-radius:10px;font-weight:800;font-size:13.5px;}
+.grand b{font-size:16px;}
+.pay{display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;}
+.pay.due{font-weight:800;color:var(--d);}
+.sign{display:flex;gap:14px;margin-top:22px;}
+.sign div{flex:1;border-top:1.5px solid #cfd5e0;padding-top:5px;text-align:center;color:#7a8498;font-size:10.5px;height:62px;}
+.foot{margin-top:14px;text-align:center;font-size:10.5px;color:#7a8498;border-top:1px solid #e6e9ef;padding-top:8px;}
+.meta{display:flex;gap:8px;flex-wrap:wrap;}
+.meta div{font-size:11px;} .meta b{font-weight:800;}
+/* ── 1 کلاسیک ── */
+.s-classic .hd{text-align:center;border-bottom:4px double var(--c);padding-bottom:12px;}
+.s-classic .hd .logo{margin:0 auto 6px;} .s-classic .biz-n{color:var(--d);}
+.s-classic .ttl{margin-top:8px;font-size:20px;color:var(--c);}
+.s-classic .meta{justify-content:space-between;border-bottom:1px solid #e3e6ec;padding:8px 2px;margin-top:2px;}
+.s-classic table.items{border:1px solid var(--c);} .s-classic table.items td{border:1px solid #e3e6ec;}
+.s-classic .grand{border-radius:4px;}
+/* ── 2 مدرن ── */
+.s-modern .page{padding-top:0;}
+.s-modern .hd{background:linear-gradient(135deg,var(--c),var(--d));color:#fff;margin:0 -34px;padding:22px 34px;display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.s-modern .hd .l{display:flex;gap:12px;align-items:center;} .s-modern .hd img.logo{background:#fff;border-radius:10px;padding:5px;}
+.s-modern .hd .r{text-align:left;} .s-modern .ttl{font-size:26px;} .s-modern .pill{display:inline-block;background:rgba(255,255,255,.2);border-radius:20px;padding:2px 12px;font-weight:700;margin-top:3px;}
+.s-modern .meta{margin-top:14px;} .s-modern .meta div{background:var(--t);border-radius:8px;padding:4px 12px;color:var(--d);}
+.s-modern .party{border:none;background:var(--t);} 
+.s-modern table.items{border-radius:10px;overflow:hidden;} .s-modern table.items tbody tr:nth-child(even) td{background:#f7f8fb;} .s-modern table.items th:first-child{border-radius:0 10px 0 0;} .s-modern table.items th:last-child{border-radius:10px 0 0 0;}
+.s-modern .grand{border-radius:14px;background:linear-gradient(135deg,var(--c),var(--d));}
+/* ── 3 مینیمال ── */
+.s-minimal .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #111;padding-bottom:10px;}
+.s-minimal .hd .l{display:flex;gap:10px;align-items:center;} .s-minimal .biz-n{font-size:16px;} .s-minimal .ttl{font-size:18px;font-weight:700;color:var(--c);}
+.s-minimal .meta{margin-top:10px;gap:22px;} 
+.s-minimal .party{border:none;border-bottom:1px solid #111;border-radius:0;padding:6px 0;} .s-minimal .party h4{color:#111;}
+.s-minimal table.items th{background:#fff;color:#111;border-bottom:1.5px solid #111;border-top:1.5px solid #111;}
+.s-minimal table.items td{border-bottom:1px solid #e3e6ec;}
+.s-minimal .grand{background:#fff;color:#111;border:1.5px solid #111;border-radius:0;} .s-minimal .grand b{color:var(--c);}
+.s-minimal .tr.sub{background:#fff;}
+/* ── 4 زرین (سنتی/تزئینی) ── */
+.s-elegant .page{border:2px solid var(--c);outline:1px solid var(--c);outline-offset:-8px;padding:34px 40px 28px;}
+.s-elegant .hd{text-align:center;} .s-elegant .hd .logo{margin:0 auto 6px;} .s-elegant .biz-n{color:var(--d);font-size:21px;}
+.s-elegant .orn{display:flex;align-items:center;gap:10px;margin:8px 0;color:var(--c);} .s-elegant .orn i{flex:1;height:1px;background:var(--c);} .s-elegant .orn span{font-size:12px;font-weight:800;border:1.5px solid var(--c);border-radius:20px;padding:2px 22px;background:var(--t);color:var(--d);}
+.s-elegant .meta{justify-content:center;gap:26px;}
+.s-elegant .party{background:var(--t);border:none;border-radius:2px;border-right:4px solid var(--c);}
+.s-elegant table.items{border:1px solid var(--c);} .s-elegant table.items th{background:var(--t);color:var(--d);border-bottom:2px solid var(--c);} .s-elegant table.items td{border-bottom:1px dotted var(--c);}
+.s-elegant .grand{background:var(--t);color:var(--d);border:1.5px solid var(--c);border-radius:2px;}
+.s-elegant .tr.sub{background:var(--t);}
+/* ── 5 پررنگ ── */
+.s-bold .page{border-right:16px solid var(--c);padding-right:26px;}
+.s-bold .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.s-bold .ttl{font-size:36px;color:var(--c);line-height:1.1;} .s-bold .biz-n{font-size:15px;}
+.s-bold .hd .l{display:flex;gap:10px;align-items:center;}
+.s-bold .meta div{background:var(--d);color:#fff;border-radius:6px;padding:3px 12px;}
+.s-bold .party{border:2px solid var(--c);border-radius:6px;} 
+.s-bold table.items th{background:var(--d);font-size:11px;} .s-bold table.items td.fin{color:var(--c);}
+.s-bold .grand{border-radius:6px;font-size:15px;padding:14px;} .s-bold .grand b{font-size:20px;}
+@page{size:A4;margin:0;}
+@media print{html,body{background:#fff;} .page{width:auto;min-height:0;height:auto;margin:0;} .s-modern .hd{margin:0 -34px;}}`;
+}
+function invDocHtml(d, style, color){
+  const bp = d.bp, e = escHtml;
+  const logo = bp.logo ? `<img class="logo" src="${bp.logo}">` : '';
+  const contact = [bp.phone, bp.address].filter(Boolean).map(e).join(' · ');
+  const bizBlock = `<div><div class="biz-n">${e(bp.name||'کسب‌وکار من')}</div><div class="biz-m">${contact}</div></div>`;
+  const meta = `<div>${d.noLabel}: <b>${invFa(d.no||'—')}</b></div><div>تاریخ: <b>${jalaliDateFa(d.date)}</b></div>${d.valid?`<div>اعتبار تا: <b>${jalaliDateFa(d.valid)}</b></div>`:''}${d.pay!==null&&d.kind==='sale'?`<div>وضعیت: <b>${d.pay.paid>0?'تسویه‌ی ناقص':'پرداخت‌نشده'}</b></div>`:''}${d.kind==='sale'&&d.pay===null?'<div>وضعیت: <b>تسویه‌شده</b></div>':''}`;
+  let head;
+  if(style==='modern') head = `<div class="hd"><div class="l">${logo}${bizBlock}</div><div class="r"><div class="ttl">${d.title}</div><div class="pill">${d.noLabel}: ${invFa(d.no||'—')}</div></div></div><div class="meta">${meta}</div>`;
+  else if(style==='minimal') head = `<div class="hd"><div class="l">${logo}${bizBlock}</div><div class="ttl">${d.title}</div></div><div class="meta">${meta}</div>`;
+  else if(style==='elegant') head = `<div class="hd">${logo}<div class="biz-n">${e(bp.name||'کسب‌وکار من')}</div><div class="biz-m">${contact}</div></div><div class="orn"><i></i><span>${d.title}</span><i></i></div><div class="meta">${meta}</div>`;
+  else if(style==='bold') head = `<div class="hd"><div><div class="ttl">${d.title}</div><div class="meta" style="margin-top:8px;">${meta}</div></div><div class="l">${bizBlock}${logo}</div></div>`;
+  else head = `<div class="hd">${logo}<div class="biz-n">${e(bp.name||'کسب‌وکار من')}</div><div class="biz-m">${contact}</div><div class="ttl">${d.title}</div></div><div class="meta">${meta}</div>`;
+  const c = d.cust||{};
+  const parties = `<div class="parties">
+    <div class="party"><h4>فروشنده</h4><b>${e(bp.name||'کسب‌وکار من')}</b>${bp.phone?`<span>تلفن: ${invFa(e(bp.phone))}</span>`:''}${bp.address?`<span>${e(bp.address)}</span>`:''}</div>
+    <div class="party"><h4>خریدار</h4><b>${e(c.name||'مشتری متفرقه')}</b>${c.phone?`<span>تلفن: ${invFa(e(c.phone))}</span>`:''}${c.address?`<span>${e(c.address)}</span>`:''}</div>
+    ${d.agent?`<div class="party"><h4>نماینده فروش</h4><b>${e(d.agent.name)}</b>${d.agent.phone?`<span>تلفن: ${invFa(e(d.agent.phone))}</span>`:''}</div>`:''}</div>`;
+  const body = d.items.map(r=>`<tr>
+    <td>${invFa(r.n)}</td>
+    <td>${r.img?`<img class="ph" src="${r.img}">`:'<div class="ph0">🔩</div>'}</td>
+    <td class="num">${r.code?e(r.code):'—'}</td>
+    <td class="nm">${e(r.name)}${r.spec&&r.spec!==r.name?`<small>${e(r.spec)}</small>`:''}</td>
+    <td class="num">${invFa(fmtNum(r.qty))}</td>
+    <td class="num">${invMoney(r.unit)}</td>
+    <td class="num">${invMoney(r.gross)}</td>
+    <td class="num">${r.disc>0?invMoney(r.disc):'—'}</td>
+    <td class="num fin">${invMoney(r.net)}</td></tr>`).join('');
+  const table = `<table class="items"><colgroup><col style="width:4%"><col style="width:8%"><col style="width:10%"><col style="width:25%"><col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:9%"><col style="width:14%"></colgroup>
+    <thead><tr><th>ردیف</th><th>تصویر</th><th>کد کالا</th><th>شرح کالا</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th>تخفیف</th><th>مبلغ نهایی</th></tr></thead><tbody>${body}</tbody></table>
+    <div style="text-align:left;font-size:9.5px;color:#7a8498;margin:-6px 0 10px;">همه‌ی مبالغ به تومان</div>`;
+  const tot = d.rows.map(r=>`<div class="tr ${r[2]||''}"><span>${r[0]}</span><b>${r[1]<0?'− ':''}${invMoney(Math.abs(r[1]))}</b></div>`).join('')
+    + `<div class="grand"><span>${d.grandLabel}</span><b>${invMoney(d.grand)} تومان</b></div>`
+    + (d.pay?`<div class="pay"><span>پرداخت‌شده</span><b>${invMoney(d.pay.paid)}</b></div><div class="pay due"><span>مانده‌ی قابل پرداخت</span><b>${invMoney(d.pay.due)}</b></div>`:'');
+  const notes = `${d.delivery?`<div class="nb">🚚 ${e(d.delivery)}</div>`:''}${d.notes?`<div class="nb">📝 ${e(d.notes)}</div>`:''}`;
+  const sign = d.kind==='sale' ? '<div class="sign"><div>مهر و امضای فروشنده</div><div>امضای خریدار</div></div>' : '';
+  const foot = [d.foot, bp.footer_note].filter(Boolean).map(e).join(' — ');
+  return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>${d.title} ${invFa(d.no||'')}</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');${invCss(color)}</style></head>
+<body class="s-${style}"><div class="page">${head}${parties}${table}<div class="lower"><div class="notes">${notes}</div><div class="tot">${tot}</div></div><div class="grow"></div>${sign}${foot?`<div class="foot">${foot}</div>`:''}</div></body></html>`;
+}
+function invPickers(){
+  const sr = document.getElementById('invStyleRow'), cr = document.getElementById('invColorRow'); if(!sr||!cr) return;
+  sr.innerHTML = INV_STYLES.map(s=>`<button type="button" class="inv-chip ${s[0]===INV.style?'on':''}" onclick="invPick('style','${s[0]}')">${s[1]}</button>`).join('');
+  cr.innerHTML = INV_COLORS.map(c=>`<button type="button" class="inv-dot ${c[0]===INV.color?'on':''}" title="${c[1]}" style="--dc:${c[2]}" onclick="invPick('color','${c[0]}')"><i></i><span>${c[1]}</span></button>`).join('');
+}
+function invPick(w, v){
+  INV[w] = v; invPickers(); invRender();
+  clearTimeout(invSaveT);
+  invSaveT = setTimeout(()=>postParts('update_business_profile', {invoice_theme:INV.style, invoice_color:INV.color}), 700);
+}
+function invRender(){
+  const d = invData(INV.kind, INV.id); if(!d) return;
+  const fr = document.getElementById('invFrame'); if(!fr) return;
+  fr.onload = invFit;
+  fr.srcdoc = invDocHtml(d, INV.style, INV.color);
+}
+function invFit(){
+  const fr = document.getElementById('invFrame'), st = document.getElementById('invStage'), w = document.getElementById('invWrap');
+  if(!fr||!st||!w) return;
+  let h = 1123; try{ h = Math.max(1123, fr.contentDocument.documentElement.scrollHeight); }catch(e){}
+  const s = Math.min(1, Math.max(0.3, (st.clientWidth-20)/794));
+  fr.style.width = '794px'; fr.style.height = h+'px'; fr.style.transform = 'scale('+s+')';
+  w.style.width = (794*s)+'px'; w.style.height = (h*s)+'px';
+}
+window.addEventListener('resize', ()=>{ if(document.getElementById('invoiceModalOverlay')?.classList.contains('open')) invFit(); });
+function invOpen(kind, id){
+  const bp = PARTS.business_profile || {};
+  INV.kind = kind; INV.id = id;
+  INV.style = INV_STYLES.some(s=>s[0]===bp.invoice_theme) ? bp.invoice_theme : 'classic';
+  INV.color = INV_COLORS.some(c=>c[0]===bp.invoice_color) ? bp.invoice_color : 'sunset';
+  invPickers();
+  document.getElementById('invoiceModalOverlay').classList.add('open');
+  invRender();
+}
 async function openInvoicePreview(saleId){
   const sale = PARTS.sales.find(s=>s.id===saleId);
   if(!sale) return;
@@ -22051,68 +22249,18 @@ async function openInvoicePreview(saleId){
     const res = await postParts('generate_invoice', {sale_id: saleId});
     if(!res || res.ok===false) return;
   }
-  const fresh = PARTS.sales.find(s=>s.id===saleId);
-  renderInvoice(fresh);
-  document.getElementById('invoiceModalOverlay').classList.add('open');
+  invOpen('sale', saleId);
 }
-function closeInvoiceModal(){ document.getElementById('invoiceModalOverlay').classList.remove('open'); }
-function renderInvoice(sale){
-  const bp = PARTS.business_profile || {};
-  const theme = bp.invoice_theme === 'minimal' ? 'minimal' : 'classic';
-  const itemDiscountTotal = sale.items.reduce((s,it)=>s+(Number(it.discount)||0), 0);
-  const extraDiscount = Number(sale.discount)||0;
-  const taxPct = Number(sale.tax_percent)||0;
-  const shippingCharged = Number(sale.shipping_charged_to_customer);
-  const shipping = isNaN(shippingCharged) ? (Number(sale.shipping_cost)||0) : shippingCharged;
-  // Use the backend-computed figures (same numbers already baked into profit/AR)
-  // so the printed invoice can never drift from what the books actually show.
-  const taxAmount = Number(sale.tax_amount)||0;
-  const grandTotal = Number(sale.invoice_total)||0;
-  const subtotal = sale.items.reduce((s,it)=>s+it.qty*it.unit_price-(Number(it.discount)||0), 0);
-  const el = document.getElementById('invoicePrintArea');
-  el.className = 'inv-theme-'+theme;
-  el.innerHTML = `
-    <div class="inv-header">
-      ${bp.logo ? `<img src="${bp.logo}" class="inv-logo">` : ''}
-      <div class="inv-biz-name">${escHtml(bp.name || 'کسب و کار من')}</div>
-      <div class="inv-biz-meta">${[bp.address, bp.phone].filter(Boolean).map(escHtml).join(' · ')}</div>
-    </div>
-    <div class="inv-meta-row">
-      <div>شماره فاکتور: <b>${faDigits(sale.invoice_no)}</b></div>
-      <div>تاریخ: <b>${jalaliDateFa(sale.date)}</b></div>
-    </div>
-    ${(sale.customer_name||sale.customer_phone||sale.customer_address) ? `<div class="inv-customer">
-      <b>مشتری:</b> ${escHtml(sale.customer_name||'-')}${sale.customer_phone?' · '+escHtml(sale.customer_phone):''}${sale.customer_address?' · '+escHtml(sale.customer_address):''}
-    </div>` : ''}
-    ${(sale.agent_id && sale.show_agent_on_invoice && agentById(sale.agent_id)) ? `<div class="inv-customer">
-      <b>نماینده فروش:</b> ${escHtml(agentById(sale.agent_id).name)}${agentById(sale.agent_id).phone?' · '+escHtml(agentById(sale.agent_id).phone):''}
-    </div>` : ''}
-    <table class="inv-table">
-      <colgroup><col style="width:8%"><col style="width:34%"><col style="width:10%"><col style="width:16%"><col style="width:14%"><col style="width:18%"></colgroup>
-      <thead><tr><th>ردیف</th><th>شرح کالا</th><th>تعداد</th><th>قیمت واحد</th><th>تخفیف</th><th>جمع</th></tr></thead>
-      <tbody>${sale.items.map((it,i)=>{
-        const lineDiscount = Number(it.discount)||0;
-        const lineTotal = it.qty*it.unit_price - lineDiscount;
-        return `<tr>
-        <td>${faDigits(i+1)}</td><td class="inv-td-desc">${escHtml(productLabel(productById(it.product_id)))}</td>
-        <td>${faDigits(it.qty)}</td><td>${fmtToman(it.unit_price)}</td>
-        <td>${lineDiscount>0 ? '− '+fmtToman(lineDiscount) : '—'}</td><td>${fmtToman(lineTotal)}</td></tr>`;
-      }).join('')}</tbody>
-    </table>
-    <div class="inv-totals">
-      <div class="inv-total-row"><span>جمع کل (بعد از تخفیف هر ردیف)</span><span>${fmtToman(subtotal)}</span></div>
-      ${itemDiscountTotal>0 ? `<div class="inv-total-row"><span>جمع تخفیف ردیف‌ها</span><span>− ${fmtToman(itemDiscountTotal)}</span></div>` : ''}
-      ${extraDiscount>0 ? `<div class="inv-total-row"><span>تخفیف کلی فاکتور</span><span>− ${fmtToman(extraDiscount)}</span></div>` : ''}
-      ${shipping>0 ? `<div class="inv-total-row"><span>هزینه ارسال</span><span>+ ${fmtToman(shipping)}</span></div>` : ''}
-      ${taxPct>0 ? `<div class="inv-total-row"><span>مالیات (${faDigits(taxPct)}%)</span><span>${fmtToman(taxAmount)}</span></div>` : ''}
-      <div class="inv-total-row inv-grand"><span>مبلغ نهایی قابل پرداخت</span><span>${fmtToman(grandTotal)}</span></div>
-    </div>
-    ${sale.delivery_method ? `<div class="inv-delivery">🚚 روش تحویل: ${escHtml(sale.delivery_method)}${isPickupMethod(sale.delivery_method)?'':sale.shipping_payer==='split'?' (هزینه ارسال بین طرفین تقسیم شده)':(sale.shipping_payer==='business'?' (هزینه ارسال رایگان)':'')}</div>` : ''}
-    ${sale.notes ? `<div class="inv-note">📝 ${escHtml(sale.notes)}</div>` : ''}
-    ${bp.footer_note ? `<div class="inv-footer">${escHtml(bp.footer_note)}</div>` : ''}
-  `;
+function printQuote(id){ if(PARTS.quotations.find(x=>x.id===id)) invOpen('quote', id); }
+function closeInvoiceModal(){ document.getElementById('invoiceModalOverlay').classList.remove('open'); const f = document.getElementById('invFrame'); if(f){ f.onload = null; f.srcdoc = ''; } }
+function printInvoice(){
+  const fr = document.getElementById('invFrame'); if(!fr || !fr.contentWindow) return;
+  const go = ()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ showToast('چاپ در این مرورگر باز نشد','error'); } };
+  const d = fr.contentDocument;
+  const ready = (d && d.fonts && d.fonts.ready) ? Promise.race([d.fonts.ready, new Promise(r=>setTimeout(r,2000))]) : Promise.resolve();
+  ready.then(()=>setTimeout(go,100));
 }
-function printInvoice(){ window.print(); }
+
 
 
 // ══════════════════════════════════════════════════════════════════
@@ -22850,7 +22998,7 @@ xdef('rb_cond', a=>{
     const from = n.from || eff.from, to = n.to || eff.to, nd = new Set(m.kinds), groups = new Map();
     rbDimValues(n.dim).forEach(v=>{ if(n.dim==='group' && (v.key==='__none' || String(v.key).startsWith('p:'))) return; groups.set(v.key, []); });
     rbFacts.forEach(f=>{ if(!nd.has(f.k)) return; if(f.date){ if(m.snap ? f.date > to : (f.date < from || f.date > to)) return; } const ks = rbNumKeys(f, n.dim); if(!ks) return; new Set(ks.map(String)).forEach(k=>{ let gg = groups.get(k); if(!gg){ gg = []; groups.set(k, gg); } gg.push(f); }); });
-    const rows = []; groups.forEach((fs,k)=>{ const v = rbEval(m, fs, {pool:fs, base:fs, end:to, days:rbDays(from,to)}); rows.push({k, v, ok:rbNumPass(v, n.op, aa, bb)}); });
+    const rows = []; groups.forEach((fs,k)=>{ const v = rbEval(m, fs, {pool:fs, base:fs, end:to, days:rbDays(from,to)}); rows.push({k, v, ok:rbCondDefined(n.mid, fs) && rbNumPass(v, n.op, aa, bb)}); });
     rows.sort((x,y)=>(y.ok-x.ok) || (y.v-x.v));
     const money = m.unit==='money';
     out.formula = 'برای هر «'+RB_NUM_ENT[n.dim].label+'» مقدارِ «'+m.label+'» حساب می‌شود و فقط آن‌هایی که شرط را قبول کنند می‌مانند.';
@@ -25017,7 +25165,7 @@ Object.assign(RB_FT, {
 //  ⚙️ مرکز تنظیمات — همه‌ی تنظیمات کلی یک‌جا و مستقیماً قابل ویرایش (بدون پنجره‌ی جدا)
 //  هر کارت دکمه‌ی «ذخیره»‌ی خودش را دارد و روی سرور ذخیره می‌شود. پیشوند stg
 // ══════════════════════════════════════════════════════════════════════════════
-const STG = {logo:null, payer:null, theme:null, bpTheme:null};
+const STG = {logo:null, payer:null, theme:null, bpTheme:null, bpColor:null};
 const stgG = id=>document.getElementById(id);
 const stgV = id=>{ const e = stgG(id); return e ? e.value : ''; };
 function stgCard(id, ic, fa, en, body, saveFn, extraBtns){
@@ -25031,7 +25179,7 @@ function renderSettingsHub(){
   const host = stgG('stgRoot'); if(!host) return;
   if(host.contains(document.activeElement) && document.activeElement.matches('input,textarea,select')) return;   // never clobber what the user is typing
   const bp = PARTS.business_profile || {}, ps = PARTS.pricing_settings || {}, ds = PARTS.dash_settings || {};
-  STG.bpTheme = STG.bpTheme || bp.invoice_theme || 'classic'; STG.payer = STG.payer || ps.shipping_payer || 'business'; STG.theme = STG.theme || ds.theme || 'sunset';
+  STG.bpTheme = STG.bpTheme || bp.invoice_theme || 'classic'; STG.bpColor = STG.bpColor || bp.invoice_color || 'sunset'; STG.payer = STG.payer || ps.shipping_payer || 'business'; STG.theme = STG.theme || ds.theme || 'sunset';
   const logo = STG.logo !== null ? STG.logo : (bp.logo||'');
   const hid = new Set(ds.hidden||[]);
   const lowN = (PARTS.low_stock||[]).length;
@@ -25045,7 +25193,8 @@ function renderSettingsHub(){
       ${stgField('تلفن','<input class="stg-in" id="stgBpPhone" dir="ltr" value="'+dshEsc(bp.phone||'')+'" placeholder="09…">')}
       ${stgField('آدرس','<textarea class="stg-in" id="stgBpAddr" placeholder="شیراز، …">'+dshEsc(bp.address||'')+'</textarea>', '', true)}
       ${stgField('متن پایین فاکتور','<textarea class="stg-in" id="stgBpFoot" placeholder="مثلاً: ضمانت اصالت کالا">'+dshEsc(bp.footer_note||'')+'</textarea>','', true)}
-      ${stgField('قالب فاکتور', stgSeg('stgBpTheme',[['classic','کلاسیک'],['minimal','مینیمال']], STG.bpTheme,'stgSetBpTheme'),'',true)}
+      ${stgField('قالب فاکتور', stgSeg('stgBpTheme',INV_STYLES.map(x=>[x[0],x[1]]), STG.bpTheme,'stgSetBpTheme'),'',true)}
+      ${stgField('رنگ فاکتور', stgSeg('stgBpColor',INV_COLORS.map(x=>[x[0],x[1]]), STG.bpColor,'stgSetBpColor'),'برای دیدن زنده‌ی ۲۵ قالب، یک فاکتور را باز کن و همان‌جا ساختار و رنگ را عوض کن.',true)}
       ${stgField('شماره‌ی فاکتور بعدی','<input class="stg-in" id="stgNextInv" type="number" min="1" dir="ltr" value="'+(bp.next_invoice_no||1)+'">','شماره‌ای که فاکتور بعدی می‌گیرد؛ فقط جلو ببر تا تکراری نشود.')}
       ${stgField('شماره‌ی پیش‌فاکتور بعدی','<input class="stg-in" id="stgNextQuote" type="number" min="1" dir="ltr" value="'+(bp.next_quote_no||1)+'">')}
       ${stgField('شماره‌ی سفارش خرید بعدی','<input class="stg-in" id="stgNextPo" type="number" min="1" dir="ltr" value="'+(bp.next_po_no||1)+'">')}
@@ -25113,6 +25262,7 @@ async function stgSetIcon(k){
   if(r && r.ok!==false) showToast('سبک آیکون‌ها ذخیره شد','success');
 }
 function stgGo(id){ const e = stgG('stgc_'+id); if(e) e.scrollIntoView({behavior:'smooth', block:'start'}); }
+function stgSetBpColor(t){ STG.bpColor = t; document.querySelectorAll('#stgBpColor button').forEach(b=>b.classList.toggle('on', b.getAttribute('onclick').includes("'"+t+"'"))); }
 function stgSetBpTheme(t){ STG.bpTheme = t; document.querySelectorAll('#stgBpTheme button').forEach(b=>b.classList.toggle('on', b.getAttribute('onclick').includes("'"+t+"'"))); }
 function stgSetPayer(t){ STG.payer = t; document.querySelectorAll('#stgPsPayer button').forEach(b=>b.classList.toggle('on', b.getAttribute('onclick').includes("'"+t+"'"))); const r = stgG('stgRatioF'); if(r) r.style.display = t==='split' ? '' : 'none'; }
 function stgSetTheme(t){ STG.theme = t; document.querySelectorAll('.stg-th').forEach(b=>b.classList.toggle('on', b.getAttribute('onclick').includes("'"+t+"'"))); }
@@ -25124,9 +25274,9 @@ function stgLogo(inp){
 }
 function stgLogoClear(){ STG.logo = ''; const p = stgG('stgLogoPrev'); if(p){ const n = document.createElement('div'); n.className = 'ph'; n.id = 'stgLogoPrev'; n.textContent = '🏢'; p.replaceWith(n); } stgMsg('bp','لوگو حذف می‌شود؛ «ذخیره» را بزن'); }
 async function stgSaveBp(){
-  const p = {name:stgV('stgBpName'), phone:stgV('stgBpPhone'), address:stgV('stgBpAddr'), footer_note:stgV('stgBpFoot'), invoice_theme:STG.bpTheme, next_invoice_no:stgV('stgNextInv'), next_quote_no:stgV('stgNextQuote'), next_po_no:stgV('stgNextPo')};
+  const p = {name:stgV('stgBpName'), phone:stgV('stgBpPhone'), address:stgV('stgBpAddr'), footer_note:stgV('stgBpFoot'), invoice_theme:STG.bpTheme, invoice_color:STG.bpColor, next_invoice_no:stgV('stgNextInv'), next_quote_no:stgV('stgNextQuote'), next_po_no:stgV('stgNextPo')};
   if(STG.logo !== null) p.logo = STG.logo;
-  const r = await postParts('update_business_profile', p); STG.logo = null; STG.bpTheme = null;
+  const r = await postParts('update_business_profile', p); STG.logo = null; STG.bpTheme = null; STG.bpColor = null;
   if(r && r.ok!==false){ showToast('مشخصات کسب‌وکار ذخیره شد','success'); stgMsg('bp','✅ ذخیره شد'); }
 }
 async function stgSavePs(){
@@ -25356,6 +25506,7 @@ function picStart(){
 if(document.body) picStart(); else document.addEventListener('DOMContentLoaded',picStart);
 
 /* تغییر سبک آیکون‌ها: emoji | 3d | s1 | s3 | s6 | s7 */
+(function(){ try{ if(PIC3['✏']) PIC3['✎']=PIC3['✏']; PIC_GMAP['✎']=PIC_GMAP['✏']||'pencil'; }catch(e){} })();
 const PIC_MODES=['emoji','3d','s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12'];
 function picApply(mode){
   if(!PIC_MODES.includes(mode)) mode='3d';
@@ -25632,8 +25783,9 @@ function slTInit(t){
   if(!t.closest('.xpl-modal')){
     const host = t.parentElement && (t.parentElement.classList.contains('parts-table-wrap') || t.parentElement.classList.contains('xpl-scroll') || t.parentElement.classList.contains('rb-tbl-wrap') || /wrap|scroll/i.test(t.parentElement.className)) ? t.parentElement : t;
     const bar = document.createElement('div'); bar.className='sl-tb sl-tb-t'; bar.setAttribute('data-nopic','1');
-    bar.innerHTML = '<div class="sl-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input class="sl-q" placeholder="جستجو در این جدول…"></div><span class="sl-count"></span><button type="button" class="sl-clear" style="display:none">✕ پاک کردن فیلترها</button>';
+    bar.innerHTML = '<div class="sl-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input class="sl-q" placeholder="جستجو در این جدول…"></div><span class="sl-count"></span><button type="button" class="sl-clear" style="display:none">✕ پاک کردن فیلترها</button><button type="button" class="sl-csv" title="دانلود ردیف‌های نمایان به‌صورت CSV (قابل‌باز شدن در اکسل)">دانلود CSV</button>';
     host.parentNode.insertBefore(bar, host); t._slBar = bar;
+    bar.querySelector('.sl-csv').addEventListener('click',()=>slTCsv(t));
     let tm = null;
     bar.querySelector('.sl-q').addEventListener('input',e=>{ clearTimeout(tm); const v=e.target.value; tm=setTimeout(()=>{ const st=SLT[slTKey(t)]||(SLT[slTKey(t)]={sort:null,flt:{},q:''}); st.q=v; slTApply(t); },140); });
     bar.querySelector('.sl-clear').addEventListener('click',()=>{ const st=SLT[slTKey(t)]; if(st){ st.q=''; st.flt={}; } slTApply(t); });
@@ -25730,11 +25882,12 @@ function slBar(k, total){
   if(!bar){
     bar = document.createElement('div'); bar.id = 'slbar_'+k; bar.className='sl-tb sl-tb-l'; bar.setAttribute('data-nopic','1');
     bar.innerHTML = (d.noSearch?'':'<div class="sl-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input class="sl-q" placeholder="جستجو…"></div>')
-      + '<div class="sl-sorts"><span class="sl-lbl">مرتب‌سازی:</span>' + d.fields.map(f=>`<button type="button" class="sl-pill" data-f="${f.id}"><span class="sl-pl">${slEsc(f.label)}</span><i class="sl-arr"></i><span class="sl-fb" data-f="${f.id}" title="فیلتر «${slEsc(f.label)}»">${SL_FUNNEL}</span></button>`).join('') + '</div><span class="sl-count"></span><button type="button" class="sl-clear" style="display:none">✕ پاک کردن فیلترها</button>';
+      + '<div class="sl-sorts"><span class="sl-lbl">مرتب‌سازی:</span>' + d.fields.map(f=>`<button type="button" class="sl-pill" data-f="${f.id}"><span class="sl-pl">${slEsc(f.label)}</span><i class="sl-arr"></i><span class="sl-fb" data-f="${f.id}" title="فیلتر «${slEsc(f.label)}»">${SL_FUNNEL}</span></button>`).join('') + '</div><span class="sl-count"></span><button type="button" class="sl-clear" style="display:none">✕ پاک کردن فیلترها</button><button type="button" class="sl-csv" title="دانلود موردهای نمایان به‌صورت CSV (قابل‌باز شدن در اکسل)">دانلود CSV</button>';
     host.parentNode.insertBefore(bar, host);
     let tm=null;
     const q = bar.querySelector('.sl-q'); if(q) q.addEventListener('input',e=>{ clearTimeout(tm); const v=e.target.value; tm=setTimeout(()=>{ slSt(k).q=v; slRe(k); },140); });
     bar.querySelector('.sl-clear').addEventListener('click',()=>{ const st=slSt(k); st.q=''; st.flt={}; if(q) q.value=''; slRe(k); });
+    bar.querySelector('.sl-csv').addEventListener('click',()=>slLCsv(k));
     bar.addEventListener('click',e=>{
       const fb = e.target.closest('.sl-fb'), pill = e.target.closest('.sl-pill'); if(!pill) return;
       const f = d.fields.find(x=>x.id===pill.dataset.f); if(!f) return;
@@ -25747,7 +25900,7 @@ function slBar(k, total){
   return bar;
 }
 function slRe(k){ const fn = window[SL_DEFS[k].render]; if(typeof fn==='function') fn(); }
-let SL_SRC = {};
+let SL_SRC = {}, SL_OUT = {};
 function slLOpenFilter(k, f, anchor){
   const d = SL_DEFS[k], st = slSt(k), src = SL_SRC[k] || [], counts = new Map();
   src.forEach(x=>{ const v = slVal(f,x); const s = v.s.length>80?v.s.slice(0,80):v.s; counts.set(s,(counts.get(s)||0)+1); });
@@ -25778,6 +25931,7 @@ function slApply(k, arr){
     if(f){ const dir = st.sort.d==='desc'?-1:1, keyed = out.map((x,i)=>({x,i,v:slVal(f,x)}));
       keyed.sort((a,b)=>slCmp(a.v,b.v,dir) || (a.i-b.i)); out = keyed.map(o=>o.x); }
   }
+  SL_OUT[k] = out;
   if(bar){
     const active = !!(st.q || fl.length);
     bar.querySelectorAll('.sl-pill').forEach(p=>{
@@ -25789,6 +25943,26 @@ function slApply(k, arr){
     const h = document.getElementById(d.host); if(h) h.classList.toggle('sl-nores', arr.length>0 && out.length===0);
   }
   return out;
+}
+
+function slCsv(head, rows, name){
+  const q = v=>{ v = v==null?'':String(v); return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const text = '\uFEFF' + [head].concat(rows).map(r=>r.map(q).join(',')).join('\r\n');
+  try{
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
+    a.download = (name||'export').replace(/[^\w\u0600-\u06FF-]+/g,'_')+'-'+isoToday()+'.csv'; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); showToast('فایل CSV دانلود شد','success');
+  }catch(e){ showToast('دانلود انجام نشد','error'); }
+}
+function slTCsv(t){
+  const info = slTInfo(t); if(!info) return;
+  const head = info.ths.map(h=>slClean(h.textContent)), idx = head.map((h,i)=>i).filter(i=>head[i]);
+  const rows = [...info.body.rows].filter(r=>!r.classList.contains('sl-hide') && !r.classList.contains('sl-nores') && r.cells.length===info.n && !r.classList.contains('xpl-sub')).map(r=>idx.map(i=>slClean(r.cells[i].textContent)));
+  slCsv(idx.map(i=>head[i]), rows, (t.id||'table'));
+}
+function slLCsv(k){
+  const d = SL_DEFS[k], out = SL_OUT[k] || [];
+  slCsv(d.fields.map(f=>f.label), out.map(x=>d.fields.map(f=>{ let v; try{ v=f.get(x); }catch(e){ v=''; } return f.t==='date' ? (v||'') : (v==null?'':v); })), k);
 }
 // ══════════════════════════════════════════════════════
 //  GOALS MODULE  —  js_goals.js

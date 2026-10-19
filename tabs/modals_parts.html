@@ -705,11 +705,7 @@ button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
       <input type="text" class="modal-input" id="bpFooter" placeholder="مثلاً: با تشکر از خرید شما" dir="auto" style="width:100%;margin:0;"/>
     </div>
     <div style="margin-bottom:6px;">
-      <div class="builder-label">قالب ظاهری فاکتور</div>
-      <div class="cash-toggle">
-        <button type="button" id="bpThemeClassicBtn" class="active deposit" onclick="setBpTheme('classic')">📜 کلاسیک</button>
-        <button type="button" id="bpThemeMinimalBtn" class="withdrawal" onclick="setBpTheme('minimal')">◽ ساده</button>
-      </div>
+      <div class="builder-label">قالب ظاهری فاکتور</div><div style="font-size:12px;color:var(--text3);">ساختار و رنگ (۲۵ قالب) را موقع باز کردن هر فاکتور می‌توانی زنده امتحان و انتخاب کنی.</div>
     </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeBusinessProfileModal()">انصراف</button>
@@ -720,9 +716,11 @@ button.pjdp-c:hover{background:var(--sageL);border-color:var(--sage);}
 
 <!-- Parts Biz: Invoice preview modal — formal, numbered, printable -->
 <div class="overlay" id="invoiceModalOverlay" style="z-index:9500;">
-  <div class="modal" style="max-width:560px;">
-    <div id="invoicePrintArea"></div>
-    <div class="modal-btns" style="margin-top:16px;">
+  <div class="modal inv-modal">
+    <div class="inv-pick"><div class="inv-pick-l">ساختار</div><div class="inv-pick-row" id="invStyleRow"></div></div>
+    <div class="inv-pick"><div class="inv-pick-l">رنگ</div><div class="inv-pick-row" id="invColorRow"></div></div>
+    <div id="invStage"><div id="invWrap"><iframe id="invFrame" title="فاکتور"></iframe></div></div>
+    <div class="modal-btns" style="margin-top:14px;">
       <button class="btn-cancel" onclick="closeInvoiceModal()">بستن</button>
       <button class="btn-ok" onclick="printInvoice()">🖨 چاپ / ذخیره PDF</button>
     </div>

@@ -1918,7 +1918,7 @@ PARTS_FILE = os.path.join(BASE_DIR, "parts.json")
 
 def _default_business_profile():
     return {"name": "", "address": "", "phone": "", "logo": "", "footer_note": "",
-            "next_invoice_no": 1, "next_po_no": 1, "next_quote_no": 1, "invoice_theme": "classic"}
+            "next_invoice_no": 1, "next_po_no": 1, "next_quote_no": 1, "invoice_theme": "classic", "invoice_color": "sunset"}
 
 RETURN_REASONS = ["کالای معیوب", "ارسال اشتباه", "انصراف مشتری", "کیفیت پایین", "اندازه/مدل نامناسب", "سایر"]
 
@@ -3617,8 +3617,10 @@ def parts_api():
                 bp[k] = (body.get(k) or "").strip()
         if "logo" in body:
             bp["logo"] = body.get("logo", "")
-        if "invoice_theme" in body and body.get("invoice_theme") in ("classic", "minimal"):
+        if "invoice_theme" in body and body.get("invoice_theme") in ("classic", "minimal", "modern", "elegant", "bold"):
             bp["invoice_theme"] = body.get("invoice_theme")
+        if "invoice_color" in body and body.get("invoice_color") in ("ocean", "emerald", "sunset", "violet", "graphite"):
+            bp["invoice_color"] = body.get("invoice_color")
         for k in ("next_invoice_no", "next_quote_no", "next_po_no"):
             if k in body:
                 try:
